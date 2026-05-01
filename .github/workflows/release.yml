@@ -3,26 +3,9 @@
 # =============================================================================
 # Trigger: git tag push (pl. v1.0.0) VAGY GitHub Release létrehozása
 #
-# Mit csinál:
-#   1. Buildi a Dockerfile.unraid-et (frontend + API egyben)
-#   2. Feltölti GHCR-be:
-#      - ghcr.io/OWNER/REPO:latest        ← Watchtower ezt figyeli
-#      - ghcr.io/OWNER/REPO:v1.2.3        ← verziós tag (rollback-hez)
-#      - ghcr.io/OWNER/REPO:1.2           ← minor verzió tag
-#   3. GitHub Release-hez automatikus changelog és Docker pull parancs
-#
 # Verzió létrehozása:
 #   git tag v1.0.0 && git push origin v1.0.0
 #   → elindul ez a workflow, Watchtower pedig max 24 órán belül frissít
-#
-# Watchtower beállítása (ha még nincs):
-#   docker run -d \
-#     --name watchtower \
-#     -v /var/run/docker.sock:/var/run/docker.sock \
-#     containrrr/watchtower \
-#     --cleanup \
-#     --interval 86400 \
-#     produktivpro    ← csak ezt a konténert figyeli
 # =============================================================================
 
 name: Release (Unraid all-in-one)
@@ -30,8 +13,8 @@ name: Release (Unraid all-in-one)
 on:
   push:
     tags:
-      - 'v*.*.*'          # v1.0.0, v1.2.3, stb.
-  workflow_dispatch:       # kézi indítás (pl. teszteléshez)
+      - 'v*.*.*'
+  workflow_dispatch:
     inputs:
       tag:
         description: 'Verzió tag (pl. v1.0.0)'
@@ -40,15 +23,14 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
   release:
     name: Build & Release
     runs-on: ubuntu-latest
     permissions:
-      contents: write      # GitHub Release létrehozásához
-      packages: write      # GHCR push
+      contents: write
+      packages: write
 
     steps:
       - name: Checkout
@@ -64,7 +46,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ── Verzió kiolvasása ────────────────────────────────────────────────
+      # GHCR csak kisbetűs nevet fogad el — repo névből kisbetűs image név
+      - name: Set lowercase image name
+        run: |
+          echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      # Verzió kiolvasása a tag-ből
       - name: Extract version
         id: version
         run: |
@@ -73,21 +60,20 @@ jobs:
           else
             VERSION="${GITHUB_REF#refs/tags/}"
           fi
-          # v1.2.3 → 1.2.3 és 1.2
           SEMVER="${VERSION#v}"
           MINOR="${SEMVER%.*}"
           echo "version=${VERSION}"   >> $GITHUB_OUTPUT
           echo "semver=${SEMVER}"     >> $GITHUB_OUTPUT
           echo "minor=${MINOR}"       >> $GITHUB_OUTPUT
 
-      # ── All-in-one image build + push ────────────────────────────────────
+      # All-in-one image build + push
       - name: Build & push all-in-one image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           dockerfile: Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64   # x86 Unraid + NAS ARM support
+          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:${{ steps.version.outputs.version }}
@@ -101,12 +87,12 @@ jobs:
           cache-from: type=gha,scope=unraid
           cache-to: type=gha,scope=unraid,mode=max
 
-      # ── GitHub Release létrehozása ────────────────────────────────────────
+      # GitHub Release létrehozása automatikus changelog-gal
       - name: Create GitHub Release
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true   # automatikus changelog a commit-okból
+          generate_release_notes: true
           body: |
             ## Telepítés / Frissítés
 
@@ -115,13 +101,11 @@ jobs:
             docker run -d \
               --name produktivpro \
               --restart unless-stopped \
-              -p 8080:80 \
+              -p 8080:5050 \
               -v /mnt/user/appdata/produktivpro:/data \
               -e DEFAULT_ADMIN_PIN=1234 \
               ${{ env.IMAGE }}:${{ steps.version.outputs.version }}
             ```
-
-            **Watchtower** automatikusan frissíti a `latest` tag-et figyelő konténereket.
 
             **Kézi frissítés:**
             ```bash
