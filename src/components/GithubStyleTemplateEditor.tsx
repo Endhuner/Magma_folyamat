@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/useKV'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -777,6 +777,7 @@ export function GithubStyleTemplateEditor() {
                         <Input
                           id="margin-top"
                           type="number"
+                          min={0}
                           step="0.1"
                           value={marginTop}
                           onChange={(e) => setMarginTop(e.target.value)}
@@ -788,6 +789,7 @@ export function GithubStyleTemplateEditor() {
                         <Input
                           id="margin-right"
                           type="number"
+                          min={0}
                           step="0.1"
                           value={marginRight}
                           onChange={(e) => setMarginRight(e.target.value)}
@@ -799,6 +801,7 @@ export function GithubStyleTemplateEditor() {
                         <Input
                           id="margin-bottom"
                           type="number"
+                          min={0}
                           step="0.1"
                           value={marginBottom}
                           onChange={(e) => setMarginBottom(e.target.value)}
@@ -810,6 +813,7 @@ export function GithubStyleTemplateEditor() {
                         <Input
                           id="margin-left"
                           type="number"
+                          min={0}
                           step="0.1"
                           value={marginLeft}
                           onChange={(e) => setMarginLeft(e.target.value)}

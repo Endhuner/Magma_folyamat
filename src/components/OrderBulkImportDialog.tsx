@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Upload } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Order } from '@/lib/types'
+import { getField, normalizeRow } from '@/lib/importHelpers'
+import { parseFloatSafe, parseIntSafe } from '@/lib/helpers'
 
 interface OrderBulkImportDialogProps {
   open: boolean
@@ -37,28 +39,41 @@ export function OrderBulkImportDialog({ open, onClose, onImport }: OrderBulkImpo
       const worksheet = workbook.Sheets[sheetName]
       const data = XLSX.utils.sheet_to_json(worksheet)
 
-      const orders: Partial<Order>[] = data.map((row: any, index: number) => ({
-        id: `import-${Date.now()}-${index}`,
-        customer: row['Customer'] || '',
-        productName: row['Megnevezése'] || '',
-        ownOrderNumber: row['Saját rendelési szám'] || '',
-        orderNumber: row['Rendelési szám'] || '',
-        orderDate: row['Order date (year/month/day)'] || '',
-        actualPickupDate: row['Actual pickup date (year/month/day)'] || '',
-        readyForShipping: row['Szállításra kész'] || '',
-        designation: row['Megjelölés'] || '',
-        drawingNumber: row['Rajzszám'] || '',
-        material: row['Anyag'] || '',
-        amountPc: Number(row['Mennyiség db'] || 0),
-        surfaceTreatment: row['Felületkezelés'] || '',
-        palletsCount: Number(row['Össz raklapok száma'] || 0),
-        requiredMaterialKg: Number(row['Szükséges anyag kg'] || 0),
-        deliveryNote: row['Szállítólevél'] || '',
-        status: row['Status'] || 'Felvéve',
-        notes: row['Notes'] || '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }))
+      const orders: Partial<Order>[] = data.map((rawRow: any, index: number) => {
+        const row = normalizeRow(rawRow)
+        const amountPcStr = getField(row, 'Mennyiség db', 'Mennyiség', 'Amount', 'Darabszám', 'Db')
+        const palletsCountStr = getField(row, 'Össz raklapok száma', 'Raklapok száma', 'Raklap', 'Pallets')
+        const requiredMaterialKgStr = getField(row, 'Szükséges anyag kg', 'Anyag kg', 'Szükséges anyag', 'Required material')
+        const grossWeightKgStr = getField(row, 'Bruttó súly kg', 'Bruttó súly', 'Gross weight')
+        const statusVal = getField(row, 'Status', 'Státusz', 'Állapot')
+        const order: Partial<Order> = {
+          id: `import-${Date.now()}-${index}`,
+          customer: getField(row, 'Customer', 'Ügyfél', 'Vevő', 'Vevő név'),
+          productName: getField(row, 'Megnevezése', 'Termék megnevezés', 'Megnevezés', 'Termék név'),
+          ownOrderNumber: getField(row, 'Saját rendelési szám', 'Saját rendelés', 'Saját rend. szám'),
+          orderNumber: getField(row, 'Rendelési szám', 'Rendelés szám', 'Rend. szám', 'Order number'),
+          orderDate: getField(row, 'Order date (year/month/day)', 'Order date', 'Rendelés dátuma', 'Rendelési dátum'),
+          pickupDate: getField(row, 'Actual pickup date (year/month/day)', 'Actual pickup date', 'Tényleges átvétel', 'Átvétel dátuma', 'Pickup date'),
+          ready: getField(row, 'Szállításra kész', 'Szállítás kész', 'Ready for shipping', 'Ready'),
+          designation: getField(row, 'Megjelölés', 'Designation'),
+          material: getField(row, 'Anyag', 'Alapanyag', 'Material'),
+          amountPc: parseIntSafe(amountPcStr, 0, { allowNegative: false }),
+          surfaceTreatment: getField(row, 'Felületkezelés', 'Felület kezelés', 'Surface treatment'),
+          palletsCount: parseIntSafe(palletsCountStr, 0, { allowNegative: false }),
+          requiredMaterialKg: requiredMaterialKgStr
+            ? String(parseFloatSafe(requiredMaterialKgStr, 0, { allowNegative: false }))
+            : '',
+          grossWeightKg: grossWeightKgStr
+            ? String(parseFloatSafe(grossWeightKgStr, 0, { allowNegative: false }))
+            : '',
+          deliveryNote: getField(row, 'Szállítólevél', 'Delivery note'),
+          status: (statusVal || 'Felvéve') as Order['status'],
+          notes: getField(row, 'Notes', 'Megjegyzés', 'Megjegyzések', 'Jegyzet'),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+        return order
+      })
 
       onImport(orders)
       onClose()

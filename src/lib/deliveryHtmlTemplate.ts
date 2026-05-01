@@ -1,5 +1,7 @@
 import { Order, Customer, Product, DeliveryNote } from '@/lib/types'
 import { generateDeliveryNoteSequenceNumber } from '@/lib/helpers'
+import { kvStore } from '@/lib/kvStore'
+import { esc } from '@/lib/htmlSafe'
 import { toast } from 'sonner'
 
 export interface TemplateStyles {
@@ -312,13 +314,13 @@ export function generateDeliveryHtmlTemplate(
         <tbody>
           ${orders.map(order => `
             <tr>
-              <td class="center">${order.ownOrderNumber || '-'}</td>
-              <td class="center">${order.orderNumber || '-'}</td>
-              <td>${order.productName || '-'}</td>
+              <td class="center">${esc(order.ownOrderNumber || '-')}</td>
+              <td class="center">${esc(order.orderNumber || '-')}</td>
+              <td>${esc(order.productName || '-')}</td>
               <td class="center">${order.amountPc || 0}</td>
               <td class="center">${order.boxesCount || '-'}</td>
               <td class="center">${order.palletsCount || '-'}</td>
-              <td class="right">${order.grossWeightKg || '-'}</td>
+              <td class="right">${esc(order.grossWeightKg || '-')}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -414,17 +416,17 @@ function applyDeliveryTemplateData(
       console.log('Termék neve:', order.productName)
       console.log('Mennyiség:', order.amountPc)
       
-      let filledTemplate = itemTemplate
+      const filledTemplate = itemTemplate
         .replace(/{{index}}/g, String(idx + 1))
-        .replace(/{{productName}}/g, order.productName || '-')
+        .replace(/{{productName}}/g, esc(order.productName || '-'))
         .replace(/{{quantity}}/g, String(order.amountPc || 0))
         .replace(/{{boxes}}/g, String(order.boxesCount || '-'))
         .replace(/{{pallets}}/g, String(order.palletsCount || '-'))
-        .replace(/{{weight}}/g, String(order.grossWeightKg || '-'))
-        .replace(/{{ownOrderNumber}}/g, order.ownOrderNumber || '-')
-        .replace(/{{referenceNumber}}/g, order.ownOrderNumber || '-')
-        .replace(/{{orderNumber}}/g, order.orderNumber || '-')
-        .replace(/{{designation}}/g, order.designation || '-')
+        .replace(/{{weight}}/g, esc(String(order.grossWeightKg || '-')))
+        .replace(/{{ownOrderNumber}}/g, esc(order.ownOrderNumber || '-'))
+        .replace(/{{referenceNumber}}/g, esc(order.ownOrderNumber || '-'))
+        .replace(/{{orderNumber}}/g, esc(order.orderNumber || '-'))
+        .replace(/{{designation}}/g, esc(order.designation || '-'))
         .replace(/{{material}}/g, order.material || '-')
         .replace(/{{surfaceTreatment}}/g, order.surfaceTreatment || '-')
       
@@ -458,25 +460,25 @@ function applyDeliveryTemplateData(
   }
 
   console.log('\n=== STATIKUS VÁLTOZÓK BEHELYETTESÍTÉSE (MÁSODSZOR!) ===')
-  html = html.replace(/{{sequenceNumber}}/g, sequenceNumber)
-  html = html.replace(/{{senderName}}/g, 'Magma Kft')
-  html = html.replace(/{{senderAddress}}/g, 'H-1211 Budapest, Déli utca 13.')
-  html = html.replace(/{{senderTaxNumber}}/g, 'HU10368152-2-43')
-  html = html.replace(/{{customerName}}/g, customerInfo?.name || firstCustomer)
-  html = html.replace(/{{customerAddress}}/g, fullAddress)
-  html = html.replace(/{{customerCity}}/g, customerInfo?.city || '')
-  html = html.replace(/{{customerCountry}}/g, customerInfo?.country || '')
-  html = html.replace(/{{customerTaxNumber}}/g, customerInfo?.taxNumber || '')
+  html = html.replace(/{{sequenceNumber}}/g, esc(sequenceNumber))
+  html = html.replace(/{{senderName}}/g, esc('Magma Kft'))
+  html = html.replace(/{{senderAddress}}/g, esc('H-1211 Budapest, Déli utca 13.'))
+  html = html.replace(/{{senderTaxNumber}}/g, esc('HU10368152-2-43'))
+  html = html.replace(/{{customerName}}/g, esc(customerInfo?.name || firstCustomer))
+  html = html.replace(/{{customerAddress}}/g, esc(fullAddress))
+  html = html.replace(/{{customerCity}}/g, esc(customerInfo?.city || ''))
+  html = html.replace(/{{customerCountry}}/g, esc(customerInfo?.country || ''))
+  html = html.replace(/{{customerTaxNumber}}/g, esc(customerInfo?.taxNumber || ''))
   html = html.replace(/{{deliveryDate}}/g, new Date().toLocaleDateString('hu-HU'))
   html = html.replace(/{{issueDate}}/g, new Date().toLocaleDateString('hu-HU'))
-  html = html.replace(/{{referenceNumber}}/g, sequenceNumber)
+  html = html.replace(/{{referenceNumber}}/g, esc(sequenceNumber))
   html = html.replace(/{{totalQuantity}}/g, String(totalQuantity))
   html = html.replace(/{{totalBoxes}}/g, String(totalBoxes))
   html = html.replace(/{{totalPallets}}/g, String(totalPallets))
   html = html.replace(/{{totalWeight}}/g, totalGrossWeight.toFixed(2))
-  html = html.replace(/{{orderNumber}}/g, orderNumber)
-  html = html.replace(/{{ownOrderNumber}}/g, ownOrderNumber)
-  html = html.replace(/{{productName}}/g, orders[0]?.productName || '')
+  html = html.replace(/{{orderNumber}}/g, esc(orderNumber))
+  html = html.replace(/{{ownOrderNumber}}/g, esc(ownOrderNumber))
+  html = html.replace(/{{productName}}/g, esc(orders[0]?.productName || ''))
   
   console.log('✅ Statikus változók behelyettesítve')
   console.log('Használt orderNumber (saját rendelési szám, csak cikluson KÍVÜL):', orderNumber)
@@ -544,16 +546,16 @@ export async function exportDeliveryAsHtml(
 
   let html = ''
   let templateSource = 'beégetett sablon'
-  let activeTemplate = null
-  let usedMargins = null
+  let activeTemplate: any = null
+  let usedMargins: any = null
 
   try {
-    const activeTemplates = await spark.kv.get<{ cmr?: string, delivery?: string }>('active-templates')
-    const savedTemplates = await spark.kv.get<any[]>('saved-templates')
-    
+    const activeTemplates = kvStore.get<{ cmr?: string, delivery?: string }>('active-templates')
+    const savedTemplates = kvStore.get<any[]>('saved-templates')
+
     const firstOrder = orders[0]
     const customer = customers.find(c => c.name === firstOrder?.customer)
-    let templateToUse = null
+    let templateToUse: any = null
     
     if (customer?.deliveryTemplateId) {
       templateToUse = savedTemplates?.find((t: any) => t.id === customer.deliveryTemplateId)

@@ -2,9 +2,10 @@ import { useState, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Product } from '@/lib/types'
-import { Upload, FileXls, CheckCircle, Warning, X, Sparkle } from '@phosphor-icons/react'
+import { Upload, FileXls, CheckCircle, Warning, X } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
+import { getField, normalizeRow } from '@/lib/importHelpers'
 
 interface ProductBulkImportDialogProps {
   open: boolean
@@ -24,7 +25,6 @@ export function ProductBulkImportDialog({ open, onClose, onImport }: ProductBulk
   const [errors, setErrors] = useState<ImportError[]>([])
   const [success, setSuccess] = useState(false)
   const [previewData, setPreviewData] = useState<any[]>([])
-  const [fillingData, setFillingData] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,7 +46,7 @@ export function ProductBulkImportDialog({ open, onClose, onImport }: ProductBulk
       await workbook.xlsx.load(data)
       const worksheet = workbook.worksheets[0]
       const jsonData: any[] = []
-      
+
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return
         const rowData: any = {}
@@ -57,92 +57,28 @@ export function ProductBulkImportDialog({ open, onClose, onImport }: ProductBulk
         })
         jsonData.push(rowData)
       })
-      
-      setPreviewData(jsonData.slice(0, 5))
+
+      // Az előnézet ugyanazon a fejléc-toleráns kiolvasáson alapul, mint az import.
+      const preview = jsonData.slice(0, 5).map((rawRow) => {
+        const r = normalizeRow(rawRow)
+        return {
+          customer: getField(r, 'Ügyfél', 'Vevő', 'Ügyfél név', 'Vevő név'),
+          drawingNumber: getField(r, 'Termék rajzszáma', 'Rajzszám', 'Rajz szám'),
+          productName: getField(r, 'Termék megnevezés', 'Termék név', 'Megnevezés'),
+          material: getField(r, 'Anyag', 'Alapanyag'),
+          weightPerPiece: getField(r, 'Súly/db', 'Súly/db g', 'Súly/db (g)', 'Tömeg/db', 'Tömeg/db g'),
+        }
+      })
+      setPreviewData(preview)
     } catch (error) {
       setErrors([{ row: 0, field: 'file', message: 'Hiba a fájl olvasása során' }])
     }
-  }
-
-  const fillMissingDataWithAI = async (row: any): Promise<any> => {
-    const fieldMapping = [
-      { key: 'Ügyfél', field: 'customer' },
-      { key: 'Termék rajzszáma', field: 'drawingNumber' },
-      { key: 'Termék megnevezés', field: 'productName' },
-      { key: 'Megjegyzés', field: 'notes' },
-      { key: 'Fészekszáma', field: 'nestCount' },
-      { key: 'Súly/db', field: 'weightPerPiece' },
-      { key: 'Anyag', field: 'material' },
-      { key: 'Felületkezelés', field: 'surfaceTreatment' },
-      { key: 'Ciklus idő', field: 'cycleTime' },
-      { key: 'Utómunka idő', field: 'postProcessingTime' },
-      { key: 'Utómunkák', field: 'postProcessing' },
-      { key: 'Doboz méret', field: 'boxSize' },
-      { key: 'Doboz/db', field: 'piecesPerBox' },
-      { key: 'Doboz/Raklap', field: 'boxesPerPallet' },
-      { key: 'Arktikál nr.', field: 'articleNumber' },
-      { key: 'Raktár', field: 'warehouse' },
-      { key: 'Engusz súly', field: 'spruWeight' }
-    ]
-
-    const missingFields = fieldMapping.filter(
-      ({ key }) => !row[key] || String(row[key]).trim() === ''
-    )
-
-    if (missingFields.length === 0) {
-      return row
-    }
-
-    const availableData = fieldMapping
-      .filter(({ key }) => row[key] && String(row[key]).trim() !== '')
-      .map(({ key }) => `${key}: ${row[key]}`)
-      .join(', ')
-
-    const missingFieldNames = missingFields.map(({ key }) => key).join(', ')
-
-    const promptText = `Te egy termelési adatfeltöltő asszisztens vagy. A következő termék adatok hiányosak.
-
-Meglévő adatok: ${availableData || 'Nincs'}
-Hiányzó mezők: ${missingFieldNames}
-
-Feladatod: Töltsd ki a hiányzó mezőket ésszerű, realisztikus adatokkal a meglévő információk és a gyártási/termelési környezet alapján.
-
-Szabályok:
-- Ha van termék név de nincs rajzszám, adj valós formátumú rajzszámot (pl. DWG-2024-001)
-- Ha van anyag de nincs súly, adj reális súlyt a gyártási kontextusban (pl. "0.5 kg", "250 g")
-- Ha van terméknév de nincs anyag, találj ki valós műanyag vagy fém anyagnevet (pl. "PP", "ABS", "Alumínium")
-- Ha nincs felületkezelés, adj meg egy valósat (pl. "Porfestés", "Galvanizálás", "Nincs")
-- Ha nincs ciklus idő, adj meg valós időtartamot (pl. "45 sec", "2 min")
-- Ha nincs fészekszám, adj meg egy reális számot (1, 2, 4, 8)
-- Ha nincs doboz méret, adj meg reális karton méretet (pl. "40x30x20 cm")
-- Ha nincs raktár hely, adj meg valós kódot (pl. "A-01", "B-12")
-- Ha nincs cikkszám, adj valós formátumú kódot (pl. "ART-2024-001")
-
-Válaszolj CSAK és kizárólag JSON formátumban, egy "fields" nevű objektummal, amely tartalmazza a hiányzó mezők értékeit.`
-
-    try {
-      const result = await (window as any).spark.llm(promptText, 'gpt-4o-mini', true)
-      const parsed = JSON.parse(result)
-
-      if (parsed.fields) {
-        for (const [key, value] of Object.entries(parsed.fields)) {
-          if (typeof value === 'string' && value.trim() !== '') {
-            row[key] = value
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Hiba az AI kitöltés során:', error)
-    }
-
-    return row
   }
 
   const handleImport = async () => {
     if (!file) return
 
     setImporting(true)
-    setFillingData(true)
     setErrors([])
     setSuccess(false)
 
@@ -153,7 +89,7 @@ Válaszolj CSAK és kizárólag JSON formátumban, egy "fields" nevű objektumma
       await workbook.xlsx.load(data)
       const worksheet = workbook.worksheets[0]
       const jsonData: any[] = []
-      
+
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return
         const rowData: any = {}
@@ -165,48 +101,64 @@ Válaszolj CSAK és kizárólag JSON formátumban, egy "fields" nevű objektumma
         jsonData.push(rowData)
       })
 
-      const filledRows = []
-      for (let i = 0; i < jsonData.length; i++) {
-        const filledRow = await fillMissingDataWithAI(jsonData[i])
-        filledRows.push(filledRow)
-      }
+      const validationErrors: ImportError[] = []
+      const validProducts: Partial<Product>[] = []
 
-      setFillingData(false)
+      jsonData.forEach((rawRow: any, index: number) => {
+        const row = normalizeRow(rawRow)
+        const productName = getField(row, 'Termék megnevezés', 'Termék név', 'Megnevezés')
+        const drawingNumber = getField(row, 'Termék rajzszáma', 'Rajzszám', 'Rajz szám')
 
-      const validProducts: Partial<Product>[] = filledRows.map((row: any, index: number) => {
-        return {
-          id: `import-${Date.now()}-${index}`,
-          customer: String(row['Ügyfél'] || '').trim(),
-          drawingNumber: String(row['Termék rajzszáma'] || '').trim(),
-          productName: String(row['Termék megnevezés'] || '').trim(),
-          notes: String(row['Megjegyzés'] || '').trim(),
-          nestCount: String(row['Fészekszáma'] || '').trim(),
-          weightPerPiece: String(row['Súly/db'] || '').trim(),
-          material: String(row['Anyag'] || '').trim(),
-          surfaceTreatment: String(row['Felületkezelés'] || '').trim(),
-          cycleTime: String(row['Ciklus idő'] || '').trim(),
-          postProcessingTime: String(row['Utómunka idő'] || '').trim(),
-          postProcessing: String(row['Utómunkák'] || '').trim(),
-          boxSize: String(row['Doboz méret'] || '').trim(),
-          piecesPerBox: String(row['Doboz/db'] || '').trim(),
-          boxesPerPallet: String(row['Doboz/Raklap'] || '').trim(),
-          articleNumber: String(row['Arktikál nr.'] || '').trim(),
-          warehouse: String(row['Raktár'] || '').trim(),
-          spruWeight: String(row['Engusz súly'] || '').trim(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+        if (!productName && !drawingNumber) {
+          validationErrors.push({
+            row: index + 2,
+            field: 'Termék megnevezés / Rajzszám',
+            message: 'A „Termék megnevezés" vagy „Termék rajzszáma" mezők egyikének kitöltése kötelező',
+          })
+          return
         }
+
+        validProducts.push({
+          id: `import-${Date.now()}-${index}`,
+          customer: getField(row, 'Ügyfél', 'Vevő', 'Ügyfél név', 'Vevő név'),
+          drawingNumber,
+          productName,
+          notes: getField(row, 'Megjegyzés', 'Megjegyzések'),
+          nestCount: getField(row, 'Fészekszáma', 'Fészekszám', 'Fészek szám', 'Fészek'),
+          weightPerPiece: getField(row, 'Súly/db', 'Súly/db g', 'Súly/db (g)', 'Tömeg/db', 'Tömeg/db g', 'Súly per db', 'Darabsúly'),
+          material: getField(row, 'Anyag', 'Alapanyag'),
+          surfaceTreatment: getField(row, 'Felületkezelés', 'Felület kezelés'),
+          cycleTime: getField(row, 'Ciklus idő', 'Ciklusidő', 'Ciklus idő (sec)', 'Ciklus idő (s)', 'Ciklus'),
+          postProcessingTime: getField(row, 'Utómunka idő', 'Utómunka', 'Utómunka idő (perc)', 'Utómunka idő (min)'),
+          postProcessing: getField(row, 'Utómunkák', 'Utómunka leírás'),
+          boxSize: getField(row, 'Doboz méret', 'Dobozméret', 'Doboz méret (cm)', 'Doboz méret cm'),
+          piecesPerBox: getField(row, 'Doboz/db', 'Doboz/db (db/doboz)', 'Db/doboz', 'Darabszám/doboz'),
+          boxesPerPallet: getField(row, 'Doboz/Raklap', 'Doboz/Raklap (doboz/raklap)', 'Doboz/raklap', 'Dobozok/raklap'),
+          articleNumber: getField(row, 'Arktikál nr.', 'Artikál nr.', 'Artikel nr.', 'Cikkszám', 'Article nr.', 'Article number'),
+          warehouse: getField(row, 'Raktár', 'Raktár hely', 'Tároló'),
+          spruWeight: getField(row, 'Engusz súly', 'Engusz súly g', 'Beömlő súly', 'Engusz tömeg', 'Beömlő tömeg'),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
       })
 
       setImporting(false)
-      setSuccess(true)
-      onImport(validProducts)
-      setTimeout(() => {
-        handleClose()
-      }, 1500)
+
+      if (validationErrors.length > 0) {
+        setErrors(validationErrors)
+      }
+
+      if (validProducts.length > 0) {
+        setSuccess(true)
+        onImport(validProducts)
+        if (validationErrors.length === 0) {
+          setTimeout(() => {
+            handleClose()
+          }, 1500)
+        }
+      }
     } catch (error) {
       setImporting(false)
-      setFillingData(false)
       setErrors([{ row: 0, field: 'file', message: 'Hiba történt az importálás során' }])
     }
   }
@@ -216,7 +168,6 @@ Válaszolj CSAK és kizárólag JSON formátumban, egy "fields" nevű objektumma
     setErrors([])
     setSuccess(false)
     setPreviewData([])
-    setFillingData(false)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -245,7 +196,8 @@ Válaszolj CSAK és kizárólag JSON formátumban, egy "fields" nevű objektumma
         <DialogHeader>
           <DialogTitle>Tömeges Termék Import</DialogTitle>
           <DialogDescription>
-            Töltsön fel egy Excel fájlt (.xlsx) termék adatokkal. A hiányzó adatok automatikusan kitöltésre kerülnek AI segítségével.
+            Töltsön fel egy Excel fájlt (.xlsx) termék adatokkal. Az oszlopfejléceknek meg kell egyezniük a sablon szerinti
+            elnevezésekkel. A „Termék megnevezés" vagy „Termék rajzszáma" egyikének kitöltése kötelező.
           </DialogDescription>
         </DialogHeader>
 
@@ -263,7 +215,7 @@ Válaszolj CSAK és kizárólag JSON formátumban, egy "fields" nevű objektumma
               className="hidden"
               id="product-file-upload"
             />
-            
+
             {!file ? (
               <label htmlFor="product-file-upload" className="cursor-pointer">
                 <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" weight="duotone" />
@@ -308,15 +260,17 @@ Válaszolj CSAK és kizárólag JSON formátumban, egy "fields" nevű objektumma
                         <th className="px-2 py-1 text-left font-medium">Rajzszám</th>
                         <th className="px-2 py-1 text-left font-medium">Termék</th>
                         <th className="px-2 py-1 text-left font-medium">Anyag</th>
+                        <th className="px-2 py-1 text-left font-medium">Súly/db</th>
                       </tr>
                     </thead>
                     <tbody>
                       {previewData.map((row, idx) => (
                         <tr key={idx} className="border-t">
-                          <td className="px-2 py-1">{row['Ügyfél'] || '-'}</td>
-                          <td className="px-2 py-1">{row['Termék rajzszáma'] || '-'}</td>
-                          <td className="px-2 py-1">{row['Termék megnevezés'] || '-'}</td>
-                          <td className="px-2 py-1">{row['Anyag'] || '-'}</td>
+                          <td className="px-2 py-1">{row.customer || '-'}</td>
+                          <td className="px-2 py-1">{row.drawingNumber || '-'}</td>
+                          <td className="px-2 py-1">{row.productName || '-'}</td>
+                          <td className="px-2 py-1">{row.material || '-'}</td>
+                          <td className="px-2 py-1">{row.weightPerPiece || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -326,16 +280,7 @@ Válaszolj CSAK és kizárólag JSON formátumban, egy "fields" nevű objektumma
             </div>
           )}
 
-          {fillingData && (
-            <Alert className="bg-primary/10 border-primary">
-              <Sparkle className="w-4 h-4 text-primary animate-pulse" weight="fill" />
-              <AlertDescription className="text-primary-foreground">
-                AI kitölti a hiányzó adatokat...
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {importing && !fillingData && (
+          {importing && (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Importálás folyamatban...</p>
               <Progress value={undefined} className="w-full" />

@@ -1,5 +1,43 @@
+# =============================================================================
+# .dockerignore — Docker build context kizárások
+# =============================================================================
+# Csak az build-hez szükséges fájlok kerülnek a Docker build context-be.
+# Ez gyorsítja a buildet és csökkenti az image méretét.
+
+# Függőségek (a Dockerfile maga telepíti npm ci-vel)
 node_modules
+apps/*/node_modules
+packages/*/node_modules
+
+# Build outputok (a Dockerfile hozza létre)
 dist
+apps/*/dist
+*-dist
+
+# Git és CI
 .git
 .github
-*.md
+
+# Lokális adatok és titkok
+apps/api/data
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Tesztek (nem kellenek a production image-be)
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+src/lib/db/__tests__
+
+# Deploy konfig — az Unraid XML template és .env példa nem kell az image-be,
+# de a startup.sh KELL (a Dockerfile bemásolja)
+deploy/unraid/produktivpro.xml
+deploy/unraid/nginx.conf
+deploy/unraid/supervisord.conf
+deploy/.env.example
+deploy/nginx/
+
+# Egyéb
+*.log
+.DS_Store

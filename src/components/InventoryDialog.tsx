@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { parseIntSafe } from '@/lib/helpers'
 
 interface InventoryDialogProps {
   open: boolean
@@ -125,8 +126,10 @@ export function InventoryDialog({ open, onClose, onSave, item, products }: Inven
               <Input
                 id="quantity"
                 type="number"
+                min={0}
+                inputMode="numeric"
                 value={formData.quantity || 0}
-                onChange={(e) => setFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
+                onChange={(e) => setFormData(prev => ({ ...prev, quantity: parseIntSafe(e.target.value, 0, { allowNegative: false }) }))}
               />
             </div>
           </div>

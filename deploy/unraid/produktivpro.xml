@@ -1,0 +1,131 @@
+<?xml version="1.0"?>
+<!--
+  ProduktívPro — Unraid Community Applications template
+  ======================================================
+  Ezt a fájlt a GitHub repo-ban kell tartani, és a CA plugin innen olvassa.
+
+  Ahhoz, hogy a CA-ban megjelenjen, a template URL-t be kell küldeni a
+  Unraid Community Applications-nek, VAGY kézzel add hozzá:
+    CA → Settings → "My Repositories" → Add your template URL:
+    https://raw.githubusercontent.com/OWNER/REPO/main/deploy/unraid/produktivpro.xml
+
+  Cseréld ki az alábbi helyőrzőket:
+    OWNER → GitHub felhasználónév (kisbetűs)
+    REPO  → repo neve (kisbetűs)
+-->
+<Container version="2">
+  <Name>ProduktivPro</Name>
+  <Repository>ghcr.io/OWNER/REPO:latest</Repository>
+  <Registry>https://ghcr.io/OWNER/REPO</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/OWNER/REPO/issues</Support>
+  <Project>https://github.com/OWNER/REPO</Project>
+  <Overview>
+    ProduktívPro — termelési és rendeléskezelő alkalmazás 4-5 felhasználó számára.
+    Tartalmaz egy React alapú webes felületet és egy Node.js REST API-t SQLite adatbázissal.
+    Telepítés után azonnal használható: csak add meg az admin PIN-t és kész.
+  </Overview>
+  <Category>Productivity: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <!-- Port mapping: host:8080 → konténer:5050 (Node.js) -->
+  <TemplateURL>https://raw.githubusercontent.com/OWNER/REPO/main/deploy/unraid/produktivpro.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/OWNER/REPO/main/public/favicon.ico</Icon>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+  <DateInstalled></DateInstalled>
+
+  <!-- ── Port ──────────────────────────────────────────────────────────── -->
+  <Config
+    Name="WebUI Port"
+    Target="5050"
+    Default="8080"
+    Mode="tcp"
+    Description="A webfelület portja. Böngészőből: http://&lt;unraid-ip&gt;:8080 — a konténeren belül a Node.js a 5050-es porton hallgat."
+    Type="Port"
+    Display="always"
+    Required="true"
+    Mask="false">8080</Config>
+
+  <!-- ── Adatok volume ──────────────────────────────────────────────────── -->
+  <Config
+    Name="Adatok mappája"
+    Target="/data"
+    Default="/mnt/user/appdata/produktivpro"
+    Mode="rw"
+    Description="SQLite adatbázis és beállítások tárolási helye. CA Backup automatikusan menti."
+    Type="Path"
+    Display="always"
+    Required="true"
+    Mask="false">/mnt/user/appdata/produktivpro</Config>
+
+  <!-- ── Admin beállítások ─────────────────────────────────────────────── -->
+  <Config
+    Name="Admin PIN"
+    Target="DEFAULT_ADMIN_PIN"
+    Default="1234"
+    Mode=""
+    Description="Az admin felhasználó PIN kódja (csak az első indításkor használja). Telepítés után a felületen módosítható."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="true">1234</Config>
+
+  <Config
+    Name="Admin neve"
+    Target="DEFAULT_ADMIN_NAME"
+    Default="Admin"
+    Mode=""
+    Description="Az admin felhasználó megjelenő neve."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="false">Admin</Config>
+
+  <!-- ── Biztonság ─────────────────────────────────────────────────────── -->
+  <Config
+    Name="JWT Secret"
+    Target="JWT_SECRET"
+    Default=""
+    Mode=""
+    Description="Biztonsági kulcs a munkamenetekhez (min. 32 karakter). Ha üresen hagyod, az alkalmazás automatikusan generál egyet az első indításkor és elmenti az adatok mappájába — így újraindítás után is érvényes marad."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="true"></Config>
+
+  <!-- ── Speciális beállítások ─────────────────────────────────────────── -->
+  <Config
+    Name="Session hossza (mp)"
+    Target="SESSION_TTL_SECONDS"
+    Default="28800"
+    Mode=""
+    Description="Bejelentkezés érvényessége másodpercben. 28800 = 8 óra, 86400 = 24 óra."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">28800</Config>
+
+  <Config
+    Name="CORS Origin"
+    Target="CORS_ORIGIN"
+    Default="*"
+    Mode=""
+    Description="Ha Cloudflare Tunnel-t vagy saját domaint használsz, add meg ide (pl. https://produktivpro.pelda.hu). Alapértelmezett * = minden forrás engedélyezett."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">*</Config>
+
+  <Config
+    Name="Log szint"
+    Target="LOG_LEVEL"
+    Default="info"
+    Mode=""
+    Description="API szerver log szintje: trace / debug / info / warn / error"
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">info</Config>
+
+</Container>

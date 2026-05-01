@@ -11,17 +11,23 @@ interface InventoryDeductionDialogProps {
   onClose: () => void
   onConfirm: () => void
   deductionResult: InventoryDeductionResult | null
+  /** Felhasználói művelet megnevezése: 'szállítólevél' / 'CMR' / 'státuszváltás'. */
+  context?: string
 }
 
 export function InventoryDeductionDialog({
   open,
   onClose,
   onConfirm,
-  deductionResult
+  deductionResult,
+  context,
 }: InventoryDeductionDialogProps) {
   if (!deductionResult) return null
 
   const hasFailures = deductionResult.failedItems.length > 0
+  const hasShortages = deductionResult.deductedItems.some((d) => d.shortage > 0)
+  const hasWarnings = hasFailures || hasShortages
+  const label = context || 'művelet'
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -29,9 +35,9 @@ export function InventoryDeductionDialog({
         <DialogHeader>
           <DialogTitle>Készlet csökkentés megerősítése</DialogTitle>
           <DialogDescription>
-            {hasFailures 
-              ? 'Figyelmeztetés: Nem minden termék vonható le a készletből'
-              : 'A rendelések teljesítése automatikusan csökkenteni fogja a készletet'}
+            {hasWarnings
+              ? `Figyelmeztetés: nem minden mennyiség fedezett a készletből (${label}).`
+              : `A ${label} kiállítása automatikusan csökkenti a készletet.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -44,19 +50,38 @@ export function InventoryDeductionDialog({
                   <span>Sikeresen levonható tételek ({deductionResult.deductedItems.length})</span>
                 </div>
                 <div className="space-y-2">
-                  {deductionResult.deductedItems.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-success/10 border border-success/20 rounded-lg">
-                      <div>
-                        <div className="font-medium">{item.productName}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Rajzszám: {item.drawingNumber}
+                  {deductionResult.deductedItems.map((item, idx) => {
+                    const partial = item.shortage > 0
+                    return (
+                      <div
+                        key={idx}
+                        className={`flex items-center justify-between p-3 rounded-lg border ${
+                          partial
+                            ? 'bg-warning/10 border-warning/30'
+                            : 'bg-success/10 border-success/20'
+                        }`}
+                      >
+                        <div>
+                          <div className="font-medium">{item.productName}</div>
+                          <div className="text-sm text-muted-foreground">
+                            Rajzszám: {item.drawingNumber}
+                          </div>
+                          {partial && (
+                            <div className="text-xs text-warning-foreground mt-1">
+                              Részleges levonás: {item.deductedQuantity} / {item.requiredQuantity} db —
+                              hiány: <span className="font-mono">{item.shortage} db</span>
+                            </div>
+                          )}
                         </div>
+                        <Badge
+                          variant="outline"
+                          className={`font-mono ${partial ? 'border-warning/60 bg-warning/20' : ''}`}
+                        >
+                          -{item.deductedQuantity} db
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="font-mono">
-                        -{item.deductedQuantity} db
-                      </Badge>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -69,7 +94,8 @@ export function InventoryDeductionDialog({
                 </div>
                 <Alert variant="destructive">
                   <AlertDescription>
-                    Ezek a tételek nem kerülnek levonásra. A rendelések státusza mégis megváltozik.
+                    Ezeket a tételeket nem tudjuk levonni a készletről. A {label} kiállítása a
+                    felhasználó döntésétől függően mégis folytatódhat.
                   </AlertDescription>
                 </Alert>
                 <div className="space-y-2">
@@ -104,11 +130,11 @@ export function InventoryDeductionDialog({
           <Button variant="outline" onClick={onClose}>
             Mégse
           </Button>
-          <Button 
+          <Button
             onClick={onConfirm}
-            variant={hasFailures ? 'destructive' : 'default'}
+            variant={hasWarnings ? 'destructive' : 'default'}
           >
-            {hasFailures ? 'Folytatás figyelmeztetéssel' : 'Készlet csökkentése'}
+            {hasWarnings ? 'Folytatás figyelmeztetéssel' : 'Megerősítés'}
           </Button>
         </DialogFooter>
       </DialogContent>

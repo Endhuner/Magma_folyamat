@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Printer, CaretDown } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { parseIntSafe } from '@/lib/helpers'
 
 export interface PrintSettings {
   copies: number
@@ -122,7 +123,7 @@ export function LabelPrintSettingsDialog({
                 min="1"
                 max="999"
                 value={copies}
-                onChange={(e) => setCopies(parseInt(e.target.value) || 1)}
+                onChange={(e) => setCopies(Math.max(1, Math.min(999, parseIntSafe(e.target.value, 1, { allowNegative: false }))))}
                 className="font-mono"
               />
               <p className="text-xs text-muted-foreground">

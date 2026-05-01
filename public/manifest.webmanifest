@@ -1,0 +1,50 @@
+{
+  "name": "ProduktívPro - Termelésirányítás",
+  "short_name": "ProduktívPro",
+  "description": "Termelésirányítási rendszer műhelyi műszakrögzítéshez és gyártáskövetéshez.",
+  "lang": "hu",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "categories": ["productivity", "business", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Gyártás",
+      "short_name": "Gyártás",
+      "description": "Folyamatban lévő gyártások és műszakrögzítés",
+      "url": "/?tab=production",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Áttekintés",
+      "short_name": "Áttekintés",
+      "description": "Dashboard mutatók",
+      "url": "/?tab=dashboard",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

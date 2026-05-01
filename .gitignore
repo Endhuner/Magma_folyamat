@@ -1,19 +1,32 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# =============================================================================
+# .gitignore — ProduktívPro
+# =============================================================================
 
+# Függőségek
 node_modules
+apps/*/node_modules
+packages/*/node_modules
+
+# Build outputok
 dist
 dist-ssr
 *-dist
-*.local
+apps/*/dist
 
-# Editor directories and files
+# Lokális adatok — SOHA ne kerüljön repo-ba!
+apps/api/data
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Titkok és env fájlok
+.env
+.env.local
+.env.*.local
+**/.env
+# .env.example és .env.example.* MEGENGEDETT (nincs titok bennük)
+
+# Editor
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -24,11 +37,14 @@ dist-ssr
 *.sln
 *.sw?
 
-.env
-**/agent-eval-report*
-packages
-pids
+# Logok
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Egyéb
 .file-manifest
 .devcontainer/
-
-.spark-workbench-id
+pids

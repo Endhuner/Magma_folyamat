@@ -387,6 +387,8 @@ export function LabelTemplateDialog({
                   <Input
                     id="margin-top"
                     type="number"
+                    min={0}
+                    step="0.1"
                     value={pageMarginTop}
                     onChange={(e) => setPageMarginTop(e.target.value)}
                     placeholder="1"
@@ -398,6 +400,8 @@ export function LabelTemplateDialog({
                   <Input
                     id="margin-right"
                     type="number"
+                    min={0}
+                    step="0.1"
                     value={pageMarginRight}
                     onChange={(e) => setPageMarginRight(e.target.value)}
                     placeholder="0"
@@ -409,6 +413,8 @@ export function LabelTemplateDialog({
                   <Input
                     id="margin-bottom"
                     type="number"
+                    min={0}
+                    step="0.1"
                     value={pageMarginBottom}
                     onChange={(e) => setPageMarginBottom(e.target.value)}
                     placeholder="0"
@@ -420,6 +426,8 @@ export function LabelTemplateDialog({
                   <Input
                     id="margin-left"
                     type="number"
+                    min={0}
+                    step="0.1"
                     value={pageMarginLeft}
                     onChange={(e) => setPageMarginLeft(e.target.value)}
                     placeholder="1"
@@ -437,6 +445,8 @@ export function LabelTemplateDialog({
                   <Input
                     id="padding-top"
                     type="number"
+                    min={0}
+                    step="0.1"
                     value={contentPaddingTop}
                     onChange={(e) => setContentPaddingTop(e.target.value)}
                     placeholder="2"
@@ -448,6 +458,8 @@ export function LabelTemplateDialog({
                   <Input
                     id="padding-right"
                     type="number"
+                    min={0}
+                    step="0.1"
                     value={contentPaddingRight}
                     onChange={(e) => setContentPaddingRight(e.target.value)}
                     placeholder="2"
@@ -459,6 +471,8 @@ export function LabelTemplateDialog({
                   <Input
                     id="padding-bottom"
                     type="number"
+                    min={0}
+                    step="0.1"
                     value={contentPaddingBottom}
                     onChange={(e) => setContentPaddingBottom(e.target.value)}
                     placeholder="2"
@@ -470,6 +484,8 @@ export function LabelTemplateDialog({
                   <Input
                     id="padding-left"
                     type="number"
+                    min={0}
+                    step="0.1"
                     value={contentPaddingLeft}
                     onChange={(e) => setContentPaddingLeft(e.target.value)}
                     placeholder="2"

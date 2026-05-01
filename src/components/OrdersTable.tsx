@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { Order, OrderStatus, Product } from '@/lib/types'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Pencil, Trash, Package, CopySimple } from '@phosphor-icons/react'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
-import { parseYear } from '@/lib/helpers'
+import { ORDERS_TABLE_PAGE_SIZE, VIRTUAL_ROW_STYLE } from '@/lib/virtualRow'
 
 interface OrdersTableProps {
   orders: Order[]
@@ -40,22 +40,18 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
   'Javítás alatt': 'oklch(0.93 0.08 350)',
 }
 
-function stripDiacritics(s: string | undefined | null): string {
-  return String(s ?? '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-}
-
-function isDelivered(status: string): boolean {
-  const st = stripDiacritics(status)
-  return st === 'kiszallitva' || st.includes('kiszallitva')
-}
-
-export function OrdersTable({ orders, products, onEdit, onDelete, onDuplicate, onStatusChange, selectedIds, onSelectionChange, visibleColumns }: OrdersTableProps) {
+function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onStatusChange, selectedIds, onSelectionChange, visibleColumns }: OrdersTableProps) {
   const [sortField, setSortField] = useState<keyof Order | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  /**
+   * Soft pagináció: ha a rendelések száma `ORDERS_TABLE_PAGE_SIZE` fölött van,
+   * elsőre csak az első N sort rendereljük, és egy "Mind mutatása" gomb kéri
+   * a többit. Ez biztosítja, hogy az első festés gyors maradjon akár 10k+
+   * sornál is. A `content-visibility: auto` mellett ez a "biztonsági öv" —
+   * ha a böngésző nem támogatja a content-visibility-t, a pagináció akkor is
+   * megvédi a felhasználót.
+   */
+  const [showAll, setShowAll] = useState(false)
 
   const isColumnVisible = (columnId: string) => {
     if (!visibleColumns || visibleColumns.length === 0) return true
@@ -68,12 +64,12 @@ export function OrdersTable({ orders, products, onEdit, onDelete, onDuplicate, o
     return [...orders].sort((a, b) => {
       const aVal = a[sortField]
       const bVal = b[sortField]
-      
+
       if (typeof aVal === 'string' && typeof bVal === 'string') {
         const comparison = aVal.localeCompare(bVal, 'hu')
         return sortDirection === 'asc' ? comparison : -comparison
       }
-      
+
       if (typeof aVal === 'number' && typeof bVal === 'number') {
         return sortDirection === 'asc' ? aVal - bVal : bVal - aVal
       }
@@ -81,6 +77,27 @@ export function OrdersTable({ orders, products, onEdit, onDelete, onDuplicate, o
       return 0
     })
   }, [orders, sortField, sortDirection])
+
+  /**
+   * Ha új szűrés / új szortírozás után a sorszám visszaesett a küszöb alá,
+   * automatikusan kapcsoljuk vissza az "összes mutatása" módot — különben a
+   * gomb megmaradna feleslegesen.
+   */
+  useEffect(() => {
+    if (sortedOrders.length <= ORDERS_TABLE_PAGE_SIZE && showAll) {
+      setShowAll(false)
+    }
+  }, [sortedOrders.length, showAll])
+
+  /** A ténylegesen renderelt (DOM-ba kerülő) sorok — pagináltan vagy mind. */
+  const visibleOrders = useMemo(() => {
+    if (showAll || sortedOrders.length <= ORDERS_TABLE_PAGE_SIZE) {
+      return sortedOrders
+    }
+    return sortedOrders.slice(0, ORDERS_TABLE_PAGE_SIZE)
+  }, [sortedOrders, showAll])
+
+  const hasMoreRows = sortedOrders.length > visibleOrders.length
 
   const handleSort = (field: keyof Order) => {
     if (sortField === field) {
@@ -222,9 +239,13 @@ export function OrdersTable({ orders, products, onEdit, onDelete, onDuplicate, o
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedOrders.map((order, index) => {
+              {visibleOrders.map((order) => {
                 return (
-                  <TableRow key={order.id} className="even:bg-[oklch(0.94_0.015_250)] hover:bg-[oklch(0.88_0.02_250)]">
+                  <TableRow
+                    key={order.id}
+                    className="even:bg-[oklch(0.94_0.015_250)] hover:bg-[oklch(0.88_0.02_250)]"
+                    style={VIRTUAL_ROW_STYLE}
+                  >
                     <TableCell>
                       <Checkbox
                         checked={selectedIds.includes(order.id)}
@@ -312,6 +333,16 @@ export function OrdersTable({ orders, products, onEdit, onDelete, onDuplicate, o
           </Table>
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
+        {hasMoreRows && (
+          <div className="flex items-center justify-between px-3 py-2 border-t bg-muted/40 text-sm">
+            <span className="text-muted-foreground">
+              Az első <strong>{visibleOrders.length}</strong> sor látszik a(z) {sortedOrders.length} szűrt rendelésből.
+            </span>
+            <Button variant="outline" size="sm" onClick={() => setShowAll(true)}>
+              Mind mutatása ({sortedOrders.length})
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-accent/30 border-t-2 border-accent/50 backdrop-blur-sm z-10">
@@ -352,3 +383,12 @@ export function OrdersTable({ orders, products, onEdit, onDelete, onDuplicate, o
     </>
   )
 }
+
+/**
+ * `React.memo` wrapper — Orders táblázat újrarenderelést csak akkor enged, ha
+ * a propsok referenciája változott. Az App.tsx-ben filteredOrders, products,
+ * selectedIds, visibleColumns mind useMemo-zott — így ez a memoizáció
+ * megakadályozza, hogy egy másik tab (pl. Inventory) state-frissítése
+ * újrarajzolja az egész Rendelések táblát.
+ */
+export const OrdersTable = memo(OrdersTableImpl)

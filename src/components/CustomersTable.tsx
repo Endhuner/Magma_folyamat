@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Customer, Order } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -24,7 +25,7 @@ interface CustomersTableProps {
   onDelete: (id: string) => void
 }
 
-export function CustomersTable({ customers, orders, onEdit, onDelete }: CustomersTableProps) {
+function CustomersTableImpl({ customers, orders, onEdit, onDelete }: CustomersTableProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [customerToDelete, setCustomerToDelete] = useState<string | null>(null)
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
@@ -174,3 +175,5 @@ export function CustomersTable({ customers, orders, onEdit, onDelete }: Customer
     </>
   )
 }
+
+export const CustomersTable = memo(CustomersTableImpl)

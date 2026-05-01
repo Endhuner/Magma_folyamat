@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,7 +12,7 @@ import { format } from 'date-fns'
 import { hu } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { utils, write } from 'xlsx'
-import { downloadBlob, generateCmrTemplateWorkbook } from '@/lib/xlsxTemplateExport'
+import { downloadBlob } from '@/lib/xlsxTemplateExport'
 import { ExportEditDialog } from '@/components/ExportEditDialog'
 import { ColumnFilterManager } from '@/components/ColumnFilterManager'
 
@@ -26,7 +26,7 @@ interface DeliveryNotesTableProps {
   visibleColumns?: string[]
 }
 
-export function DeliveryNotesTable({ deliveryNotes, orders, customers, products, onDelete, onUpdate, visibleColumns }: DeliveryNotesTableProps) {
+function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, onDelete, onUpdate, visibleColumns }: DeliveryNotesTableProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'delivery' | 'cmr'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all')
@@ -129,26 +129,14 @@ export function DeliveryNotesTable({ deliveryNotes, orders, customers, products,
       const timestamp = new Date().toISOString().split('T')[0]
       const fileName = `${selectedNote.type === 'delivery' ? 'Szallito' : 'CMR'}_${selectedNote.customer.replace(/[^a-zA-Z0-9_-]/g, '_')}_${timestamp}.xlsx`
 
-      let blob: Blob
-      if (selectedNote.type === 'cmr') {
-        try {
-          blob = await generateCmrTemplateWorkbook({ rows: exportData })
-        } catch (templateError) {
-          console.warn('CMR template re-export fallback:', templateError)
-          const worksheet = utils.json_to_sheet(exportData)
-          const workbook = utils.book_new()
-          utils.book_append_sheet(workbook, worksheet, 'CMR')
-          const wbout = write(workbook, { bookType: 'xlsx', type: 'array' })
-          blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-          toast.warning('A CMR sablon nem elérhető, alap táblázatos export készült')
-        }
-      } else {
-        const worksheet = utils.json_to_sheet(exportData)
-        const workbook = utils.book_new()
-        utils.book_append_sheet(workbook, worksheet, 'Szállító')
-        const wbout = write(workbook, { bookType: 'xlsx', type: 'array' })
-        blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-      }
+      const sheetName = selectedNote.type === 'cmr' ? 'CMR' : 'Szállító'
+      const worksheet = utils.json_to_sheet(exportData)
+      const workbook = utils.book_new()
+      utils.book_append_sheet(workbook, worksheet, sheetName)
+      const wbout = write(workbook, { bookType: 'xlsx', type: 'array' })
+      const blob = new Blob([wbout], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
 
       downloadBlob(blob, fileName)
 
@@ -271,26 +259,14 @@ export function DeliveryNotesTable({ deliveryNotes, orders, customers, products,
       const timestamp = new Date().toISOString().split('T')[0]
       const fileName = `${note.type === 'delivery' ? 'Szallito' : 'CMR'}_${safeCustomerName}_${timestamp}.xlsx`
 
-      let blob: Blob
-      if (note.type === 'cmr') {
-        try {
-          blob = await generateCmrTemplateWorkbook({ rows: exportData })
-        } catch (templateError) {
-          console.warn('CMR template re-export fallback:', templateError)
-          const worksheet = utils.json_to_sheet(exportData)
-          const workbook = utils.book_new()
-          utils.book_append_sheet(workbook, worksheet, 'CMR')
-          const wbout = write(workbook, { bookType: 'xlsx', type: 'array' })
-          blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-          toast.warning('A CMR sablon nem elérhető, alap táblázatos export készült')
-        }
-      } else {
-        const worksheet = utils.json_to_sheet(exportData)
-        const workbook = utils.book_new()
-        utils.book_append_sheet(workbook, worksheet, 'Szállító')
-        const wbout = write(workbook, { bookType: 'xlsx', type: 'array' })
-        blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-      }
+      const sheetName = note.type === 'cmr' ? 'CMR' : 'Szállító'
+      const worksheet = utils.json_to_sheet(exportData)
+      const workbook = utils.book_new()
+      utils.book_append_sheet(workbook, worksheet, sheetName)
+      const wbout = write(workbook, { bookType: 'xlsx', type: 'array' })
+      const blob = new Blob([wbout], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
 
       downloadBlob(blob, fileName)
 
@@ -714,3 +690,5 @@ export function DeliveryNotesTable({ deliveryNotes, orders, customers, products,
     </>
   )
 }
+
+export const DeliveryNotesTable = memo(DeliveryNotesTableImpl)

@@ -10,6 +10,13 @@ export type OrderStatus =
 export interface Order {
   id: string
   customer: string
+  /**
+   * Hivatkozott Product.id — opcionális, mert a régi rendelések még nem
+   * tartalmazzák. Ha van, ezt használjuk a gyártáshoz / készlethez tartozó
+   * termék párosításához (`findProductForOrder`), és csak fallback-ként
+   * vesszük figyelembe a `customer + productName/designation` egyezést.
+   */
+  productId?: string
   productName: string
   designation: string
   notes: string
@@ -80,6 +87,10 @@ export interface Product {
   articleNumber: string
   warehouse: string
   spruWeight: string
+  /** Automatikus készletfrissítés műszakrögzítéskor (lövésszám × fészekszám). */
+  autoUpdateInventory?: boolean
+  /** Alacsony készlet küszöb (db). A figyelmeztető banner ennél kevesebb darabszámot jelez. */
+  lowStockThreshold?: number
   createdAt: string
   updatedAt: string
 }
@@ -115,6 +126,10 @@ export interface InventoryItem {
   drawingNumber: string
   customer: string
   quantity: number
+  /** Összes rögzített lövés a termék teljes élettartama alatt (gyártási kumulatív). */
+  totalShots?: number
+  /** Termékhez tartozó fészekszám, cache-elve. Üres ha a termékről nem érkezett adat. */
+  nestCount?: string
   location: string
   notes: string
   lastUpdated: string
@@ -127,6 +142,182 @@ export interface InventoryTransaction {
   type: 'in' | 'out' | 'adjustment'
   quantity: number
   orderId?: string
+  /** Ha a bevét műszakból származik, ide mentjük a hivatkozott ProductionShift.id-t. */
+  shiftId?: string
   notes: string
+  userId?: string
+  createdAt: string
+}
+
+/**
+ * Gyártási műszak rögzítés (PRD §3.5 / §4.4).
+ * Egy nap – egy műszak – egy rendelés kombinációra.
+ * A darabszám a `shotsCount × nestCount` képlet szerint automatikusan kiszámítódik
+ * a műszakrögzítés pillanatában és a készletbe (ha a termék `autoUpdateInventory`-ja be van kapcsolva) bevétként átvezetődik.
+ */
+export interface ProductionShift {
+  id: string
+  orderId: string
+  /** YYYY-MM-DD formátum. */
+  date: string
+  /** de = délelőtt, du = délután. */
+  shift: 'de' | 'du'
+  shotsCount: number
+  /** Kalkulált gyártott darabszám a rögzítés pillanatában: shotsCount × (Product.nestCount). */
+  producedQuantity: number
+  notes: string
+  userId?: string
+  createdAt: string
+  updatedAt?: string
+}
+
+/**
+ * Selejt rögzítés egy rendeléshez. Külön entitás a műszaktól, mert
+ *  - lehet műszakhoz nem köthető (pl. utólagos minőségi ellenőrzés)
+ *  - mennyisége db-ban van (a műszaknál lövés × fészek alapján számolódik a darabszám)
+ *  - külön kell jelenteni / összesíteni
+ */
+export interface ProductionDefect {
+  id: string
+  orderId: string
+  /** Opcionális hivatkozás a műszakra, amelyhez tartozik. */
+  shiftId?: string
+  /** Selejt mennyiség darabban. */
+  quantity: number
+  /** Indok / megjegyzés. */
+  reason: string
+  /** YYYY-MM-DD. */
+  date: string
+  userId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Naplóbejegyzés — minden jelentős gyártási eseményt (státuszváltás, műszak rögzítés, javítás)
+ * auditálható sorban tart.
+ */
+export interface ProductionLog {
+  id: string
+  productId?: string
+  orderId: string
+  action: string
+  notes: string
+  userId?: string
+  createdAt: string
+}
+
+/**
+ * Gép — egyszerű lista a műhely gépeiről.
+ */
+export interface Machine {
+  id: string
+  name: string
+  serialNumber: string
+  type: string
+  capacity: string
+  notes: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Felhasználó — a rendszer használói. A backend `users` tábla 1:1
+ * megfelelője. Phase 3-tól PIN-nel jelentkezik be (a `pinHash` mezőt
+ * a backend SOHA nem küldi vissza — csak a típus tartalmazza, hogy a
+ * Drizzle-row típusa egyezzen).
+ */
+export interface User {
+  id: string
+  name: string
+  email: string
+  /** 'admin' | 'operator' | 'viewer' — a backend Zod-enum elfogadott értékei. */
+  role: string
+  notes: string
+  /** Csak backend-belső; a /me / /users válaszokból kihagyjuk. */
+  pinHash?: string | null
+  /** false esetén a user nem tud belépni (zárolt). Default: true. */
+  active?: boolean
+  /** Utolsó sikeres belépés ISO timestamp-je, ha volt. */
+  lastLoginAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Anyag — egyszerű lista a felhasznált alapanyagokról.
+ */
+export interface Material {
+  id: string
+  name: string
+  type: string
+  supplier: string
+  unitPrice: string
+  unit: string
+  notes: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Egy mező-szintű változás a változásnaplóban.
+ * Csak akkor mentjük, ha a mező értéke ténylegesen különbözik
+ * (mély-egyenlőséggel detektálva). Az érték-mezők bármilyen
+ * serializable JSON-érték lehetnek.
+ */
+export interface AuditFieldChange {
+  field: string
+  /** Felhasználó-barát mező-felirat (opcionális, pl. "Mennyiség (db)"). */
+  label?: string
+  before: unknown
+  after: unknown
+}
+
+/** Az audit-log által követett entitás-típusok. */
+export type AuditEntityType =
+  | 'order'
+  | 'customer'
+  | 'product'
+  | 'machine'
+  | 'user'
+  | 'material'
+  | 'shift'
+  | 'defect'
+  | 'inventory'
+  | 'inventoryTransaction'
+
+/** Az audit-log műveletek. */
+export type AuditAction =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'status'
+  | 'in'
+  | 'out'
+  | 'adjustment'
+  | 'bulkDelete'
+  | 'bulkImport'
+
+/**
+ * A változásnapló (audit-log) egységes bejegyzése.
+ * Minden jelentős entitás-művelet egy ilyen sort generál a nyomonkövetéshez.
+ *  - `changes`: 'update' esetén kötelező; egyéb műveleteknél opcionális.
+ *  - 'status': rendelési státusz-váltás (ld. order entitás).
+ *  - 'in' / 'out' / 'adjustment': készletmozgások.
+ */
+export interface AuditLogEntry {
+  id: string
+  entityType: AuditEntityType
+  /** Felhasználó-barát entitásnév magyarul (pl. "Rendelés", "Termék"). */
+  entityLabel: string
+  entityId: string
+  /** Olvasható megnevezés (pl. rendelésszám / vevő / név). */
+  entityName: string
+  action: AuditAction
+  changes?: AuditFieldChange[]
+  /** Szabadszöveges összegzés / megjegyzés. */
+  notes?: string
+  userId?: string
+  userName?: string
   createdAt: string
 }

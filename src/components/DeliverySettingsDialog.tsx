@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/useKV'
 import { FloppyDisk, ArrowCounterClockwise, BuildingOffice, Truck } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { parseIntSafe } from '@/lib/helpers'
 
 interface DeliverySettings {
   companyName: string
@@ -180,7 +181,7 @@ export function DeliverySettingsDialog({ open, onClose }: DeliverySettingsDialog
                     id="startingNumber"
                     type="number"
                     value={localSettings.startingNumber}
-                    onChange={(e) => handleInputChange('startingNumber', parseInt(e.target.value) || 1)}
+                    onChange={(e) => handleInputChange('startingNumber', Math.max(1, parseIntSafe(e.target.value, 1, { allowNegative: false })))}
                     min="1"
                   />
                   <p className="text-xs text-muted-foreground">

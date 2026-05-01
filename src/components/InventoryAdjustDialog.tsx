@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Badge } from '@/components/ui/badge'
+import { parseIntSafe } from '@/lib/helpers'
 
 interface InventoryAdjustDialogProps {
   open: boolean
@@ -98,7 +99,7 @@ export function InventoryAdjustDialog({ open, onClose, onSave, item }: Inventory
               id="quantity"
               type="number"
               value={quantity || ''}
-              onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
+              onChange={(e) => setQuantity(parseIntSafe(e.target.value, 0, { allowNegative: false }))}
               min="0"
               placeholder="0"
             />

@@ -1,4 +1,5 @@
 import { Order, Customer, Product } from './types'
+import { kvStore } from './kvStore'
 import { toast } from 'sonner'
 
 interface LabelData {
@@ -108,7 +109,7 @@ export async function exportLabelsAsPDF(
     
     if (customer?.labelTemplateId) {
       try {
-        const labelTemplates = await spark.kv.get<LabelTemplate[]>('label-templates')
+        const labelTemplates = kvStore.get<LabelTemplate[]>('label-templates')
         templateToUse = labelTemplates?.find(t => t.id === customer.labelTemplateId)
       } catch (error) {
         console.warn('Nem sikerült betölteni a vevő címke sablonját', error)
@@ -169,7 +170,7 @@ export async function exportLabelsAsPNG(
     
     if (customer?.labelTemplateId) {
       try {
-        const labelTemplates = await spark.kv.get<LabelTemplate[]>('label-templates')
+        const labelTemplates = kvStore.get<LabelTemplate[]>('label-templates')
         templateToUse = labelTemplates?.find(t => t.id === customer.labelTemplateId)
       } catch (error) {
         console.warn('Nem sikerült betölteni a vevő címke sablonját', error)

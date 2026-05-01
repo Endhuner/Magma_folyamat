@@ -1,4 +1,5 @@
 import { Order, Customer, Product } from './types'
+import { kvStore } from './kvStore'
 import { toast } from 'sonner'
 
 interface LabelData {
@@ -112,7 +113,7 @@ export async function generateLabels(
     console.log(`   3️⃣ Terméknév egyezés: rendelés.productName === termék.productName`)
     console.log(`\n   Összes termék ellenőrzése (${products.length} db):\n`)
     
-    let matchedProduct = null
+    let matchedProduct: Product | null = null
     let matchIndex = -1
     
     for (let i = 0; i < products.length; i++) {
@@ -251,7 +252,7 @@ export async function generateLabels(
     
     if (customer?.labelTemplateId) {
       try {
-        const labelTemplates = await spark.kv.get<LabelTemplate[]>('label-templates')
+        const labelTemplates = kvStore.get<LabelTemplate[]>('label-templates')
         templateToUse = labelTemplates?.find(t => t.id === customer.labelTemplateId)
         
         if (templateToUse) {
@@ -1139,7 +1140,7 @@ export async function generateLabelsWithPrintSettings(
     
     if (customer?.labelTemplateId) {
       try {
-        const labelTemplates = await spark.kv.get<LabelTemplate[]>('label-templates')
+        const labelTemplates = kvStore.get<LabelTemplate[]>('label-templates')
         templateToUse = labelTemplates?.find(t => t.id === customer.labelTemplateId)
       } catch (error) {
         console.warn('Nem sikerült betölteni a vevő címke sablonját', error)
@@ -1239,7 +1240,7 @@ export async function generateLabelsByCustomer(
     console.log(`   ${customerName}: ${orders.length} rendelés`)
   })
 
-  const labelTemplates = await spark.kv.get<LabelTemplate[]>('label-templates')
+  const labelTemplates = kvStore.get<LabelTemplate[]>('label-templates')
   let generatedCount = 0
   let customersWithTemplates = 0
   let customersWithoutTemplates = 0

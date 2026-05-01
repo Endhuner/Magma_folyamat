@@ -1,4 +1,4 @@
-import { Order, OrderStatus, Product } from './types'
+import { Product } from './types'
 
 function parseNumberLoose(x: string | number | null | undefined): number | null {
   if (x == null) return null
@@ -73,10 +73,9 @@ export function computeGrossWeightKg(
   if (rendelt == null || weightG == null) return ''
   
   const termekKg = (rendelt * weightG) / 1000
-  
-  const dobozTaraKg = 0.5
+
   const raklapTaraKg = 20
-  
+
   const pallets = palletsCount || 0
   const raklapSuly = pallets * raklapTaraKg
   

@@ -1,7 +1,14 @@
-import { Order, DashboardMetrics, Product } from './types'
+import { Order, DashboardMetrics } from './types'
 import { format, formatDistanceToNow, isPast } from 'date-fns'
 
-function stripDiacritics(s: string | undefined | null): string {
+/**
+ * Egységes, ékezet-érzéketlen szöveg-normalizáló keresés/összehasonlítás
+ * előtt. NFKD-ra bont, ledobja a kombináló jeleket, kisbetűsít és trim-el.
+ *
+ * Korábban a App.tsx, OrdersTable.tsx, OrderDialog.tsx mind külön definiálta
+ * — most egy közös forrásból érkezik, így a viselkedés konzisztens.
+ */
+export function stripDiacritics(s: string | undefined | null): string {
   return String(s ?? '')
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -9,7 +16,12 @@ function stripDiacritics(s: string | undefined | null): string {
     .trim()
 }
 
-function isDelivered(status: string): boolean {
+/**
+ * Igaz, ha a státusz „Kiszállítva" (vagy bármi, ami ezt tartalmazza ékezetek
+ * nélkül). A magyar elnevezés és az ékezet-tolerancia miatt nem szigorú
+ * egyenlőség, hanem `includes`.
+ */
+export function isDelivered(status: string): boolean {
   const st = stripDiacritics(status)
   return st === 'kiszallitva' || st.includes('kiszallitva')
 }
@@ -54,6 +66,57 @@ export function isOverdue(dueDate: string, status: string): boolean {
   return !isDelivered(status) && isPast(new Date(dueDate))
 }
 
+/**
+ * Biztonságos egész-szám parsing.
+ * - Trim, decimális vessző normalizálás (",", "."), ezer-elválasztó eltávolítás (" ", "·").
+ * - Üres / NaN / Infinity esetén a fallback értéket adja vissza (default: 0).
+ * - Float bemenetnél csonkít (Math.trunc) — pl. "12.7" → 12.
+ *
+ * Mindenhol használd a `parseInt(...) || 0` minta helyett.
+ *
+ * @example parseIntSafe('12,5')   // 12
+ * @example parseIntSafe('abc', 5) // 5
+ * @example parseIntSafe('-10', 0, { allowNegative: false }) // 0
+ */
+export function parseIntSafe(
+  v: unknown,
+  fallback: number = 0,
+  opts: { allowNegative?: boolean } = {}
+): number {
+  const { allowNegative = true } = opts
+  if (v === null || v === undefined || v === '') return fallback
+  const s = String(v).trim().replace(/\s+/g, '').replace(',', '.')
+  if (!s) return fallback
+  const n = Number(s)
+  if (!Number.isFinite(n)) return fallback
+  const truncated = Math.trunc(n)
+  if (!allowNegative && truncated < 0) return fallback
+  return truncated
+}
+
+/**
+ * Biztonságos lebegőpontos parsing.
+ * - Hasonló mint parseIntSafe, de nem csonkít.
+ * - Decimális vessző normalizálás.
+ *
+ * @example parseFloatSafe('12,5')   // 12.5
+ * @example parseFloatSafe('abc', 0) // 0
+ */
+export function parseFloatSafe(
+  v: unknown,
+  fallback: number = 0,
+  opts: { allowNegative?: boolean } = {}
+): number {
+  const { allowNegative = true } = opts
+  if (v === null || v === undefined || v === '') return fallback
+  const s = String(v).trim().replace(/\s+/g, '').replace(',', '.')
+  if (!s) return fallback
+  const n = Number(s)
+  if (!Number.isFinite(n)) return fallback
+  if (!allowNegative && n < 0) return fallback
+  return n
+}
+
 export function generateOwnOrderNumber(existingOrders: { ownOrderNumber: string }[]): string {
   const now = new Date()
   const year = now.getFullYear()
@@ -69,7 +132,7 @@ export function generateOwnOrderNumber(existingOrders: { ownOrderNumber: string 
   const maxSequence = currentYearOrders.reduce((max, order) => {
     const match = order.ownOrderNumber.match(/^M\d{2}1(\d+)$/)
     if (match) {
-      const seq = parseInt(match[1], 10)
+      const seq = parseIntSafe(match[1], 0)
       return Math.max(max, seq)
     }
     return max
@@ -93,7 +156,7 @@ export function parseYear(dateStr: string): number | null {
   let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
   if (m) return Number(m[3])
 
-  m = s.match(/^(\d{4})([\/-]\d{1,2})?([\/-]\d{1,2})?$/)
+  m = s.match(/^(\d{4})([/-]\d{1,2})?([/-]\d{1,2})?$/)
   if (m) return Number(m[1])
 
   m = s.match(/(20\d{2}|19\d{2})/)
@@ -107,15 +170,13 @@ export function generateDeliveryNoteSequenceNumber(
   type: 'delivery' | 'cmr'
 ): string {
   const prefix = type === 'delivery' ? 'SZL' : 'CMR'
-  const now = new Date()
-  const year = now.getFullYear()
-  
+
   const sameTypeNotes = deliveryNotes.filter(note => note.type === type)
   
   const maxSequence = sameTypeNotes.reduce((max, note) => {
     const match = note.sequenceNumber.match(/^(SZL|CMR)(\d+)$/)
     if (match) {
-      const seq = parseInt(match[2], 10)
+      const seq = parseIntSafe(match[2], 0)
       return Math.max(max, seq)
     }
     return max

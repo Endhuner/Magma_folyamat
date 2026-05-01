@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { InventoryItem, Product, Order } from '@/lib/types'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Pencil, Trash, Package } from '@phosphor-icons/react'
+import { Pencil, Trash, Package, Clock, BoxArrowDown } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 
 interface InventoryTableProps {
@@ -13,9 +13,11 @@ interface InventoryTableProps {
   onEdit: (id: string) => void
   onDelete: (id: string) => void
   onAdjust: (id: string) => void
+  onShowHistory?: (id: string) => void
+  onWarehouseAdd?: (productId: string) => void
 }
 
-export function InventoryTable({ inventory, products, onEdit, onDelete, onAdjust }: InventoryTableProps) {
+function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, onShowHistory, onWarehouseAdd }: InventoryTableProps) {
   const getStockStatus = (quantity: number) => {
     if (quantity === 0) return { label: 'Nincs készleten', variant: 'destructive' as const }
     if (quantity < 50) return { label: 'Alacsony', variant: 'outline' as const }
@@ -84,17 +86,39 @@ export function InventoryTable({ inventory, products, onEdit, onDelete, onAdjust
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
+                    {onWarehouseAdd && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onWarehouseAdd(item.productId)}
+                        title="Raktári bevét"
+                      >
+                        <BoxArrowDown className="w-4 h-4" />
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => onAdjust(item.id)}
+                      title="Készlet korrekció"
                     >
                       <Package className="w-4 h-4" />
                     </Button>
+                    {onShowHistory && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onShowHistory(item.id)}
+                        title="Mozgásnapló"
+                      >
+                        <Clock className="w-4 h-4" />
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => onEdit(item.id)}
+                      title="Szerkesztés"
                     >
                       <Pencil className="w-4 h-4" />
                     </Button>
@@ -102,6 +126,7 @@ export function InventoryTable({ inventory, products, onEdit, onDelete, onAdjust
                       size="sm"
                       variant="destructive"
                       onClick={() => onDelete(item.id)}
+                      title="Törlés"
                     >
                       <Trash className="w-4 h-4" />
                     </Button>
@@ -116,3 +141,5 @@ export function InventoryTable({ inventory, products, onEdit, onDelete, onAdjust
     </>
   )
 }
+
+export const InventoryTable = memo(InventoryTableImpl)

@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1777541544297,
+      "tag": "0000_redundant_lady_deathstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1798675200000,
+      "tag": "0001_add_order_product_id",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,19 +1,97 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hu">
 
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ProduktívPro - Rendelések Kezelése</title>
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+    <title>ProduktívPro - Termelésirányítás</title>
+    <meta name="description"
+        content="Termelésirányítási rendszer műhelyi műszakrögzítéshez és gyártáskövetéshez." />
+
+    <!-- PWA / mobil -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ProduktívPro" />
+    <meta name="application-name" content="ProduktívPro" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png" />
+    <link rel="icon" href="/icons/icon-512.png" sizes="512x512" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-    <link href="/src/main.css" rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap"
+        rel="stylesheet">
+    <!-- main.css-t a main.tsx importálja JS-ből (Vite HMR-kompatibilis módon).
+         Korábban itt volt egy <link rel="stylesheet" href="/src/main.css">,
+         de dev-szerveren a Vite a CSS-t JS-modulként szolgálja, ezért a böngésző
+         MIME-hibával dobta el. Ne tedd vissza. -->
 </head>
 
 <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Service worker regisztráció (PWA).
+         Csak production buildben fut — dev-szerveren a Vite minden modult
+         dinamikusan transzformál és a SW cache összezavarná a HMR-t. Az
+         5173-as Vite portot is figyelmen kívül hagyjuk biztos, ami biztos. -->
+    <script>
+      (function () {
+        var host = window.location.hostname;
+        var port = window.location.port;
+        var isDev =
+          host === 'localhost' ||
+          host === '127.0.0.1' ||
+          host.endsWith('.localhost') ||
+          port === '5173' ||
+          port === '5000';
+
+        if (isDev) {
+          // Ha korábban dev közben regisztrálva lett egy SW (régebbi verzió),
+          // töröljük az összes regisztrációt + cache-t, mert csak zavar.
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker
+              .getRegistrations()
+              .then(function (regs) { regs.forEach(function (r) { r.unregister(); }); })
+              .catch(function () {});
+          }
+          if (typeof caches !== 'undefined' && caches.keys) {
+            caches.keys().then(function (keys) {
+              keys.forEach(function (k) { caches.delete(k); });
+            }).catch(function () {});
+          }
+          return;
+        }
+
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function () {
+            navigator.serviceWorker
+              .register('/sw.js', { scope: '/' })
+              .then(function (reg) {
+                reg.addEventListener('updatefound', function () {
+                  var nw = reg.installing;
+                  if (!nw) return;
+                  nw.addEventListener('statechange', function () {
+                    if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                      console.log('[PWA] Új verzió letöltve. Frissítéshez töltsd újra az oldalt.');
+                    }
+                  });
+                });
+              })
+              .catch(function (err) {
+                console.warn('[PWA] Service worker regisztráció hiba:', err);
+              });
+          });
+        }
+      })();
+    </script>
 </body>
 
 </html>

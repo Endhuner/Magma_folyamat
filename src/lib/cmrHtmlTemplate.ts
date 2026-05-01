@@ -1,6 +1,8 @@
 import { Order, Customer, Product, DeliveryNote } from '@/lib/types'
 import { generateDeliveryNoteSequenceNumber } from '@/lib/helpers'
 import { CmrLayoutSettings } from '@/lib/cmrTemplateBuilder'
+import { kvStore } from '@/lib/kvStore'
+import { esc } from '@/lib/htmlSafe'
 import { toast } from 'sonner'
 
 const DEFAULT_CMR_SETTINGS: Partial<CmrLayoutSettings> = {
@@ -219,60 +221,60 @@ export function generateCmrHtmlTemplate(
 </head>
 <body>
   <div class="cmr-document">
-    <div class="sequence-number">Saját rendelési szám: ${sequenceNumber}</div>
-    
+    <div class="sequence-number">Saját rendelési szám: ${esc(sequenceNumber)}</div>
+
     <div class="header">
       <h1>NEMZETKÖZI FUVARLEVÉL</h1>
       <h2>INTERNATIONAL CONSIGNMENT NOTE</h2>
     </div>
-    
+
     <div class="notice-box">
       This carriage is subject, notwithstanding any clause to the contrary to the Convention on the Contract for the international Carriage of goods by road (CMR).<br>
       A fuvarozásra elétrő megállapodás esetén is a nemzetközi árufuvarozási egyezmény CMR rendelkezései az irányadók
     </div>
-    
+
     <div class="cmr-grid">
       <div class="section">
         <div class="section-title">1. Feladó (Név, cím, ország)<br>Sender (Name, Address, Country)</div>
         <div class="section-content">
-          <strong>${effectiveSettings.senderName}</strong><br>
-          ${effectiveSettings.senderAddress}<br>
-          ${effectiveSettings.senderCity}, ${effectiveSettings.senderCountry}<br>
-          Adószám: ${effectiveSettings.senderTaxNumber}
+          <strong>${esc(effectiveSettings.senderName)}</strong><br>
+          ${esc(effectiveSettings.senderAddress)}<br>
+          ${esc(effectiveSettings.senderCity)}, ${esc(effectiveSettings.senderCountry)}<br>
+          Adószám: ${esc(effectiveSettings.senderTaxNumber)}
         </div>
       </div>
-      
+
       <div class="section">
         <div class="section-title">2. Átvevő (Név, cím, ország)<br>Consignee (Name, Address, Country)</div>
         <div class="section-content">
-          <strong>${customerInfo?.name || firstCustomer}</strong><br>
-          ${fullAddress}<br>
-          ${customerInfo?.city || ''}, ${customerInfo?.country || ''}<br>
-          ${customerInfo?.taxNumber ? `Adószám: ${customerInfo.taxNumber}` : ''}
+          <strong>${esc(customerInfo?.name || firstCustomer)}</strong><br>
+          ${esc(fullAddress)}<br>
+          ${esc(customerInfo?.city || '')}, ${esc(customerInfo?.country || '')}<br>
+          ${customerInfo?.taxNumber ? `Adószám: ${esc(customerInfo.taxNumber)}` : ''}
         </div>
       </div>
-      
+
       <div class="section">
         <div class="section-title">3. Az áru átvételének helye és időpontja<br>Place and date of delivery of the goods</div>
         <div class="section-content">
-          Helység / Place: <strong>${effectiveSettings.placeOfTakingOver}</strong><br>
-          Ország / Country: <strong>${effectiveSettings.senderCountry}</strong>
+          Helység / Place: <strong>${esc(effectiveSettings.placeOfTakingOver)}</strong><br>
+          Ország / Country: <strong>${esc(effectiveSettings.senderCountry)}</strong>
         </div>
       </div>
-      
+
       <div class="section">
         <div class="section-title">4. Az áru leadásának helye és időpontja<br>Place and date of taking over of the goods</div>
         <div class="section-content">
-          Helység / Place: <strong>${customerInfo?.city || ''}</strong><br>
-          Ország / Country: <strong>${customerInfo?.country || ''}</strong>
+          Helység / Place: <strong>${esc(customerInfo?.city || '')}</strong><br>
+          Ország / Country: <strong>${esc(customerInfo?.country || '')}</strong>
         </div>
       </div>
-      
+
       <div class="section">
         <div class="section-title">16. Carrier (Name, Address, Country)<br>Fuvarozó (Név, cím, ország)</div>
         <div class="section-content">
-          ${effectiveSettings.carrierName || '<em>Kitöltendő</em>'}<br>
-          ${effectiveSettings.carrierAddress || ''}
+          ${effectiveSettings.carrierName ? esc(effectiveSettings.carrierName) : '<em>Kitöltendő</em>'}<br>
+          ${esc(effectiveSettings.carrierAddress || '')}
         </div>
       </div>
       
@@ -313,11 +315,11 @@ export function generateCmrHtmlTemplate(
         ${orders.map((order, idx) => `
           <tr>
             <td class="center">${idx + 1}</td>
-            <td class="center">${order.orderNumber || '-'}</td>
+            <td class="center">${esc(order.orderNumber || '-')}</td>
             <td class="center">${order.amountPc || 0}</td>
             <td>Raklap</td>
-            <td>${order.productName}<br><small>${order.designation || ''}</small></td>
-            <td class="right">${order.grossWeightKg || '-'}</td>
+            <td>${esc(order.productName)}<br><small>${esc(order.designation || '')}</small></td>
+            <td class="right">${esc(order.grossWeightKg || '-')}</td>
           </tr>
         `).join('')}
       </tbody>
@@ -503,18 +505,18 @@ function applyTemplateData(
       console.log('Termék neve:', order.productName)
       console.log('Mennyiség:', order.amountPc)
       
-      let filledTemplate = itemTemplate
+      const filledTemplate = itemTemplate
         .replace(/{{index}}/g, String(idx + 1))
         .replace(/{{quantity}}/g, String(order.amountPc || 0))
         .replace(/{{packaging}}/g, 'Raklap')
-        .replace(/{{productName}}/g, order.productName || '')
-        .replace(/{{designation}}/g, order.designation || '')
-        .replace(/{{weight}}/g, String(order.grossWeightKg || '-'))
+        .replace(/{{productName}}/g, esc(order.productName || ''))
+        .replace(/{{designation}}/g, esc(order.designation || ''))
+        .replace(/{{weight}}/g, esc(String(order.grossWeightKg || '-')))
         .replace(/{{boxes}}/g, String(order.boxesCount || 0))
         .replace(/{{pallets}}/g, String(order.palletsCount || 0))
-        .replace(/{{orderNumber}}/g, order.orderNumber || '-')
-        .replace(/{{referenceNumber}}/g, order.ownOrderNumber || '-')
-        .replace(/{{ownOrderNumber}}/g, order.ownOrderNumber || '-')
+        .replace(/{{orderNumber}}/g, esc(order.orderNumber || '-'))
+        .replace(/{{referenceNumber}}/g, esc(order.ownOrderNumber || '-'))
+        .replace(/{{ownOrderNumber}}/g, esc(order.ownOrderNumber || '-'))
       
       console.log(`✅ Rendelés ${idx + 1} feldolgozva:`)
       console.log(`  - ownOrderNumber: "${order.ownOrderNumber || '-'}"`)
@@ -546,32 +548,32 @@ function applyTemplateData(
   }
 
   console.log('\n=== STATIKUS VÁLTOZÓK BEHELYETTESÍTÉSE (MÁSODSZOR!) ===')
-  html = html.replace(/{{documentNumber}}/g, sequenceNumber)
-  html = html.replace(/{{sequenceNumber}}/g, sequenceNumber)
-  html = html.replace(/{{senderName}}/g, effectiveSettings.senderName || '')
-  html = html.replace(/{{senderAddress}}/g, effectiveSettings.senderAddress || '')
-  html = html.replace(/{{senderCity}}/g, effectiveSettings.senderCity || '')
-  html = html.replace(/{{senderCountry}}/g, effectiveSettings.senderCountry || '')
-  html = html.replace(/{{senderTaxNumber}}/g, effectiveSettings.senderTaxNumber || '')
-  html = html.replace(/{{recipientName}}/g, customerInfo?.name || firstCustomer)
-  html = html.replace(/{{recipientAddress}}/g, fullAddress)
-  html = html.replace(/{{recipientCity}}/g, customerInfo?.city || '')
-  html = html.replace(/{{recipientCountry}}/g, customerInfo?.country || '')
-  html = html.replace(/{{customerName}}/g, customerInfo?.name || firstCustomer)
-  html = html.replace(/{{customerAddress}}/g, fullAddress)
-  html = html.replace(/{{customerCity}}/g, customerInfo?.city || '')
-  html = html.replace(/{{customerCountry}}/g, customerInfo?.country || '')
-  html = html.replace(/{{customerTaxNumber}}/g, customerInfo?.taxNumber || '')
-  html = html.replace(/{{pickupLocation}}/g, effectiveSettings.placeOfTakingOver || '')
-  html = html.replace(/{{deliveryLocation}}/g, customerInfo?.city || '')
+  html = html.replace(/{{documentNumber}}/g, esc(sequenceNumber))
+  html = html.replace(/{{sequenceNumber}}/g, esc(sequenceNumber))
+  html = html.replace(/{{senderName}}/g, esc(effectiveSettings.senderName || ''))
+  html = html.replace(/{{senderAddress}}/g, esc(effectiveSettings.senderAddress || ''))
+  html = html.replace(/{{senderCity}}/g, esc(effectiveSettings.senderCity || ''))
+  html = html.replace(/{{senderCountry}}/g, esc(effectiveSettings.senderCountry || ''))
+  html = html.replace(/{{senderTaxNumber}}/g, esc(effectiveSettings.senderTaxNumber || ''))
+  html = html.replace(/{{recipientName}}/g, esc(customerInfo?.name || firstCustomer))
+  html = html.replace(/{{recipientAddress}}/g, esc(fullAddress))
+  html = html.replace(/{{recipientCity}}/g, esc(customerInfo?.city || ''))
+  html = html.replace(/{{recipientCountry}}/g, esc(customerInfo?.country || ''))
+  html = html.replace(/{{customerName}}/g, esc(customerInfo?.name || firstCustomer))
+  html = html.replace(/{{customerAddress}}/g, esc(fullAddress))
+  html = html.replace(/{{customerCity}}/g, esc(customerInfo?.city || ''))
+  html = html.replace(/{{customerCountry}}/g, esc(customerInfo?.country || ''))
+  html = html.replace(/{{customerTaxNumber}}/g, esc(customerInfo?.taxNumber || ''))
+  html = html.replace(/{{pickupLocation}}/g, esc(effectiveSettings.placeOfTakingOver || ''))
+  html = html.replace(/{{deliveryLocation}}/g, esc(customerInfo?.city || ''))
   html = html.replace(/{{deliveryDate}}/g, new Date().toLocaleDateString('hu-HU'))
   html = html.replace(/{{issueDate}}/g, new Date().toLocaleDateString('hu-HU'))
-  html = html.replace(/{{carrierName}}/g, effectiveSettings.carrierName || '')
-  html = html.replace(/{{carrierAddress}}/g, effectiveSettings.carrierAddress || '')
-  html = html.replace(/{{vehiclePlate}}/g, effectiveSettings.vehiclePlate || '')
-  html = html.replace(/{{orderNumber}}/g, orderNumber)
-  html = html.replace(/{{ownOrderNumber}}/g, ownOrderNumber)
-  html = html.replace(/{{productName}}/g, orders[0]?.productName || '')
+  html = html.replace(/{{carrierName}}/g, esc(effectiveSettings.carrierName || ''))
+  html = html.replace(/{{carrierAddress}}/g, esc(effectiveSettings.carrierAddress || ''))
+  html = html.replace(/{{vehiclePlate}}/g, esc(effectiveSettings.vehiclePlate || ''))
+  html = html.replace(/{{orderNumber}}/g, esc(orderNumber))
+  html = html.replace(/{{ownOrderNumber}}/g, esc(ownOrderNumber))
+  html = html.replace(/{{productName}}/g, esc(orders[0]?.productName || ''))
   html = html.replace(/{{totalQuantity}}/g, String(totalQuantity))
   html = html.replace(/{{totalBoxes}}/g, String(totalBoxes))
   html = html.replace(/{{totalPallets}}/g, String(totalPallets))
@@ -643,16 +645,16 @@ export async function exportCmrAsHtml(
 
   let html = ''
   let templateSource = 'beégetett sablon'
-  let activeTemplate = null
-  let usedMargins = null
+  let activeTemplate: any = null
+  let usedMargins: any = null
 
   try {
-    const activeTemplates = await spark.kv.get<{ cmr?: string, delivery?: string }>('active-templates')
-    const savedTemplates = await spark.kv.get<any[]>('saved-templates')
-    
+    const activeTemplates = kvStore.get<{ cmr?: string, delivery?: string }>('active-templates')
+    const savedTemplates = kvStore.get<any[]>('saved-templates')
+
     const firstOrder = orders[0]
     const customer = customers.find(c => c.name === firstOrder?.customer)
-    let templateToUse = null
+    let templateToUse: any = null
     
     if (customer?.cmrTemplateId) {
       templateToUse = savedTemplates?.find((t: any) => t.id === customer.cmrTemplateId)

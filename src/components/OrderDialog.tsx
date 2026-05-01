@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { generateOwnOrderNumber } from '@/lib/helpers'
+import { generateOwnOrderNumber, parseIntSafe, stripDiacritics } from '@/lib/helpers'
 import { computeAutoFieldsForOrder } from '@/lib/orderService'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MagnifyingGlass, Check } from '@phosphor-icons/react'
@@ -43,14 +43,6 @@ function inputDateToYMD(value: string): string {
   const date = new Date(value)
   if (isNaN(date.getTime())) return ''
   return dateToYMD(date)
-}
-
-function stripDiacritics(s: string): string {
-  return String(s ?? '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
 }
 
 export function OrderDialog({ open, onClose, onSave, order, customers, products, orders }: OrderDialogProps) {
@@ -100,8 +92,12 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
     )
 
     const allOptions = customerProducts.map(p => ({
+      // A `value` a Product.id — egyedi és stabil. A label a felhasználónak
+      // megjelenített név (vagy rajzszám), a `drawingNumber` / `productName`
+      // pedig a `handleProductSelect` által a formra másolt mezők.
+      id: p.id,
       label: p.productName || p.drawingNumber || '(nincs név)',
-      value: p.drawingNumber || p.productName,
+      value: p.id,
       drawingNumber: p.drawingNumber,
       productName: p.productName,
       material: p.material,
@@ -151,13 +147,17 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
   }, [order, open, orders])
 
   const handleCustomerSelect = (customerName: string) => {
-    setFormData({ 
-      ...formData, 
-      customer: customerName, 
-      productName: '', 
-      designation: '', 
-      material: '', 
-      notes: '' 
+    setFormData({
+      ...formData,
+      customer: customerName,
+      // Vevőváltáskor a termékhivatkozást is nulláznunk kell, különben
+      // ott marad a régi vevő terméke az új vevő alatt — ami a
+      // `findProductForOrder`-en keresztül később false-positive találatot adna.
+      productId: undefined,
+      productName: '',
+      designation: '',
+      material: '',
+      notes: '',
     })
     setShowCustomerList(false)
     setCustomerSearchQuery('')
@@ -170,6 +170,9 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
 
     setFormData(prev => ({
       ...prev,
+      // Erős hivatkozás a master-termékre. Ezt használja a `findProductForOrder`,
+      // hogy a gyártás-kártyán mindig a *valódi* termékadat jelenjen meg.
+      productId: product.id,
       productName: product.drawingNumber || '',
       designation: product.productName || '',
       material: product.material || prev.material || '',
@@ -294,22 +297,30 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
                             {productOptions.length === 0 ? (
                               <div className="px-3 py-2 text-sm text-muted-foreground">Nincs találat</div>
                             ) : (
-                              productOptions.map((p, idx) => (
-                                <div
-                                  key={idx}
-                                  className={cn(
-                                    "flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent rounded-sm",
-                                    formData.productName === p.value && "bg-accent"
-                                  )}
-                                  onClick={() => handleProductSelect(p.value)}
-                                >
-                                  {formData.productName === p.value && <Check className="w-4 h-4" />}
-                                  <div className={cn(formData.productName !== p.value && "ml-6")}>
-                                    <div>{p.label}</div>
-                                    {p.drawingNumber && <div className="text-xs text-muted-foreground">Rajzszám: {p.drawingNumber}</div>}
+                              productOptions.map((p) => {
+                                // A kijelölést elsődlegesen a productId alapján
+                                // mutatjuk; ha az nincs (régi rendelés szerkesztésekor),
+                                // visszaesünk a régi név-alapú összevetésre.
+                                const isSelected = formData.productId
+                                  ? formData.productId === p.id
+                                  : formData.productName === p.drawingNumber
+                                return (
+                                  <div
+                                    key={p.id}
+                                    className={cn(
+                                      "flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent rounded-sm",
+                                      isSelected && "bg-accent"
+                                    )}
+                                    onClick={() => handleProductSelect(p.value)}
+                                  >
+                                    {isSelected && <Check className="w-4 h-4" />}
+                                    <div className={cn(!isSelected && "ml-6")}>
+                                      <div>{p.label}</div>
+                                      {p.drawingNumber && <div className="text-xs text-muted-foreground">Rajzszám: {p.drawingNumber}</div>}
+                                    </div>
                                   </div>
-                                </div>
-                              ))
+                                )
+                              })
                             )}
                           </div>
                         </ScrollArea>
@@ -378,7 +389,7 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
                   id="amountPc"
                   type="number"
                   value={formData.amountPc}
-                  onChange={(e) => setFormData({ ...formData, amountPc: Number(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, amountPc: parseIntSafe(e.target.value, 0, { allowNegative: false }) })}
                   min={0}
                 />
               </div>

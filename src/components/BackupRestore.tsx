@@ -1,5 +1,12 @@
 import { useState } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/useKV'
+import { useEntityKV } from '@/hooks/useEntityKV'
+import {
+  ordersRepo,
+  customersRepo,
+  productsRepo,
+  deliveryNotesRepo,
+} from '@/lib/db/repos'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -10,6 +17,7 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { hu } from 'date-fns/locale'
 import { CmrLayoutSettings } from '@/lib/cmrTemplateBuilder'
+import { validateBackup } from '@/lib/backupSchema'
 
 interface BackupData {
   version: string
@@ -35,10 +43,13 @@ interface SavedBackup {
 }
 
 export function BackupRestore() {
-  const [orders, setOrders] = useKV<Order[]>('orders', [])
-  const [customers, setCustomers] = useKV<Customer[]>('customers', [])
-  const [products, setProducts] = useKV<Product[]>('products', [])
-  const [deliveryNotes, setDeliveryNotes] = useKV<DeliveryNote[]>('deliveryNotes', [])
+  // Az entitások már IndexedDB-ből jönnek (useEntityKV adapter), de a backup
+  // fájl-formátum változatlan — exporthoz az értékeket olvassuk, importhoz
+  // a settert hívjuk (a setter diff-et számol a Dexie alá).
+  const [orders, setOrders] = useEntityKV<Order>(ordersRepo)
+  const [customers, setCustomers] = useEntityKV<Customer>(customersRepo)
+  const [products, setProducts] = useEntityKV<Product>(productsRepo)
+  const [deliveryNotes, setDeliveryNotes] = useEntityKV<DeliveryNote>(deliveryNotesRepo)
   const [customerSequences] = useKV<Record<string, number>>('customerSequences', {})
   const [cmrSettings] = useKV<CmrLayoutSettings>('cmr-layout-settings', {
     senderName: 'Magma Kft',
@@ -124,12 +135,27 @@ export function BackupRestore() {
 
       try {
         const text = await file.text()
-        const data: BackupData = JSON.parse(text)
-
-        if (!data.version || !data.timestamp) {
-          toast.error('Érvénytelen biztonsági mentés fájl')
+        let parsed: unknown
+        try {
+          parsed = JSON.parse(text)
+        } catch {
+          toast.error('Hibás JSON fájl — nem lehet beolvasni a tartalmat')
           return
         }
+
+        // Strukturális Zod-validáció — ne engedjük át a sérült/nem megfelelő
+        // shape-ű mentéseket a setOrders/setCustomers stb. felé.
+        const result = validateBackup(parsed)
+        if (!result.success || !result.data) {
+          // A Zod hibaüzenet többsoros, ezért description-t használunk a toast-ban.
+          toast.error('Érvénytelen biztonsági mentés fájl', {
+            description: result.error || 'A fájl nem felel meg a várt sémának.',
+            duration: 12000,
+          })
+          return
+        }
+
+        const data = result.data as unknown as BackupData
 
         toast.warning(
           <div className="flex flex-col gap-1">

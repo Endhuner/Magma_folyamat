@@ -8,7 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Funnel, Plus, Trash, CaretDown } from '@phosphor-icons/react'
 import { ColumnFilter } from '@/lib/types'
 import { toast } from 'sonner'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/useKV'
 
 const AVAILABLE_COLUMNS = [
   { id: 'sequenceNumber', label: 'Sorszám' },
