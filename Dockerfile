@@ -50,6 +50,19 @@ RUN npm ci
 COPY packages/shared packages/shared
 COPY apps/api apps/api
 
+# Shared csomag fordítása (TypeScript → JavaScript)
+# Production-ban nincs tsx, a Node.js nem tud .ts fájlokat futtatni
+WORKDIR /repo/packages/shared
+RUN npx tsc src/index.ts src/types.ts src/schemas.ts \
+      --noEmit false --outDir dist \
+      --module nodenext --moduleResolution nodenext \
+      --target ES2022 --declaration false --skipLibCheck \
+      --esModuleInterop true && \
+    node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('package.json','utf8')); \
+      p.main='./dist/index.js'; \
+      p.exports={'.':{'import':'./dist/index.js'},'./types':{'import':'./dist/types.js'}}; \
+      fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
+
 WORKDIR /repo/apps/api
 RUN npm run build
 
@@ -65,7 +78,8 @@ RUN mkdir -p /data
 
 # ── API futtatható fájlok ───────────────────────────────────────────────────
 COPY --from=build-api /repo/node_modules          ./node_modules
-COPY --from=build-api /repo/packages/shared       ./packages/shared
+COPY --from=build-api /repo/packages/shared/dist        ./packages/shared/dist
+COPY --from=build-api /repo/packages/shared/package.json ./packages/shared/package.json
 COPY --from=build-api /repo/apps/api/dist         ./apps/api/dist
 COPY --from=build-api /repo/apps/api/package.json ./apps/api/package.json
 COPY --from=build-api /repo/apps/api/src/db/migrations ./apps/api/dist/db/migrations
