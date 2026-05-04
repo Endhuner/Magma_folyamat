@@ -37,18 +37,6 @@ function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, o
 
   return (
     <>
-      <div className="bg-muted/50 border border-accent/30 rounded-lg p-3 mb-3">
-        <h4 className="text-xs font-semibold text-muted-foreground mb-2">📋 Gyors referencia - Sablon változók (Készlet):</h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1 text-xs font-mono">
-          <div><span className="text-accent font-semibold">{'{{drawingNumber}}'}</span> - Rajzszám</div>
-          <div><span className="text-accent font-semibold">{'{{productName}}'}</span> - Termék neve</div>
-          <div><span className="text-accent font-semibold">{'{{customer}}'}</span> - Vevő</div>
-          <div><span className="text-accent font-semibold">{'{{quantity}}'}</span> - Mennyiség (db)</div>
-          <div><span className="text-accent font-semibold">{'{{location}}'}</span> - Raktár hely</div>
-          <div><span className="text-accent font-semibold">{'{{notes}}'}</span> - Megjegyzés</div>
-          <div><span className="text-accent font-semibold">{'{{lastUpdated}}'}</span> - Utolsó frissítés</div>
-        </div>
-      </div>
 
       <div className="border rounded-lg overflow-hidden">
         <Table>

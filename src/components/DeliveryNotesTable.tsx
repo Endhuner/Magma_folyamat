@@ -297,25 +297,6 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
 
   return (
     <>
-      <div className="bg-muted/50 border border-accent/30 rounded-lg p-3 mb-3">
-        <h4 className="text-xs font-semibold text-muted-foreground mb-2">📋 Gyors referencia - Sablon változók (Dokumentumok):</h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1 text-xs font-mono">
-          <div><span className="text-accent font-semibold">{'{{ownOrderNumber}}'}</span> - Saját rendelési szám</div>
-          <div><span className="text-accent font-semibold">{'{{orderNumber}}'}</span> - Vevő rendelési száma</div>
-          <div><span className="text-accent font-semibold">{'{{customer}}'}</span> - Vevő neve</div>
-          <div><span className="text-accent font-semibold">{'{{customerLanguage}}'}</span> - Vevő nyelve</div>
-          <div><span className="text-accent font-semibold">{'{{customerAddress}}'}</span> - Vevő címe</div>
-          <div><span className="text-accent font-semibold">{'{{customerCity}}'}</span> - Város</div>
-          <div><span className="text-accent font-semibold">{'{{customerCountry}}'}</span> - Ország</div>
-          <div><span className="text-accent font-semibold">{'{{drawingNumber}}'}</span> - Termék rajzszáma</div>
-          <div><span className="text-accent font-semibold">{'{{productName}}'}</span> - Termék neve</div>
-          <div><span className="text-accent font-semibold">{'{{designation}}'}</span> - Termék megnevezés</div>
-          <div><span className="text-accent font-semibold">{'{{amountPc}}'}</span> - Mennyiség (db)</div>
-          <div><span className="text-accent font-semibold">{'{{boxesCount}}'}</span> - Dobozok száma</div>
-          <div><span className="text-accent font-semibold">{'{{palletsCount}}'}</span> - Raklapok száma</div>
-          <div><span className="text-accent font-semibold">{'{{grossWeightKg}}'}</span> - Össz bruttó súly</div>
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">

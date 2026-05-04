@@ -174,33 +174,7 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
 
   return (
     <>
-      <div className="bg-muted/50 border border-accent/30 rounded-lg p-3 mb-3">
-        <h4 className="text-xs font-semibold text-muted-foreground mb-2">📋 Gyors referencia - Sablon változók:</h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1 text-xs font-mono">
-          <div><span className="text-accent font-semibold">{'{{customer}}'}</span> - Vevő</div>
-          <div><span className="text-accent font-semibold">{'{{productName}}'}</span> - Termék neve</div>
-          <div><span className="text-accent font-semibold">{'{{designation}}'}</span> - Megnevezése</div>
-          <div><span className="text-accent font-semibold">{'{{notes}}'}</span> - Megjegyzés</div>
-          <div><span className="text-accent font-semibold">{'{{ownOrderNumber}}'}</span> - Saját rendelési szám</div>
-          <div><span className="text-accent font-semibold">{'{{material}}'}</span> - Anyag</div>
-          <div><span className="text-accent font-semibold">{'{{orderNumber}}'}</span> - Vevő rendelési száma</div>
-          <div><span className="text-accent font-semibold">{'{{amountPc}}'}</span> - Mennyiség (db)</div>
-          <div><span className="text-accent font-semibold">{'{{orderDate}}'}</span> - Rendelés dátuma</div>
-          <div><span className="text-accent font-semibold">{'{{requiredDate}}'}</span> - Szükséges szállítási dátum</div>
-          <div><span className="text-accent font-semibold">{'{{pickupDate}}'}</span> - Tényleges átvételi dátum</div>
-          <div><span className="text-accent font-semibold">{'{{invoiced}}'}</span> - Számlázva</div>
-          <div><span className="text-accent font-semibold">{'{{ready}}'}</span> - Szállításra kész</div>
-          <div><span className="text-accent font-semibold">{'{{surfaceTreatment}}'}</span> - Felületkezelés</div>
-          <div><span className="text-accent font-semibold">{'{{boxesCount}}'}</span> - Dobozok száma</div>
-          <div><span className="text-accent font-semibold">{'{{palletsCount}}'}</span> - Össz raklapok száma</div>
-          <div><span className="text-accent font-semibold">{'{{grossWeightKg}}'}</span> - Össz bruttó súly</div>
-          <div><span className="text-accent font-semibold">{'{{requiredMaterialKg}}'}</span> - Szükséges anyagmennyiség</div>
-          <div><span className="text-accent font-semibold">{'{{plannedProductionHours}}'}</span> - Tervezett gyártási idő</div>
-          <div><span className="text-accent font-semibold">{'{{deliveryNote}}'}</span> - Szállítólevél</div>
-          <div><span className="text-accent font-semibold">{'{{cmr}}'}</span> - CMR</div>
-          <div><span className="text-accent font-semibold">{'{{status}}'}</span> - Státusz</div>
-        </div>
-      </div>
+
 
       <div className="border rounded-lg mb-4">
         <ScrollArea className="w-full whitespace-nowrap">

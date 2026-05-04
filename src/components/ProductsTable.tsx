@@ -171,28 +171,6 @@ function ProductsTableImpl({ products, orders, onEdit, onDelete, onBulkDelete }:
 
   return (
     <>
-      <div className="bg-muted/50 border border-accent/30 rounded-lg p-3 mb-3">
-        <h4 className="text-xs font-semibold text-muted-foreground mb-2">📋 Gyors referencia - Sablon változók (Termékek):</h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1 text-xs font-mono">
-          <div><span className="text-accent font-semibold">{'{{productCustomer}}'}</span> - Ügyfél</div>
-          <div><span className="text-accent font-semibold">{'{{drawingNumber}}'}</span> - Termék rajzszáma</div>
-          <div><span className="text-accent font-semibold">{'{{productName}}'}</span> - Termék megnevezés</div>
-          <div><span className="text-accent font-semibold">{'{{productNotes}}'}</span> - Megjegyzés</div>
-          <div><span className="text-accent font-semibold">{'{{nestCount}}'}</span> - Fészekszáma</div>
-          <div><span className="text-accent font-semibold">{'{{weightPerPiece}}'}</span> - Súly/db</div>
-          <div><span className="text-accent font-semibold">{'{{material}}'}</span> - Anyag</div>
-          <div><span className="text-accent font-semibold">{'{{surfaceTreatment}}'}</span> - Felületkezelés</div>
-          <div><span className="text-accent font-semibold">{'{{cycleTime}}'}</span> - Ciklus idő</div>
-          <div><span className="text-accent font-semibold">{'{{postWorkTime}}'}</span> - Utómunka idő</div>
-          <div><span className="text-accent font-semibold">{'{{postWork}}'}</span> - Utómunkák</div>
-          <div><span className="text-accent font-semibold">{'{{boxSize}}'}</span> - Doboz méret</div>
-          <div><span className="text-accent font-semibold">{'{{piecesPerBox}}'}</span> - Doboz/db</div>
-          <div><span className="text-accent font-semibold">{'{{boxesPerPallet}}'}</span> - Doboz/Raklap</div>
-          <div><span className="text-accent font-semibold">{'{{articleNumber}}'}</span> - Arktikál nr.</div>
-          <div><span className="text-accent font-semibold">{'{{warehouse}}'}</span> - Raktár</div>
-          <div><span className="text-accent font-semibold">{'{{spureWeight}}'}</span> - Engusz súly</div>
-        </div>
-      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2 flex-wrap">

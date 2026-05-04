@@ -67,19 +67,6 @@ function CustomersTableImpl({ customers, orders, onEdit, onDelete }: CustomersTa
 
   return (
     <>
-      <div className="bg-muted/50 border border-accent/30 rounded-lg p-3 mb-3">
-        <h4 className="text-xs font-semibold text-muted-foreground mb-2">📋 Gyors referencia - Sablon változók (Vevők):</h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1 text-xs font-mono">
-          <div><span className="text-accent font-semibold">{'{{customerName}}'}</span> - Vevő Név</div>
-          <div><span className="text-accent font-semibold">{'{{customerLanguage}}'}</span> - Szállító Nyelve</div>
-          <div><span className="text-accent font-semibold">{'{{customerCity}}'}</span> - Város</div>
-          <div><span className="text-accent font-semibold">{'{{customerPostalCode}}'}</span> - Irányítószám</div>
-          <div><span className="text-accent font-semibold">{'{{customerStreet}}'}</span> - Utca, Házszám</div>
-          <div><span className="text-accent font-semibold">{'{{customerCountry}}'}</span> - Ország</div>
-          <div><span className="text-accent font-semibold">{'{{customerAddress}}'}</span> - Teljes Cím</div>
-          <div><span className="text-accent font-semibold">{'{{customerTaxNumber}}'}</span> - Adószám</div>
-        </div>
-      </div>
 
       <Card className="w-full">
         <ScrollArea className="w-full">
