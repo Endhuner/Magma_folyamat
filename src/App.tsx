@@ -2270,9 +2270,24 @@ body {
                 <p className="text-sm text-muted-foreground">Termelés Irányítási Rendszer</p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Aktív Munkák</p>
-              <p className="text-3xl font-bold font-mono text-accent">{activeWorkCount}</p>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Aktív Munkák</p>
+                <p className="text-3xl font-bold font-mono text-accent">{activeWorkCount}</p>
+              </div>
+              {auth.user && (
+                <div className="flex items-center gap-2 border-l pl-4">
+                  <div className="text-right">
+                    <p className="text-sm font-medium">{auth.user.name}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{auth.user.role === 'admin' ? 'Adminisztrátor' : auth.user.role === 'operator' ? 'Operátor' : 'Megfigyelő'}</p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => auth.logout()} title="Kijelentkezés">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 256 256" fill="currentColor">
+                      <path d="M120,216a8,8,0,0,1-8,8H48a8,8,0,0,1-8-8V40a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H56V208h56A8,8,0,0,1,120,216Zm109.66-93.66-40-40a8,8,0,0,0-11.32,11.32L204.69,120H112a8,8,0,0,0,0,16h92.69l-26.35,26.34a8,8,0,0,0,11.32,11.32l40-40A8,8,0,0,0,229.66,122.34Z"/>
+                    </svg>
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
