@@ -68,7 +68,7 @@ COPY --from=build-api /repo/node_modules          ./node_modules
 COPY --from=build-api /repo/packages/shared       ./packages/shared
 COPY --from=build-api /repo/apps/api/dist         ./apps/api/dist
 COPY --from=build-api /repo/apps/api/package.json ./apps/api/package.json
-COPY --from=build-api /repo/apps/api/src/db/migrations ./apps/api/src/db/migrations
+COPY --from=build-api /repo/apps/api/src/db/migrations ./apps/api/dist/db/migrations
 
 # ── Frontend statikus fájlok (a Fastify @fastify/static szolgálja ki) ───────
 COPY --from=build-frontend /app/dist ./public
