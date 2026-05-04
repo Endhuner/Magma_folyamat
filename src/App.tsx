@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, Suspense } from 'react'
+import { useState, useMemo, useEffect, useRef, Suspense, useCallback } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { useEntityKV } from '@/hooks/useEntityKV'
 import {
@@ -6,12 +6,9 @@ import {
   customersRepo,
   productsRepo,
   deliveryNotesRepo,
-  inventoryRepo,
-  inventoryTransactionsRepo,
-  shiftsRepo,
-  defectsRepo,
   auditLogRepo,
 } from '@/lib/db/repos'
+import { useServerCrud } from '@/lib/providers/useServerCrud'
 import { runMigrationIfNeeded } from '@/lib/db/migrate'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -99,15 +96,45 @@ function App() {
   const [customers, setCustomers] = useEntityKV<Customer>(customersRepo)
   const [products, setProducts] = useEntityKV<Product>(productsRepo)
   const [deliveryNotes, setDeliveryNotes] = useEntityKV<DeliveryNote>(deliveryNotesRepo)
-  const [inventory, setInventory] = useEntityKV<InventoryItem>(inventoryRepo)
-  const [inventoryTransactions, setInventoryTransactions] = useEntityKV<InventoryTransaction>(
-    inventoryTransactionsRepo
-  )
-  const [productionShifts, setProductionShifts] = useEntityKV<ProductionShift>(shiftsRepo)
-  // Naplók még localStorage-ban — egyszerűek és a méret korlátozott.
-  const [productionLogs, setProductionLogs] = useKV<ProductionLog[]>('production-logs', [])
-  // Selejt-rögzítések — külön entitás, ld. ProductionDefect (egy rendeléshez több is tartozhat).
-  const [productionDefects, setProductionDefects] = useEntityKV<ProductionDefect>(defectsRepo)
+
+  // Gyártás + Készlet: szerver-alapú (SQLite), SSE valós idejű szinkronnal.
+  // Minden felhasználó (admin + operátor) azonnal látja egymás adatait.
+  const inventoryApi = useServerCrud<InventoryItem>('inventory-items', ['inventory'])
+  const inventory = inventoryApi.items
+  const transactionsApi = useServerCrud<InventoryTransaction>('inventory-transactions', ['inventoryTransaction'])
+  const inventoryTransactions = transactionsApi.items
+  const shiftsApi = useServerCrud<ProductionShift>('shifts', ['shift'])
+  const productionShifts = shiftsApi.items
+  const logsApi = useServerCrud<ProductionLog>('production-logs', ['shift'])
+  const productionLogs = logsApi.items
+  const defectsApi = useServerCrud<ProductionDefect>('defects', ['defect'])
+  const productionDefects = defectsApi.items
+
+  // Kompatibilitási wrapper: a meglévő funkcionális setter mintát (setInventory(prev => ...))
+  // leképezi a szerver API hívásokra. Szinkronban fut, így az itemId-t befogó
+  // applyProductionShiftToInventory / applyDefectToInventory is helyesen működik.
+  const setInventory = useCallback((updater: InventoryItem[] | ((prev: InventoryItem[] | undefined) => InventoryItem[])) => {
+    const prev = inventoryApi.items
+    const next = typeof updater === 'function' ? updater(prev) : updater
+    const prevMap = new Map(prev.map(i => [i.id, i]))
+    const nextMap = new Map(next.map(i => [i.id, i]))
+    for (const item of prev) {
+      if (!nextMap.has(item.id)) inventoryApi.remove(item.id)
+    }
+    for (const item of next) {
+      if (!prevMap.has(item.id)) inventoryApi.add(item)
+      else if (JSON.stringify(prevMap.get(item.id)) !== JSON.stringify(item)) inventoryApi.replace(item)
+    }
+  }, [inventoryApi])
+
+  const setInventoryTransactions = useCallback((updater: InventoryTransaction[] | ((prev: InventoryTransaction[] | undefined) => InventoryTransaction[])) => {
+    const prev = transactionsApi.items
+    const next = typeof updater === 'function' ? updater(prev) : updater
+    const prevIds = new Set(prev.map(i => i.id))
+    for (const item of next) {
+      if (!prevIds.has(item.id)) transactionsApi.add(item)
+    }
+  }, [transactionsApi])
   // Változásnapló — minden lényeges adatmódosítás itt is rögzül (Dokumentumok → Változások).
   const [auditLog, setAuditLog] = useEntityKV<AuditLogEntry>(auditLogRepo)
   const [machines, setMachines] = useKV<Machine[]>('machines', [])
@@ -1161,13 +1188,7 @@ body {
     const existing = (productionShifts || []).find((s) => s.id === shift.id)
     const qtyDelta = shift.producedQuantity - (existing?.producedQuantity ?? 0)
 
-    setProductionShifts((current) => {
-      const list = current || []
-      if (existing) {
-        return list.map((s) => (s.id === shift.id ? shift : s))
-      }
-      return [...list, shift]
-    })
+    if (existing) { shiftsApi.replace(shift) } else { shiftsApi.add(shift) }
 
     const order = (orders || []).find((o) => o.id === shift.orderId)
     const product = findProductForOrder(order)
@@ -1189,7 +1210,7 @@ body {
       userId: shift.userId,
       createdAt: new Date().toISOString(),
     }
-    setProductionLogs((current) => [...(current || []), logEntry])
+    logsApi.add(logEntry)
 
     // Audit-log bejegyzés (változásnapló)
     const shiftName = `${shift.date} ${shift.shift === 'de' ? 'DE' : 'DU'} · ${order?.productName || order?.id || shift.orderId}`
@@ -1218,7 +1239,7 @@ body {
     if (!existing) return
     const qtyDelta = -existing.producedQuantity // fordított delta → visszavonás
 
-    setProductionShifts((current) => (current || []).filter((s) => s.id !== shiftId))
+    shiftsApi.remove(shiftId)
 
     const order = (orders || []).find((o) => o.id === existing.orderId)
     const product = findProductForOrder(order)
@@ -1227,17 +1248,14 @@ body {
       applyProductionShiftToInventory(existing, order, product, qtyDelta, /* isDelete */ true)
     }
 
-    setProductionLogs((current) => [
-      ...(current || []),
-      {
-        id: `plog-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        orderId: existing.orderId,
-        productId: product?.id,
-        action: 'Műszak törölve',
-        notes: `${existing.date} · ${existing.shotsCount} lövés visszavonva`,
-        createdAt: new Date().toISOString(),
-      },
-    ])
+    logsApi.add({
+      id: `plog-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      orderId: existing.orderId,
+      productId: product?.id,
+      action: 'Műszak törölve',
+      notes: `${existing.date} · ${existing.shotsCount} lövés visszavonva`,
+      createdAt: new Date().toISOString(),
+    })
 
     const shiftName = `${existing.date} ${existing.shift === 'de' ? 'DE' : 'DU'} · ${order?.productName || existing.orderId}`
     appendAudit('shift', 'Műszak', existing.id, shiftName, 'delete', {
@@ -1340,13 +1358,7 @@ body {
 
   const handleSaveDefect = (defect: ProductionDefect) => {
     const previous = (productionDefects || []).find((d) => d.id === defect.id)
-    setProductionDefects((current) => {
-      const list = current || []
-      const exists = list.some((d) => d.id === defect.id)
-      return exists
-        ? list.map((d) => (d.id === defect.id ? defect : d))
-        : [...list, defect]
-    })
+    if (previous) { defectsApi.replace(defect) } else { defectsApi.add(defect) }
 
     const order = (orders || []).find((o) => o.id === defect.orderId)
     const product = order ? findProductForOrder(order) : undefined
@@ -1364,18 +1376,15 @@ body {
       }
     }
 
-    setProductionLogs((current) => [
-      ...(current || []),
-      {
-        id: `plog-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        orderId: defect.orderId,
-        productId: product?.id,
-        action: previous ? 'Selejt módosítva' : 'Selejt rögzítve',
-        notes: `${defect.date} · ${defect.quantity} db · ${defect.reason}`,
-        userId: defect.userId,
-        createdAt: new Date().toISOString(),
-      },
-    ])
+    logsApi.add({
+      id: `plog-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      orderId: defect.orderId,
+      productId: product?.id,
+      action: previous ? 'Selejt módosítva' : 'Selejt rögzítve',
+      notes: `${defect.date} · ${defect.quantity} db · ${defect.reason}`,
+      userId: defect.userId,
+      createdAt: new Date().toISOString(),
+    })
 
     // Audit-log
     const defectName = `${defect.date} · ${order?.productName || defect.orderId}`
@@ -1402,7 +1411,7 @@ body {
   const handleDeleteDefect = (defectId: string) => {
     const existing = (productionDefects || []).find((d) => d.id === defectId)
     if (!existing) return
-    setProductionDefects((current) => (current || []).filter((d) => d.id !== defectId))
+    defectsApi.remove(defectId)
     const order = (orders || []).find((o) => o.id === existing.orderId)
     const product = order ? findProductForOrder(order) : undefined
 
@@ -1417,17 +1426,14 @@ body {
       )
     }
 
-    setProductionLogs((current) => [
-      ...(current || []),
-      {
-        id: `plog-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        orderId: existing.orderId,
-        productId: product?.id,
-        action: 'Selejt törölve',
-        notes: `${existing.date} · ${existing.quantity} db visszavonva`,
-        createdAt: new Date().toISOString(),
-      },
-    ])
+    logsApi.add({
+      id: `plog-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      orderId: existing.orderId,
+      productId: product?.id,
+      action: 'Selejt törölve',
+      notes: `${existing.date} · ${existing.quantity} db visszavonva`,
+      createdAt: new Date().toISOString(),
+    })
 
     const defectName = `${existing.date} · ${order?.productName || existing.orderId}`
     appendAudit('defect', 'Selejt', existing.id, defectName, 'delete', {
