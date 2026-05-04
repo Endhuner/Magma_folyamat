@@ -7,6 +7,7 @@
  *   - Indok / megjegyzés
  *   - Dátum (alap: ma)
  */
+import { generateId } from '@/lib/generateId'
 import { useEffect, useState } from 'react'
 import {
   Dialog,
@@ -85,7 +86,7 @@ export function DefectEntryDialog({
     }
     const now = new Date().toISOString()
     const id =
-      editing?.id ?? crypto.randomUUID()
+      editing?.id ?? generateId()
     const out: ProductionDefect = {
       id,
       orderId,

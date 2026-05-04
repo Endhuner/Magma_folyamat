@@ -1,3 +1,4 @@
+import { generateId } from '@/lib/generateId'
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -47,7 +48,7 @@ export function OrderBulkImportDialog({ open, onClose, onImport }: OrderBulkImpo
         const grossWeightKgStr = getField(row, 'Bruttó súly kg', 'Bruttó súly', 'Gross weight')
         const statusVal = getField(row, 'Status', 'Státusz', 'Állapot')
         const order: Partial<Order> = {
-          id: crypto.randomUUID(),
+          id: generateId(),
           customer: getField(row, 'Customer', 'Ügyfél', 'Vevő', 'Vevő név'),
           productName: getField(row, 'Megnevezése', 'Termék megnevezés', 'Megnevezés', 'Termék név'),
           ownOrderNumber: getField(row, 'Saját rendelési szám', 'Saját rendelés', 'Saját rend. szám'),

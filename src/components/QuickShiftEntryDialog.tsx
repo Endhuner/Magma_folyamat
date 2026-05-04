@@ -1,3 +1,4 @@
+import { generateId } from '@/lib/generateId'
 import { useEffect, useMemo, useState } from 'react'
 import type { Order, Product, ProductionShift } from '@/lib/types'
 import {
@@ -69,7 +70,7 @@ export function QuickShiftEntryDialog({
     }
     const now = new Date().toISOString()
     const newShift: ProductionShift = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       orderId: order.id,
       date,
       shift,

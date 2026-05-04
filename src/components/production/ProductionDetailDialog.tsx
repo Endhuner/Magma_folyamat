@@ -1,3 +1,4 @@
+import { generateId } from '@/lib/generateId'
 import { useEffect, useMemo, useState } from 'react'
 import type {
   Order,
@@ -175,7 +176,7 @@ export function ProductionDetailDialog({
       return
     }
 
-    const id = editingId ?? crypto.randomUUID()
+    const id = editingId ?? generateId()
     const now = new Date().toISOString()
 
     const newShift: ProductionShift = {

@@ -1,3 +1,4 @@
+import { generateId } from '@/lib/generateId'
 import { useState, useMemo, useEffect, useRef, Suspense, useCallback } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { useEntityKV } from '@/hooks/useEntityKV'
@@ -986,7 +987,7 @@ body {
       )
 
       const newOrder: Order = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         ...orderData,
         ...autoFields,
         createdAt: new Date().toISOString(),
@@ -1029,7 +1030,7 @@ body {
 
     const duplicatedOrder: Order = {
       ...order,
-      id: crypto.randomUUID(),
+      id: generateId(),
       orderNumber: '',
       ownOrderNumber: '',
       deliveryNote: '',
@@ -1267,7 +1268,7 @@ body {
 
     // Naplóbejegyzés
     const logEntry: ProductionLog = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       orderId: shift.orderId,
       productId: product?.id,
       action: existing ? 'Műszak módosítás' : 'Műszak rögzítés',
@@ -1314,7 +1315,7 @@ body {
     }
 
     logsApi.add({
-      id: crypto.randomUUID(),
+      id: generateId(),
       orderId: existing.orderId,
       productId: product?.id,
       action: 'Műszak törölve',
@@ -1388,7 +1389,7 @@ body {
       // Nincs még készlettétel: ha kivét érkezne (delta < 0), nem hozunk létre tételt 0 készlettel.
       // Pozitív (visszavétel) delta esetén pedig nem tipikus, hogy kell, de létrehozzuk védelemből.
       if (delta <= 0) return list
-      itemId = crypto.randomUUID()
+      itemId = generateId()
       const newItem: InventoryItem = {
         id: itemId,
         productId,
@@ -1408,7 +1409,7 @@ body {
 
     if (itemId) {
       const transaction: InventoryTransaction = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         inventoryItemId: itemId,
         type: delta >= 0 ? 'in' : 'out',
         quantity: Math.abs(delta),
@@ -1442,7 +1443,7 @@ body {
     }
 
     logsApi.add({
-      id: crypto.randomUUID(),
+      id: generateId(),
       orderId: defect.orderId,
       productId: product?.id,
       action: previous ? 'Selejt módosítva' : 'Selejt rögzítve',
@@ -1492,7 +1493,7 @@ body {
     }
 
     logsApi.add({
-      id: crypto.randomUUID(),
+      id: generateId(),
       orderId: existing.orderId,
       productId: product?.id,
       action: 'Selejt törölve',
@@ -1562,7 +1563,7 @@ body {
       }
       // Ha még nincs tétel, és negatív delta érkezne (törlés nincs mihez), ne hozzunk létre újat.
       if (delta <= 0) return list
-      itemId = crypto.randomUUID()
+      itemId = generateId()
       const newItem: InventoryItem = {
         id: itemId,
         productId,
@@ -1582,7 +1583,7 @@ body {
 
     if (itemId) {
       const transaction: InventoryTransaction = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         inventoryItemId: itemId,
         type: delta >= 0 ? 'in' : 'out',
         quantity: Math.abs(delta),
@@ -1725,7 +1726,7 @@ body {
       toast.success('Termék sikeresen frissítve')
     } else {
       const newProduct: Product = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         ...productData,
       } as Product
       setProducts((current) => [...(current || []), newProduct])
@@ -2084,7 +2085,7 @@ body {
       (deliveryNote, sequenceNumber) => {
         const newNote = {
           ...deliveryNote,
-          id: crypto.randomUUID(),
+          id: generateId(),
           sequenceNumber: sequenceNumber || '',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -2183,7 +2184,7 @@ body {
       (deliveryNote, sequenceNumber) => {
         const newNote = {
           ...deliveryNote,
-          id: crypto.randomUUID(),
+          id: generateId(),
           sequenceNumber: sequenceNumber || '',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -2723,7 +2724,7 @@ body {
             toast.success('Készlet tétel frissítve')
           } else {
             const newItem: InventoryItem = {
-              id: crypto.randomUUID(),
+              id: generateId(),
               ...itemData,
               createdAt: new Date().toISOString(),
             } as InventoryItem
@@ -2753,7 +2754,7 @@ body {
           if (!selectedInventoryItem) return
 
           const transaction: InventoryTransaction = {
-            id: crypto.randomUUID(),
+            id: generateId(),
             inventoryItemId: selectedInventoryItem.id,
             type: adjustment.type,
             quantity: adjustment.quantity,

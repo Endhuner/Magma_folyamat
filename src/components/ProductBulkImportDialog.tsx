@@ -1,3 +1,4 @@
+import { generateId } from '@/lib/generateId'
 import { useState, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -118,7 +119,7 @@ export function ProductBulkImportDialog({ open, onClose, onImport }: ProductBulk
         }
 
         validProducts.push({
-          id: crypto.randomUUID(),
+          id: generateId(),
           customer: getField(row, 'Ügyfél', 'Vevő', 'Ügyfél név', 'Vevő név'),
           drawingNumber,
           productName,

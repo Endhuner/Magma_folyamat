@@ -1,3 +1,4 @@
+import { generateId } from '@/lib/generateId'
 import { useEffect, useMemo, useState } from 'react'
 import type { InventoryItem, InventoryTransaction, Product } from '@/lib/types'
 import {
@@ -121,7 +122,7 @@ export function WarehouseAddDialog({
     } else {
       createdNew = true
       item = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         productId: selectedProduct.id,
         productName: selectedProduct.productName,
         drawingNumber: selectedProduct.drawingNumber,
@@ -137,7 +138,7 @@ export function WarehouseAddDialog({
     }
 
     const transaction: InventoryTransaction = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       inventoryItemId: item.id,
       type: 'in',
       quantity,

@@ -1,3 +1,4 @@
+import { generateId } from '@/lib/generateId'
 import { useState, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -115,7 +116,7 @@ export function BulkImportDialog({ open, onClose, onImport }: BulkImportDialogPr
         }
 
         validCustomers.push({
-          id: crypto.randomUUID(),
+          id: generateId(),
           name,
           language: getField(row, 'Szállító Nyelve', 'Szállító nyelve', 'Nyelv', 'Vevő nyelve'),
           city: getField(row, 'Város'),
