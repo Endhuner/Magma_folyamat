@@ -37,10 +37,10 @@ import {
   CmrSettingsDialog,
   DeliverySettingsDialog,
   LabelTemplateDialog,
-  OrderBulkImportDialog,
-  ProductBulkImportDialog,
-  BulkImportDialog,
 } from '@/components/lazy'
+import { OrderBulkImportDialog } from '@/components/OrderBulkImportDialog'
+import { ProductBulkImportDialog } from '@/components/ProductBulkImportDialog'
+import { BulkImportDialog } from '@/components/BulkImportDialog'
 import { DocumentFilterDialog } from '@/components/DocumentFilterDialog'
 import { OrderColumnFilterDialog } from '@/components/OrderColumnFilterDialog'
 import { ProductionView } from '@/components/ProductionView'
@@ -2826,15 +2826,11 @@ body {
         orders={orders || []}
       />
 
-      {orderBulkImportDialogOpen && (
-        <Suspense fallback={null}>
-          <OrderBulkImportDialog
-            open={orderBulkImportDialogOpen}
-            onClose={() => setOrderBulkImportDialogOpen(false)}
-            onImport={handleOrderBulkImport}
-          />
-        </Suspense>
-      )}
+      <OrderBulkImportDialog
+        open={orderBulkImportDialogOpen}
+        onClose={() => setOrderBulkImportDialogOpen(false)}
+        onImport={handleOrderBulkImport}
+      />
 
       <CustomerDialog
         open={customerDialogOpen}
@@ -2848,15 +2844,11 @@ body {
         labelTemplates={labelTemplates || []}
       />
 
-      {bulkImportDialogOpen && (
-        <Suspense fallback={null}>
-          <BulkImportDialog
-            open={bulkImportDialogOpen}
-            onClose={() => setBulkImportDialogOpen(false)}
-            onImport={handleBulkImport}
-          />
-        </Suspense>
-      )}
+      <BulkImportDialog
+        open={bulkImportDialogOpen}
+        onClose={() => setBulkImportDialogOpen(false)}
+        onImport={handleBulkImport}
+      />
 
       <ProductDialog
         open={productDialogOpen}
@@ -2868,15 +2860,11 @@ body {
         product={selectedProduct}
       />
 
-      {productBulkImportDialogOpen && (
-        <Suspense fallback={null}>
-          <ProductBulkImportDialog
-            open={productBulkImportDialogOpen}
-            onClose={() => setProductBulkImportDialogOpen(false)}
-            onImport={handleProductBulkImport}
-          />
-        </Suspense>
-      )}
+      <ProductBulkImportDialog
+        open={productBulkImportDialogOpen}
+        onClose={() => setProductBulkImportDialogOpen(false)}
+        onImport={handleProductBulkImport}
+      />
 
       {cmrSettingsDialogOpen && (
         <Suspense fallback={null}>
