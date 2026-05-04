@@ -13,7 +13,7 @@ export async function productsRoutes(app: FastifyInstance): Promise<void> {
     auditLabel: 'Termék',
     nameField: 'productName',
     permissions: {
-      read:   ['admin'],
+      read:   ['admin', 'operator'],  // operátor látja a termékeket (készletautomatikához)
       create: ['admin'],
       update: ['admin'],
       delete: ['admin'],

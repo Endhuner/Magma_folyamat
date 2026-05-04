@@ -2,9 +2,6 @@ import { useState, useMemo, useEffect, useRef, Suspense, useCallback } from 'rea
 import { useKV } from '@/hooks/useKV'
 import { useEntityKV } from '@/hooks/useEntityKV'
 import {
-  ordersRepo,
-  customersRepo,
-  productsRepo,
   deliveryNotesRepo,
   auditLogRepo,
 } from '@/lib/db/repos'
@@ -92,9 +89,13 @@ function App() {
   // megőrzi a `useKV` API-t (tuple: [értékek, setter]), de írásnál a diff-et
   // számolja és a Dexie tranzakcióval atomian perzisztálja.
   // ──────────────────────────────────────────────────────────────────────────
-  const [orders, setOrders] = useEntityKV<Order>(ordersRepo)
-  const [customers, setCustomers] = useEntityKV<Customer>(customersRepo)
-  const [products, setProducts] = useEntityKV<Product>(productsRepo)
+  // Rendelések, vevők, termékek: szerver-alapú (SQLite), mindenki látja.
+  const ordersApi = useServerCrud<Order>('orders', ['order'])
+  const orders = ordersApi.items
+  const customersApi = useServerCrud<Customer>('customers', ['customer'])
+  const customers = customersApi.items
+  const productsApi = useServerCrud<Product>('products', ['product'])
+  const products = productsApi.items
   const [deliveryNotes, setDeliveryNotes] = useEntityKV<DeliveryNote>(deliveryNotesRepo)
 
   // Gyártás + Készlet: szerver-alapú (SQLite), SSE valós idejű szinkronnal.
@@ -135,6 +136,30 @@ function App() {
       if (!prevIds.has(item.id)) transactionsApi.add(item)
     }
   }, [transactionsApi])
+
+  // Rendelések / vevők / termékek: ugyanaz a diff-alapú wrapper mint a készletnél.
+  function makeSyncSetter<T extends { id: string }>(
+    api: { items: T[]; add: (i: T) => void; remove: (id: string) => void; replace: (i: T) => void }
+  ) {
+    return (updater: T[] | ((prev: T[] | undefined) => T[])) => {
+      const prev = api.items
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      const prevMap = new Map(prev.map(i => [i.id, i]))
+      const nextMap = new Map(next.map(i => [i.id, i]))
+      for (const item of prev) { if (!nextMap.has(item.id)) api.remove(item.id) }
+      for (const item of next) {
+        if (!prevMap.has(item.id)) api.add(item)
+        else if (JSON.stringify(prevMap.get(item.id)) !== JSON.stringify(item)) api.replace(item)
+      }
+    }
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const setOrders = useCallback(makeSyncSetter(ordersApi), [ordersApi.items, ordersApi.add, ordersApi.remove, ordersApi.replace])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const setCustomers = useCallback(makeSyncSetter(customersApi), [customersApi.items, customersApi.add, customersApi.remove, customersApi.replace])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const setProducts = useCallback(makeSyncSetter(productsApi), [productsApi.items, productsApi.add, productsApi.remove, productsApi.replace])
+
   // Változásnapló — minden lényeges adatmódosítás itt is rögzül (Dokumentumok → Változások).
   const [auditLog, setAuditLog] = useEntityKV<AuditLogEntry>(auditLogRepo)
   const [machines, setMachines] = useKV<Machine[]>('machines', [])

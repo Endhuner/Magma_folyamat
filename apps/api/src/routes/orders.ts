@@ -21,7 +21,7 @@ export async function ordersRoutes(app: FastifyInstance): Promise<void> {
     auditLabel: 'Rendelés',
     nameField: 'orderNumber',
     permissions: {
-      read:   ['admin'],
+      read:   ['admin', 'operator'],  // operátor is látja a gyártáshoz szükséges rendeléseket
       create: ['admin'],
       update: ['admin'],
       delete: ['admin'],
