@@ -72,17 +72,37 @@ export function useServerCrud<T extends { id: string }>(
   reloadRef.current = reload
 
   useEffect(() => {
-    const es = new EventSource(`${API_BASE}/api/v1/events`, { withCredentials: true })
-    const types = sseKey.split(',')
-    const handler = () => { reloadRef.current() }
-    for (const t of types) {
-      if (t) es.addEventListener(t, handler)
-    }
-    return () => {
+    let es: EventSource
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    let destroyed = false
+
+    const connect = () => {
+      if (destroyed) return
+      es = new EventSource(`${API_BASE}/api/v1/events`, { withCredentials: true })
+      const types = sseKey.split(',')
+      const handler = () => { reloadRef.current() }
       for (const t of types) {
-        if (t) es.removeEventListener(t, handler)
+        if (t) es.addEventListener(t, handler)
       }
-      es.close()
+      // Ha a szerver leáll vagy a konténer újraindul, az EventSource onerror
+      // tüzel. Ilyenkor 5 másodperc után újracsatlakozunk és frissítünk.
+      es.onerror = () => {
+        es.close()
+        if (!destroyed) {
+          reconnectTimer = setTimeout(() => {
+            reloadRef.current()   // frissítés az újracsatlakozás előtt
+            connect()
+          }, 5000)
+        }
+      }
+    }
+
+    connect()
+
+    return () => {
+      destroyed = true
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      es?.close()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sseKey])

@@ -1,3 +1,4 @@
+import { generateId } from '@/lib/generateId'
 import { useState, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -239,7 +240,7 @@ export function SimpleListView<T extends SimpleRecord>({
     const baseExisting = isEdit ? items.find((i) => i.id === editingId) : undefined
 
     const out: Record<string, string> = {
-      id: editingId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      id: editingId ?? generateId(),
       createdAt: baseExisting?.createdAt ?? now,
       updatedAt: now,
     }

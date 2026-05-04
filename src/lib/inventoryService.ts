@@ -1,3 +1,4 @@
+import { generateId } from './generateId'
 import { Order, Product, InventoryItem, InventoryTransaction } from './types'
 
 export interface InventoryDeductionResult {
@@ -121,7 +122,7 @@ export function deductInventoryForOrders(
       })
 
       const transaction: InventoryTransaction = {
-        id: `trans-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: generateId(),
         inventoryItemId: inventoryItem.id,
         type: 'out',
         quantity: deductQty,

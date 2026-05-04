@@ -1,3 +1,4 @@
+import { generateId } from '@/lib/generateId'
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -59,7 +60,7 @@ export function CustomerDialog({ open, onClose, onSave, customer, savedTemplates
     }
 
     if (!customer) {
-      customerData.id = Date.now().toString()
+      customerData.id = generateId()
       customerData.createdAt = new Date().toISOString()
     }
 
