@@ -1258,11 +1258,10 @@ body {
 
     const order = (orders || []).find((o) => o.id === shift.orderId)
     const product = findProductForOrder(order)
-    // Automatikus készletfrissítés — csak akkor tiltjuk le, ha a termékhez
-    // kifejezetten `autoUpdateInventory: false` van beállítva. Product nélkül
-    // is frissítünk (Order adatokból), hogy a termelt mennyiség ne vesszen el.
-    const autoUpdate = product?.autoUpdateInventory !== false
-    if (order && autoUpdate && qtyDelta !== 0) {
+    // Automatikus készletfrissítés: mindig frissítünk, ha van rendelés és mennyiség változott.
+    // Az autoUpdateInventory DB-mezőre nem támaszkodunk — annak default értéke false volt,
+    // ami megakadályozta a készletfrissítést minden meglévő terméknél.
+    if (order && qtyDelta !== 0) {
       applyProductionShiftToInventory(shift, order, product, qtyDelta)
     }
 
@@ -1309,8 +1308,7 @@ body {
 
     const order = (orders || []).find((o) => o.id === existing.orderId)
     const product = findProductForOrder(order)
-    const autoUpdate = product?.autoUpdateInventory !== false
-    if (order && autoUpdate && qtyDelta !== 0) {
+    if (order && qtyDelta !== 0) {
       applyProductionShiftToInventory(existing, order, product, qtyDelta, /* isDelete */ true)
     }
 
@@ -1549,8 +1547,9 @@ body {
           i.id === existing.id
             ? {
                 ...i,
-                quantity: Math.max(0, i.quantity + delta),
-                totalShots: Math.max(0, (i.totalShots ?? 0) + (isDelete ? -shift.shotsCount : shift.shotsCount)),
+                // Math.round: a backend integer mezőt vár — float-os lövésszám 400-as hibát okozna
+                quantity: Math.max(0, Math.round(i.quantity + delta)),
+                totalShots: Math.max(0, Math.round((i.totalShots ?? 0) + (isDelete ? -shift.shotsCount : shift.shotsCount))),
                 nestCount: i.nestCount || nestCountValue,
                 // Hiányzó azonosítók feltöltése Product-ból utólag, ha most találtunk
                 productId: i.productId || productId,
@@ -1570,8 +1569,8 @@ body {
         productName: inventoryName,
         drawingNumber,
         customer,
-        quantity: delta,
-        totalShots: shift.shotsCount,
+        quantity: Math.round(delta),
+        totalShots: Math.round(shift.shotsCount),
         nestCount: nestCountValue,
         location: warehouse,
         notes: product ? '' : 'Automatikusan létrehozva gyártásból (nincs termékrekord)',
