@@ -20,7 +20,8 @@ import {
   type ReactNode,
 } from 'react'
 import type { InventoryItem, InventoryTransaction } from '@/lib/types'
-import { useCrudKV, type CrudApi } from './createCrudHook'
+import { type CrudApi } from './createCrudHook'
+import { useServerCrud } from './useServerCrud'
 
 export interface InventoryContextValue {
   /** Készlet-tételek CRUD API. */
@@ -39,8 +40,8 @@ export interface InventoryContextValue {
 const InventoryContext = createContext<InventoryContextValue | null>(null)
 
 export function InventoryProvider({ children }: { children: ReactNode }): ReactElement {
-  const items = useCrudKV<InventoryItem>('inventory', [])
-  const transactions = useCrudKV<InventoryTransaction>('inventoryTransactions', [])
+  const items = useServerCrud<InventoryItem>('inventory-items', ['inventory'])
+  const transactions = useServerCrud<InventoryTransaction>('inventory-transactions', ['inventoryTransaction'])
 
   const productIdIndex = useMemo(() => {
     const m = new Map<string, InventoryItem>()

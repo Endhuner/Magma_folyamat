@@ -21,7 +21,8 @@ import type {
   ProductionLog,
   ProductionShift,
 } from '@/lib/types'
-import { useCrudKV, type CrudApi } from './createCrudHook'
+import { type CrudApi } from './createCrudHook'
+import { useServerCrud } from './useServerCrud'
 
 export interface ProductionContextValue {
   shifts: CrudApi<ProductionShift>
@@ -49,9 +50,9 @@ export interface ProductionContextValue {
 const ProductionContext = createContext<ProductionContextValue | null>(null)
 
 export function ProductionProvider({ children }: { children: ReactNode }): ReactElement {
-  const shifts = useCrudKV<ProductionShift>('production-shifts', [])
-  const defects = useCrudKV<ProductionDefect>('production-defects', [])
-  const logs = useCrudKV<ProductionLog>('production-logs', [])
+  const shifts = useServerCrud<ProductionShift>('shifts', ['shift'])
+  const defects = useServerCrud<ProductionDefect>('defects', ['defect'])
+  const logs = useServerCrud<ProductionLog>('production-logs', ['shift'])
 
   const shiftsIndex = useMemo(() => {
     const m = new Map<string, ProductionShift[]>()
