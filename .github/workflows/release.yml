@@ -1,24 +1,23 @@
 # =============================================================================
 # ProduktívPro — Release workflow (all-in-one Unraid image)
 # =============================================================================
-# Trigger: git tag push (pl. v1.0.0)
+# Trigger:
+#   - main branch push → csak "latest" tag épül (gyors fejlesztés)
+#   - git tag push (pl. v1.0.0) → latest + verziószámok épülnek
 #
 # Verzió létrehozása:
-#   git tag v1.0.0 && git push origin v1.0.0
+#   git tag v1.1.0 && git push origin v1.1.0
 # =============================================================================
 
 name: Release (Unraid all-in-one)
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*.*.*'
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Verzió tag (pl. v1.0.0)'
-        required: false
-        default: 'dev'
 
 jobs:
   release:
@@ -42,25 +41,24 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Kisbetűs image név (GHCR követelmény) + verzió kiolvasása
+      # Kisbetűs image név + verzió/tag meghatározása
       - name: Prepare build metadata
         id: meta
         run: |
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           IMAGE="ghcr.io/${REPO_LOWER}"
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.tag }}"
-          else
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF#refs/tags/}"
+            SEMVER="${VERSION#v}"
+            MINOR="${SEMVER%.*}"
+            TAGS="${IMAGE}:latest,${IMAGE}:${VERSION},${IMAGE}:${SEMVER},${IMAGE}:${MINOR}"
+          else
+            TAGS="${IMAGE}:latest"
           fi
-          SEMVER="${VERSION#v}"
-          MINOR="${SEMVER%.*}"
 
-          echo "image=${IMAGE}"     >> $GITHUB_OUTPUT
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "semver=${SEMVER}"   >> $GITHUB_OUTPUT
-          echo "minor=${MINOR}"     >> $GITHUB_OUTPUT
+          echo "image=${IMAGE}"   >> $GITHUB_OUTPUT
+          echo "tags=${TAGS}"     >> $GITHUB_OUTPUT
 
       # All-in-one image build + push
       - name: Build & push image
@@ -70,46 +68,17 @@ jobs:
           file: Dockerfile
           push: true
           platforms: linux/amd64
-          tags: |
-            ${{ steps.meta.outputs.image }}:latest
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.semver }}
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.minor }}
+          tags: ${{ steps.meta.outputs.tags }}
           labels: |
             org.opencontainers.image.title=ProduktívPro
-            org.opencontainers.image.version=${{ steps.meta.outputs.semver }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=unraid
           cache-to: type=gha,scope=unraid,mode=max
 
-      # GitHub Release automatikus changelog-gal
+      # GitHub Release — csak tag push esetén
       - name: Create GitHub Release
-        if: github.event_name == 'push'
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          body: |
-            ## Telepítés / Frissítés
-
-            **Első telepítés** (Unraid terminálban):
-            ```bash
-            docker run -d \
-              --name produktivpro \
-              --restart unless-stopped \
-              -p 8080:5050 \
-              -v /mnt/user/appdata/produktivpro:/data \
-              -e DEFAULT_ADMIN_PIN=1234 \
-              ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
-            ```
-
-            **Kézi frissítés:**
-            ```bash
-            docker pull ${{ steps.meta.outputs.image }}:latest
-            docker restart produktivpro
-            ```
-
-            **CA template URL** (Unraid → Apps → Settings → My Repositories):
-            ```
-            https://raw.githubusercontent.com/${{ github.repository }}/main/deploy/unraid/produktivpro.xml
-            ```
