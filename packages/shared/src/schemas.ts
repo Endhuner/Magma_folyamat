@@ -27,13 +27,13 @@ export const orderStatusSchema = z.enum([
   'Folyamatban',
   'Előkészítve',
   'Javítás alatt',
-])
+]).catch('Felvéve')  // ismeretlen státuszt alapértelmezettre állítja visszautasítás helyett
 
 export const orderCreateSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   customer: z.string().default(''),
   /** Hivatkozott Product.id — backend kötelezett oldali párosításához. */
-  productId: z.string().uuid().optional(),
+  productId: z.string().optional(),
   productName: z.string().default(''),
   designation: z.string().default(''),
   notes: z.string().default(''),
@@ -64,7 +64,7 @@ export const orderUpdateSchema = orderCreateSchema.partial()
 // Customer
 // ----------------------------------------------------------------------
 export const customerCreateSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   name: z.string().min(1, 'A név kötelező'),
   language: z.string().default(''),
   city: z.string().default(''),
@@ -85,7 +85,7 @@ export const customerUpdateSchema = customerCreateSchema.partial()
 // Product
 // ----------------------------------------------------------------------
 export const productCreateSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   customer: z.string().default(''),
   drawingNumber: z.string().default(''),
   productName: z.string().default(''),
@@ -114,7 +114,7 @@ export const productUpdateSchema = productCreateSchema.partial()
 // Delivery note
 // ----------------------------------------------------------------------
 export const deliveryNoteCreateSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   type: z.enum(['delivery', 'cmr']),
   sequenceNumber: z.string().default(''),
   customer: z.string().default(''),
@@ -131,7 +131,7 @@ export const deliveryNoteUpdateSchema = deliveryNoteCreateSchema.partial()
 // Inventory
 // ----------------------------------------------------------------------
 export const inventoryItemCreateSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   productId: z.string(),
   productName: z.string().default(''),
   drawingNumber: z.string().default(''),
@@ -147,7 +147,7 @@ export const inventoryItemCreateSchema = z.object({
 export const inventoryItemUpdateSchema = inventoryItemCreateSchema.partial()
 
 export const inventoryTransactionCreateSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   inventoryItemId: z.string(),
   type: z.enum(['in', 'out', 'adjustment']),
   quantity: z.number().int(),
@@ -163,7 +163,7 @@ export const inventoryTransactionUpdateSchema = inventoryTransactionCreateSchema
 // Production: shift, defect, log
 // ----------------------------------------------------------------------
 export const productionShiftCreateSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   orderId: z.string(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD formátum kötelező'),
   shift: z.enum(['de', 'du']),
@@ -177,7 +177,7 @@ export const productionShiftCreateSchema = z.object({
 export const productionShiftUpdateSchema = productionShiftCreateSchema.partial()
 
 export const productionDefectCreateSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   orderId: z.string(),
   shiftId: z.string().optional(),
   quantity: z.number().int().min(0),
@@ -190,7 +190,7 @@ export const productionDefectCreateSchema = z.object({
 export const productionDefectUpdateSchema = productionDefectCreateSchema.partial()
 
 export const productionLogCreateSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   productId: z.string().optional(),
   orderId: z.string(),
   action: z.string(),
@@ -204,7 +204,7 @@ export const productionLogUpdateSchema = productionLogCreateSchema.partial()
 // Master data
 // ----------------------------------------------------------------------
 export const machineCreateSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   name: z.string().min(1),
   serialNumber: z.string().default(''),
   type: z.string().default(''),
@@ -218,7 +218,7 @@ export const machineUpdateSchema = machineCreateSchema.partial()
 export const userRoleSchema = z.enum(['admin', 'operator', 'viewer'])
 
 export const userCreateSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   name: z.string().min(1),
   email: z.string().email().or(z.literal('')).default(''),
   role: userRoleSchema.default('operator'),
@@ -245,7 +245,7 @@ export const currentUserSchema = z.object({
 })
 
 export const materialCreateSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   name: z.string().min(1),
   type: z.string().default(''),
   supplier: z.string().default(''),

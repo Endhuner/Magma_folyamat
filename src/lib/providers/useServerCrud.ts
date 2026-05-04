@@ -103,7 +103,8 @@ export function useServerCrud<T extends { id: string }>(
       body: JSON.stringify(item),
     }).then(created => {
       if (created) setItems(cur => cur.map(it => it.id === item.id ? created : it))
-    }).catch(() => {
+    }).catch((err) => {
+      console.error(`[API] POST /${resource} sikertelen:`, err, '\nKüldött adat:', item)
       setItems(cur => cur.filter(it => it.id !== item.id))
     })
   }, [resource])
@@ -117,9 +118,18 @@ export function useServerCrud<T extends { id: string }>(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(item),
+        }).catch((err) => {
+          console.error(`[API] POST /${resource} sikertelen:`, err, '\nKüldött adat:', item)
+          return null
         })
       )
-    ).catch(() => reloadRef.current())
+    ).then(results => {
+      const failed = results.filter(r => r === null).length
+      if (failed > 0) {
+        console.error(`[API] addMany /${resource}: ${failed}/${incoming.length} tétel sikertelen — újratöltés`)
+        reloadRef.current()
+      }
+    })
   }, [resource])
 
   const update = useCallback((id: string, patch: Partial<T>) => {
