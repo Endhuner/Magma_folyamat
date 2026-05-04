@@ -1408,7 +1408,7 @@ body {
 
     if (itemId) {
       const transaction: InventoryTransaction = {
-        id: crypto.randomUUID(),,
+        id: crypto.randomUUID(),
         inventoryItemId: itemId,
         type: delta >= 0 ? 'in' : 'out',
         quantity: Math.abs(delta),
@@ -1582,7 +1582,7 @@ body {
 
     if (itemId) {
       const transaction: InventoryTransaction = {
-        id: crypto.randomUUID(),,
+        id: crypto.randomUUID(),
         inventoryItemId: itemId,
         type: delta >= 0 ? 'in' : 'out',
         quantity: Math.abs(delta),
