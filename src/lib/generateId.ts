@@ -6,7 +6,7 @@
  */
 export function generateId(): string {
   if (
-    typeof crypto \!== 'undefined' &&
+    typeof crypto !== 'undefined' &&
     typeof (crypto as Crypto).randomUUID === 'function'
   ) {
     return (crypto as Crypto).randomUUID()
