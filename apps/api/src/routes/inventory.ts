@@ -28,7 +28,7 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     permissions: {
       read:   ['admin', 'operator'],
       create: ['admin', 'operator'],
-      update: ['admin'],
+      update: ['admin', 'operator'],  // operátor is módosíthat — auto-inventory frissítés műszak mentésekor
       delete: ['admin'],
     },
   })

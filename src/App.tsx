@@ -1267,7 +1267,7 @@ body {
 
     // Naplóbejegyzés
     const logEntry: ProductionLog = {
-      id: `plog-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: crypto.randomUUID(),
       orderId: shift.orderId,
       productId: product?.id,
       action: existing ? 'Műszak módosítás' : 'Műszak rögzítés',
@@ -1314,7 +1314,7 @@ body {
     }
 
     logsApi.add({
-      id: `plog-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: crypto.randomUUID(),
       orderId: existing.orderId,
       productId: product?.id,
       action: 'Műszak törölve',
@@ -1388,7 +1388,7 @@ body {
       // Nincs még készlettétel: ha kivét érkezne (delta < 0), nem hozunk létre tételt 0 készlettel.
       // Pozitív (visszavétel) delta esetén pedig nem tipikus, hogy kell, de létrehozzuk védelemből.
       if (delta <= 0) return list
-      itemId = `inv-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+      itemId = crypto.randomUUID()
       const newItem: InventoryItem = {
         id: itemId,
         productId,
@@ -1408,7 +1408,7 @@ body {
 
     if (itemId) {
       const transaction: InventoryTransaction = {
-        id: `txn-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        id: crypto.randomUUID(),,
         inventoryItemId: itemId,
         type: delta >= 0 ? 'in' : 'out',
         quantity: Math.abs(delta),
@@ -1442,7 +1442,7 @@ body {
     }
 
     logsApi.add({
-      id: `plog-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: crypto.randomUUID(),
       orderId: defect.orderId,
       productId: product?.id,
       action: previous ? 'Selejt módosítva' : 'Selejt rögzítve',
@@ -1492,7 +1492,7 @@ body {
     }
 
     logsApi.add({
-      id: `plog-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: crypto.randomUUID(),
       orderId: existing.orderId,
       productId: product?.id,
       action: 'Selejt törölve',
@@ -1562,7 +1562,7 @@ body {
       }
       // Ha még nincs tétel, és negatív delta érkezne (törlés nincs mihez), ne hozzunk létre újat.
       if (delta <= 0) return list
-      itemId = `inv-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+      itemId = crypto.randomUUID()
       const newItem: InventoryItem = {
         id: itemId,
         productId,
@@ -1582,7 +1582,7 @@ body {
 
     if (itemId) {
       const transaction: InventoryTransaction = {
-        id: `txn-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        id: crypto.randomUUID(),,
         inventoryItemId: itemId,
         type: delta >= 0 ? 'in' : 'out',
         quantity: Math.abs(delta),
@@ -2723,7 +2723,7 @@ body {
             toast.success('Készlet tétel frissítve')
           } else {
             const newItem: InventoryItem = {
-              id: `inv-${Date.now()}`,
+              id: crypto.randomUUID(),
               ...itemData,
               createdAt: new Date().toISOString(),
             } as InventoryItem
