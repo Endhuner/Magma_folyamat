@@ -103,7 +103,7 @@ export const productCreateSchema = z.object({
   articleNumber: z.string().default(''),
   warehouse: z.string().default(''),
   spruWeight: z.string().default(''),
-  autoUpdateInventory: z.boolean().optional(),
+  autoUpdateInventory: z.boolean().default(true).optional(),
   lowStockThreshold: z.number().int().min(0).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),

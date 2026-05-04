@@ -106,7 +106,7 @@ export const products = sqliteTable('products', {
   articleNumber: text('article_number').notNull().default(''),
   warehouse: text('warehouse').notNull().default(''),
   spruWeight: text('spru_weight').notNull().default(''),
-  autoUpdateInventory: integer('auto_update_inventory', { mode: 'boolean' }).default(false),
+  autoUpdateInventory: integer('auto_update_inventory', { mode: 'boolean' }).default(true),
   lowStockThreshold: integer('low_stock_threshold'),
   createdAt: text('created_at').notNull().default(nowDefault),
   updatedAt: text('updated_at').notNull().default(nowDefault),
