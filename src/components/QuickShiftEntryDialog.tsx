@@ -69,7 +69,7 @@ export function QuickShiftEntryDialog({
     }
     const now = new Date().toISOString()
     const newShift: ProductionShift = {
-      id: `shift-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: crypto.randomUUID(),
       orderId: order.id,
       date,
       shift,

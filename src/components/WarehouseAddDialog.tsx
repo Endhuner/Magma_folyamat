@@ -121,7 +121,7 @@ export function WarehouseAddDialog({
     } else {
       createdNew = true
       item = {
-        id: `inv-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        id: crypto.randomUUID(),
         productId: selectedProduct.id,
         productName: selectedProduct.productName,
         drawingNumber: selectedProduct.drawingNumber,
@@ -137,7 +137,7 @@ export function WarehouseAddDialog({
     }
 
     const transaction: InventoryTransaction = {
-      id: `txn-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: crypto.randomUUID(),
       inventoryItemId: item.id,
       type: 'in',
       quantity,

@@ -85,7 +85,7 @@ export function DefectEntryDialog({
     }
     const now = new Date().toISOString()
     const id =
-      editing?.id ?? `defect-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+      editing?.id ?? crypto.randomUUID()
     const out: ProductionDefect = {
       id,
       orderId,

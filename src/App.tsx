@@ -986,7 +986,7 @@ body {
       )
 
       const newOrder: Order = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         ...orderData,
         ...autoFields,
         createdAt: new Date().toISOString(),
@@ -1029,7 +1029,7 @@ body {
 
     const duplicatedOrder: Order = {
       ...order,
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       orderNumber: '',
       ownOrderNumber: '',
       deliveryNote: '',
@@ -1725,7 +1725,7 @@ body {
       toast.success('Termék sikeresen frissítve')
     } else {
       const newProduct: Product = {
-        id: `product-${Date.now()}`,
+        id: crypto.randomUUID(),
         ...productData,
       } as Product
       setProducts((current) => [...(current || []), newProduct])
@@ -2084,7 +2084,7 @@ body {
       (deliveryNote, sequenceNumber) => {
         const newNote = {
           ...deliveryNote,
-          id: Date.now().toString(),
+          id: crypto.randomUUID(),
           sequenceNumber: sequenceNumber || '',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -2183,7 +2183,7 @@ body {
       (deliveryNote, sequenceNumber) => {
         const newNote = {
           ...deliveryNote,
-          id: Date.now().toString(),
+          id: crypto.randomUUID(),
           sequenceNumber: sequenceNumber || '',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -2753,7 +2753,7 @@ body {
           if (!selectedInventoryItem) return
 
           const transaction: InventoryTransaction = {
-            id: `trans-${Date.now()}`,
+            id: crypto.randomUUID(),
             inventoryItemId: selectedInventoryItem.id,
             type: adjustment.type,
             quantity: adjustment.quantity,

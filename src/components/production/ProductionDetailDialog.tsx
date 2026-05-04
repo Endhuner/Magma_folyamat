@@ -175,7 +175,7 @@ export function ProductionDetailDialog({
       return
     }
 
-    const id = editingId ?? `shift-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+    const id = editingId ?? crypto.randomUUID()
     const now = new Date().toISOString()
 
     const newShift: ProductionShift = {
