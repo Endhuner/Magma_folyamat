@@ -116,7 +116,7 @@ export function BulkImportDialog({ open, onClose, onImport }: BulkImportDialogPr
         }
 
         validCustomers.push({
-          id: `import-${Date.now()}-${index}`,
+          id: crypto.randomUUID(),
           name,
           language: getField(row, 'Szállító Nyelve', 'Szállító nyelve', 'Nyelv', 'Vevő nyelve'),
           city: getField(row, 'Város'),

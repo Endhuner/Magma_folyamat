@@ -119,7 +119,7 @@ export function ProductBulkImportDialog({ open, onClose, onImport }: ProductBulk
         }
 
         validProducts.push({
-          id: `import-${Date.now()}-${index}`,
+          id: crypto.randomUUID(),
           customer: getField(row, 'Ügyfél', 'Vevő', 'Ügyfél név', 'Vevő név'),
           drawingNumber,
           productName,

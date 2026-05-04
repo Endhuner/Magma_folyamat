@@ -47,7 +47,7 @@ export function OrderBulkImportDialog({ open, onClose, onImport }: OrderBulkImpo
         const grossWeightKgStr = getField(row, 'Bruttó súly kg', 'Bruttó súly', 'Gross weight')
         const statusVal = getField(row, 'Status', 'Státusz', 'Állapot')
         const order: Partial<Order> = {
-          id: `import-${Date.now()}-${index}`,
+          id: crypto.randomUUID(),
           customer: getField(row, 'Customer', 'Ügyfél', 'Vevő', 'Vevő név'),
           productName: getField(row, 'Megnevezése', 'Termék megnevezés', 'Megnevezés', 'Termék név'),
           ownOrderNumber: getField(row, 'Saját rendelési szám', 'Saját rendelés', 'Saját rend. szám'),

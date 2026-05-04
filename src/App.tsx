@@ -7,6 +7,7 @@ import {
 } from '@/lib/db/repos'
 import { useServerCrud } from '@/lib/providers/useServerCrud'
 import { runMigrationIfNeeded } from '@/lib/db/migrate'
+import { isMigrationDone, markMigrationDone, migrateLocalDataToServer } from '@/lib/db/migrateToServer'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -335,6 +336,45 @@ function App() {
     return () => {
       cancelled = true
     }
+  }, [])
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Egyszeri migráció: IndexedDB (régi localStorage-alapú) → szerver SQLite.
+  // Csak akkor fut, ha a szerver üres ÉS van helyi adat (első indítás után).
+  // ──────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (isMigrationDone()) return
+    // Várunk 2 másodpercet, hogy a szerver-CRUD hook-ok töltsék be az adatot.
+    const timer = setTimeout(async () => {
+      try {
+        const result = await migrateLocalDataToServer()
+        markMigrationDone()
+        if (result.migrated > 0) {
+          toast.success(
+            `Helyi adatok szerverre migrálva: ${result.migrated} tétel.`,
+            { duration: 8000 }
+          )
+          // Frissítjük a szerver-CRUD hookokat, hogy az új adatot lássák.
+          ordersApi.reload()
+          customersApi.reload()
+          productsApi.reload()
+          inventoryApi.reload()
+          transactionsApi.reload()
+          shiftsApi.reload()
+          defectsApi.reload()
+          logsApi.reload()
+        } else {
+          markMigrationDone()
+        }
+        if (result.errors > 0) {
+          console.warn(`[migration] ${result.errors} tétel migrálása sikertelen`)
+        }
+      } catch (err) {
+        console.error('[migration] kritikus hiba:', err)
+      }
+    }, 2000)
+    return () => clearTimeout(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ──────────────────────────────────────────────────────────────────────────
