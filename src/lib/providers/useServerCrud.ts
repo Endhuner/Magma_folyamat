@@ -13,6 +13,7 @@
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { CrudApi } from './createCrudHook'
+import { subscribeSSE } from './sseClient'
 
 const API_BASE: string =
   (typeof import.meta !== 'undefined' &&
@@ -67,43 +68,17 @@ export function useServerCrud<T extends { id: string }>(
     reload()
   }, [reload])
 
-  // SSE feliratkozás — valós idejű frissítés más felhasználók mutációira
+  // SSE feliratkozás — egyetlen megosztott kapcsolaton keresztül (sseClient singleton)
+  // Ez megakadályozza, hogy a 9 hook 9 külön EventSource-t nyisson, ami
+  // meghaladná a böngésző HTTP/1.1 per-host 6 kapcsolatos limitjét.
   const reloadRef = useRef(reload)
   reloadRef.current = reload
 
   useEffect(() => {
-    let es: EventSource
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-    let destroyed = false
-
-    const connect = () => {
-      if (destroyed) return
-      es = new EventSource(`${API_BASE}/api/v1/events`, { withCredentials: true })
-      const types = sseKey.split(',')
-      const handler = () => { reloadRef.current() }
-      for (const t of types) {
-        if (t) es.addEventListener(t, handler)
-      }
-      // Ha a szerver leáll vagy a konténer újraindul, az EventSource onerror
-      // tüzel. Ilyenkor 5 másodperc után újracsatlakozunk és frissítünk.
-      es.onerror = () => {
-        es.close()
-        if (!destroyed) {
-          reconnectTimer = setTimeout(() => {
-            reloadRef.current()   // frissítés az újracsatlakozás előtt
-            connect()
-          }, 5000)
-        }
-      }
-    }
-
-    connect()
-
-    return () => {
-      destroyed = true
-      if (reconnectTimer) clearTimeout(reconnectTimer)
-      es?.close()
-    }
+    const types = sseKey.split(',').filter(Boolean)
+    const handler = () => { reloadRef.current() }
+    const unsubscribe = subscribeSSE(types, handler)
+    return unsubscribe
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sseKey])
 
