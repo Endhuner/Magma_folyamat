@@ -12,5 +12,11 @@ export async function customersRoutes(app: FastifyInstance): Promise<void> {
     auditEntity: 'customer',
     auditLabel: 'Vevő',
     nameField: 'name',
+    permissions: {
+      read:   ['admin'],
+      create: ['admin'],
+      update: ['admin'],
+      delete: ['admin'],
+    },
   })
 }

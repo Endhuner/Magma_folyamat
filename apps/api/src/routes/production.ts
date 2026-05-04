@@ -26,6 +26,12 @@ export async function productionRoutes(app: FastifyInstance): Promise<void> {
     updateSchema: productionShiftUpdateSchema,
     auditEntity: 'shift',
     auditLabel: 'Műszak',
+    permissions: {
+      read:   ['admin', 'operator'],
+      create: ['admin', 'operator'],
+      update: ['admin'],
+      delete: ['admin'],
+    },
   })
   registerCrudRoutes(app, {
     resource: 'defects',
@@ -34,6 +40,12 @@ export async function productionRoutes(app: FastifyInstance): Promise<void> {
     updateSchema: productionDefectUpdateSchema,
     auditEntity: 'defect',
     auditLabel: 'Selejt',
+    permissions: {
+      read:   ['admin', 'operator'],
+      create: ['admin', 'operator'],
+      update: ['admin'],
+      delete: ['admin'],
+    },
   })
   registerCrudRoutes(app, {
     resource: 'production-logs',
@@ -42,5 +54,11 @@ export async function productionRoutes(app: FastifyInstance): Promise<void> {
     updateSchema: productionLogUpdateSchema,
     auditEntity: 'shift', // a frontend 'shift'-hez társítja a logokat
     auditLabel: 'Gyártási napló',
+    permissions: {
+      read:   ['admin', 'operator'],
+      create: ['admin', 'operator'],
+      update: ['admin'],
+      delete: ['admin'],
+    },
   })
 }

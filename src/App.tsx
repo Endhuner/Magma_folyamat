@@ -172,7 +172,9 @@ function App() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   
-  const [currentTab, setCurrentTab] = useState('dashboard')
+  const [currentTab, setCurrentTab] = useState(() =>
+    auth.user?.role === 'operator' ? 'production' : 'dashboard'
+  )
   
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
@@ -2279,15 +2281,15 @@ body {
       <div className="flex-1 container mx-auto px-6 py-8">
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
           <div className="flex items-center gap-3 flex-wrap">
-            <TabsList className="grid w-full md:w-auto md:inline-grid grid-cols-4 md:grid-cols-4">
-              <TabsTrigger value="dashboard">Áttekintés</TabsTrigger>
+            <TabsList className={`grid w-full md:w-auto md:inline-grid ${auth.user?.role === 'operator' ? 'grid-cols-2 md:grid-cols-2' : 'grid-cols-4 md:grid-cols-4'}`}>
+              {auth.user?.role !== 'operator' && <TabsTrigger value="dashboard">Áttekintés</TabsTrigger>}
               <TabsTrigger value="production">Gyártás</TabsTrigger>
-              <TabsTrigger value="orders">Rendelések</TabsTrigger>
+              {auth.user?.role !== 'operator' && <TabsTrigger value="orders">Rendelések</TabsTrigger>}
               <TabsTrigger value="inventory">Készlet</TabsTrigger>
             </TabsList>
 
             <div className="flex items-center gap-2 ml-auto">
-              <DropdownMenu>
+              {auth.user?.role === 'admin' && <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2">
                     <Database className="w-4 h-4" />
@@ -2312,9 +2314,9 @@ body {
                     Anyaglista
                   </DropdownMenuItem>
                 </DropdownMenuContent>
-              </DropdownMenu>
+              </DropdownMenu>}
 
-              <DropdownMenu>
+              {auth.user?.role === 'admin' && <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2">
                     <FileText className="w-4 h-4" />
@@ -2347,7 +2349,7 @@ body {
                     Mentések
                   </DropdownMenuItem>
                 </DropdownMenuContent>
-              </DropdownMenu>
+              </DropdownMenu>}
             </div>
           </div>
 

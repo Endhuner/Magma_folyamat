@@ -20,5 +20,11 @@ export async function ordersRoutes(app: FastifyInstance): Promise<void> {
     auditEntity: 'order',
     auditLabel: 'Rendelés',
     nameField: 'orderNumber',
+    permissions: {
+      read:   ['admin'],
+      create: ['admin'],
+      update: ['admin'],
+      delete: ['admin'],
+    },
   })
 }

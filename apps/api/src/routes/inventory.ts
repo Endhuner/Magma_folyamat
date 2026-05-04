@@ -25,6 +25,12 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     auditEntity: 'inventory',
     auditLabel: 'Készlet tétel',
     nameField: 'productName',
+    permissions: {
+      read:   ['admin', 'operator'],
+      create: ['admin', 'operator'],
+      update: ['admin'],
+      delete: ['admin'],
+    },
   })
   registerCrudRoutes(app, {
     resource: 'inventory-transactions',
@@ -33,5 +39,11 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     updateSchema: inventoryTransactionUpdateSchema,
     auditEntity: 'inventoryTransaction',
     auditLabel: 'Készletmozgás',
+    permissions: {
+      read:   ['admin', 'operator'],
+      create: ['admin', 'operator'],
+      update: ['admin'],
+      delete: ['admin'],
+    },
   })
 }
