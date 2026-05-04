@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Order } from '@/lib/types'
 import { getField, normalizeRow } from '@/lib/importHelpers'
 import { parseFloatSafe, parseIntSafe } from '@/lib/helpers'
+import * as XLSX from 'xlsx'
 
 interface OrderBulkImportDialogProps {
   open: boolean
@@ -32,7 +33,6 @@ export function OrderBulkImportDialog({ open, onClose, onImport }: OrderBulkImpo
     setIsProcessing(true)
 
     try {
-      const XLSX = await import('xlsx')
       const arrayBuffer = await file.arrayBuffer()
       const workbook = XLSX.read(arrayBuffer, { type: 'array' })
       const sheetName = workbook.SheetNames[0]

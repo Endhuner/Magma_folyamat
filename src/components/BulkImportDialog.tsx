@@ -6,6 +6,7 @@ import { Upload, FileXls, CheckCircle, Warning, X } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { getField, normalizeRow } from '@/lib/importHelpers'
+import * as ExcelJS from 'exceljs'
 
 interface BulkImportDialogProps {
   open: boolean
@@ -40,7 +41,6 @@ export function BulkImportDialog({ open, onClose, onImport }: BulkImportDialogPr
 
   const parsePreview = async (file: File) => {
     try {
-      const ExcelJS = await import('exceljs')
       const data = await file.arrayBuffer()
       const workbook = new ExcelJS.Workbook()
       await workbook.xlsx.load(data)
@@ -82,7 +82,6 @@ export function BulkImportDialog({ open, onClose, onImport }: BulkImportDialogPr
     setSuccess(false)
 
     try {
-      const ExcelJS = await import('exceljs')
       const data = await file.arrayBuffer()
       const workbook = new ExcelJS.Workbook()
       await workbook.xlsx.load(data)
