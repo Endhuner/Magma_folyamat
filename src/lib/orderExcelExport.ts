@@ -21,27 +21,36 @@ interface ColDef {
   note?: string
 }
 
+// Dátum oszlop fejlécek — ezeket szövegként kell formázni,
+// hogy Excel ne konvertálja automatikusan dátum-típusra.
+const DATE_HEADERS = new Set([
+  'Order date (year/month/day)',
+  'Required date (year/month/day)',
+  'Actual pickup date (year/month/day)',
+])
+
 const COLUMNS: ColDef[] = [
-  { header: 'Pos',                            key: 'pos',                    width: 6  },
-  { header: 'Customer',                       key: 'customer',               width: 20 },
-  { header: 'Megnevezése',                    key: 'productName',            width: 22, note: 'Rajzszám / terméknév' },
-  { header: 'Megjelölés',                     key: 'designation',            width: 20 },
-  { header: 'Anyag',                          key: 'material',               width: 14 },
-  { header: 'Rendelési szám',                 key: 'orderNumber',            width: 18 },
-  { header: 'Saját rendelési szám',           key: 'ownOrderNumber',         width: 20 },
-  { header: 'Mennyiség db',                   key: 'amountPc',               width: 14, note: 'Egész szám' },
-  { header: 'Order date (year/month/day)',    key: 'orderDate',              width: 22, note: 'pl. 2025-04-01' },
-  { header: 'Actual pickup date (year/month/day)', key: 'pickupDate',       width: 28, note: 'pl. 2025-04-30' },
-  { header: 'Szállításra kész',               key: 'ready',                  width: 16 },
-  { header: 'Felületkezelés',                 key: 'surfaceTreatment',       width: 16 },
-  { header: 'Össz raklapok száma',            key: 'palletsCount',           width: 18, note: 'Egész szám' },
-  { header: 'Szükséges anyag kg',             key: 'requiredMaterialKg',     width: 18, note: 'Szám, pl. 12.5' },
-  { header: 'Bruttó súly kg',                 key: 'grossWeightKg',          width: 15, note: 'Szám, pl. 25.0' },
-  { header: 'Tervezett gyártási órák',        key: 'plannedProductionHours', width: 22 },
-  { header: 'Szállítólevél',                  key: 'deliveryNote',           width: 14 },
-  { header: 'CMR',                            key: 'cmr',                    width: 12 },
-  { header: 'Status',                         key: 'status',                 width: 16, note: 'Felvéve / Folyamatban / Előkészítve / Csomagolás alatt / Kiszállítva / Szünetel / Javítás alatt' },
-  { header: 'Notes',                          key: 'notes',                  width: 30 },
+  { header: 'Pos',                                    key: 'pos',                    width: 6  },
+  { header: 'Customer',                               key: 'customer',               width: 20 },
+  { header: 'Megnevezése',                            key: 'productName',            width: 22, note: 'Rajzszám / terméknév' },
+  { header: 'Megjelölés',                             key: 'designation',            width: 20 },
+  { header: 'Anyag',                                  key: 'material',               width: 14 },
+  { header: 'Rendelési szám',                         key: 'orderNumber',            width: 18 },
+  { header: 'Saját rendelési szám',                   key: 'ownOrderNumber',         width: 20 },
+  { header: 'Mennyiség db',                           key: 'amountPc',               width: 14, note: 'Egész szám' },
+  { header: 'Order date (year/month/day)',            key: 'orderDate',              width: 22, note: 'ÉÉÉÉ-HH-NN formátum, pl. 2025-04-01' },
+  { header: 'Required date (year/month/day)',         key: 'requiredDate',           width: 24, note: 'Határidő. ÉÉÉÉ-HH-NN formátum, pl. 2025-04-30' },
+  { header: 'Actual pickup date (year/month/day)',    key: 'pickupDate',             width: 28, note: 'Tényleges átvétel. ÉÉÉÉ-HH-NN formátum' },
+  { header: 'Szállításra kész',                       key: 'ready',                  width: 16 },
+  { header: 'Felületkezelés',                         key: 'surfaceTreatment',       width: 16 },
+  { header: 'Össz raklapok száma',                    key: 'palletsCount',           width: 18, note: 'Egész szám' },
+  { header: 'Szükséges anyag kg',                     key: 'requiredMaterialKg',     width: 18, note: 'Szám, pl. 12.5' },
+  { header: 'Bruttó súly kg',                         key: 'grossWeightKg',          width: 15, note: 'Szám, pl. 25.0' },
+  { header: 'Tervezett gyártási órák',                key: 'plannedProductionHours', width: 22 },
+  { header: 'Szállítólevél',                          key: 'deliveryNote',           width: 14 },
+  { header: 'CMR',                                    key: 'cmr',                    width: 12 },
+  { header: 'Status',                                 key: 'status',                 width: 16, note: 'Felvéve / Folyamatban / Előkészítve / Csomagolás alatt / Kiszállítva / Szünetel / Javítás alatt' },
+  { header: 'Notes',                                  key: 'notes',                  width: 30 },
 ]
 
 // ─── Segédfüggvény: mai dátum YYYY-MM-DD ─────────────────────────────────────
@@ -73,7 +82,14 @@ function downloadBuffer(buffer: ArrayBuffer, filename: string) {
 // ─── Közös munkalap-felépítő ───────────────────────────────────────────────────
 
 function buildSheet(ws: ExcelJS.Worksheet, rows: Record<string, unknown>[]) {
-  ws.columns = COLUMNS.map((c) => ({ header: c.header, key: c.header, width: c.width }))
+  ws.columns = COLUMNS.map((c) => ({
+    header: c.header,
+    key: c.header,
+    width: c.width,
+    // Dátum oszlopok szövegként — megakadályozza, hogy Excel automatikusan
+    // dátum-típusra konvertálja a ÉÉÉÉ-HH-NN formátumú stringeket.
+    style: DATE_HEADERS.has(c.header) ? { numFmt: '@' } : undefined,
+  }))
 
   // Fejléc sor formázása
   const headerRow = ws.getRow(1)
@@ -100,6 +116,18 @@ function buildSheet(ws: ExcelJS.Worksheet, rows: Record<string, unknown>[]) {
     }
     wsRow.alignment = { vertical: 'middle' }
     wsRow.height = 20
+
+    // Dátum cellák explicit szöveg-típus beállítása soronként
+    COLUMNS.forEach((col, ci) => {
+      if (DATE_HEADERS.has(col.header)) {
+        const cell = wsRow.getCell(ci + 1)
+        const val = cell.value
+        if (val !== null && val !== undefined && val !== '') {
+          cell.value = String(val)
+          cell.numFmt = '@'
+        }
+      }
+    })
   })
 
   // Szegélyek az összes cellán
@@ -139,6 +167,7 @@ export async function downloadOrderImportTemplate(): Promise<void> {
       'Saját rendelési szám': 'SAJAT-001',
       'Mennyiség db': 100,
       'Order date (year/month/day)': todayStr(),
+      'Required date (year/month/day)': '',
       'Actual pickup date (year/month/day)': '',
       'Szállításra kész': '',
       'Felületkezelés': 'Festés',
@@ -161,6 +190,7 @@ export async function downloadOrderImportTemplate(): Promise<void> {
       'Saját rendelési szám': '',
       'Mennyiség db': 50,
       'Order date (year/month/day)': todayStr(),
+      'Required date (year/month/day)': '',
       'Actual pickup date (year/month/day)': '',
       'Szállításra kész': '',
       'Felületkezelés': '',
@@ -192,8 +222,9 @@ export async function downloadOrderImportTemplate(): Promise<void> {
     ['Rendelési szám', 'Vevő rendelési száma'],
     ['Saját rendelési szám', 'Belső rendelési szám'],
     ['Mennyiség db', 'Egész szám, pl. 100'],
-    ['Order date (year/month/day)', 'Dátum YYYY-MM-DD formátumban, pl. 2025-04-01'],
-    ['Actual pickup date (year/month/day)', 'Tényleges átvétel dátuma, YYYY-MM-DD'],
+    ['Order date (year/month/day)', 'Rendelési dátum ÉÉÉÉ-HH-NN formátumban, pl. 2025-04-01'],
+    ['Required date (year/month/day)', 'Határidő ÉÉÉÉ-HH-NN formátumban, pl. 2025-04-30'],
+    ['Actual pickup date (year/month/day)', 'Tényleges átvétel dátuma, ÉÉÉÉ-HH-NN formátum'],
     ['Status', 'Felvéve | Folyamatban | Előkészítve | Csomagolás alatt | Kiszállítva | Szünetel | Javítás alatt'],
     ['Notes', 'Szabad szöveges megjegyzés'],
   ]
@@ -237,6 +268,7 @@ export async function exportOrdersToExcel(
     'Saját rendelési szám':                    o.ownOrderNumber,
     'Mennyiség db':                            o.amountPc,
     'Order date (year/month/day)':             o.orderDate,
+    'Required date (year/month/day)':          o.requiredDate,
     'Actual pickup date (year/month/day)':     o.pickupDate,
     'Szállításra kész':                        o.ready,
     'Felületkezelés':                          o.surfaceTreatment,

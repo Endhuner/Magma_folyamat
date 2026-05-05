@@ -272,7 +272,7 @@ export function ProductionDetailDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-7xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Factory className="w-6 h-6" weight="duotone" />

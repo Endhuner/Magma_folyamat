@@ -158,6 +158,10 @@ export function useServerCrud<T extends { id: string }>(
   }, [resource])
 
   const update = useCallback((id: string, patch: Partial<T>) => {
+    // Ha az elem POST-ban van (még nincs szerveren), a PATCH 404-et adna vissza
+    // → reload → az optimista elem eltűnne. Kihagyjuk; a POST után az elem
+    // a szerver-verziójával szinkronizálódik.
+    if (pendingIds.current.has(id)) return
     setItems(cur => cur.map(it => it.id === id ? { ...it, ...patch } : it))
     apiFetch<T>(apiUrl(resource, id), {
       method: 'PATCH',
@@ -167,6 +171,8 @@ export function useServerCrud<T extends { id: string }>(
   }, [resource])
 
   const replace = useCallback((item: T) => {
+    // Ugyanaz a védekezés mint update-nél: ha a POST még úton van, ne PUT-oljunk.
+    if (pendingIds.current.has(item.id)) return
     setItems(cur => cur.map(it => it.id === item.id ? item : it))
     apiFetch<T>(apiUrl(resource, item.id), {
       method: 'PUT',
