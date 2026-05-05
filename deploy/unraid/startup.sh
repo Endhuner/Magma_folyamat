@@ -90,8 +90,12 @@ fi
 # ── 4. DB migrációk ───────────────────────────────────────────────────────
 echo "[startup] Adatbázis migrációk futtatása..."
 cd /app/apps/api
-node dist/db/migrate.js
-echo "[startup] Migrációk kész."
+if node dist/db/migrate.js; then
+  echo "[startup] Migrációk kész."
+else
+  echo "[startup] HIBA: DB migráció sikertelen! A szerver NEM indul el." >&2
+  exit 1
+fi
 
 # ── 5. Cron démon indítása (időszakos backupok: 6:00 és 18:00) ───────────
 # crond az Alpine busybox része — nincs extra csomag szükséges.

@@ -66,15 +66,7 @@ export function useServerCrud<T extends { id: string }>(
         const pending = cur.filter(
           i => (pendingSnapshot.has(i.id) || pendingIds.current.has(i.id)) && !serverMap.has(i.id)
         )
-        // DIAGNOSZTIKAI napló — konzolban látható, ha valami eltűnik
-        if (resource === 'orders') {
-          const removed = cur.filter(i => !serverMap.has(i.id) && !pendingSnapshot.has(i.id) && !pendingIds.current.has(i.id))
-          if (removed.length > 0) {
-            console.warn(`[ServerCrud/${resource}] reload: ${removed.length} elem NEM szerepel a szerveren és NEM pending → eltávolítva:`, removed.map(i => i.id))
-          }
-          console.log(`[ServerCrud/${resource}] reload kész — szerveren: ${data?.length ?? 0}, pending: ${pendingSnapshot.size}, eredmény: ${(data?.length ?? 0) + pending.length}`)
-        }
-        return [...(data ?? []), ...pending]
+          return [...(data ?? []), ...pending]
       })
       setError(null)
     } catch (e) {
@@ -114,7 +106,6 @@ export function useServerCrud<T extends { id: string }>(
 
   const add = useCallback((item: T) => {
     pendingIds.current.add(item.id)
-    if (resource === 'orders') console.log(`[ServerCrud/orders] add() — optimista hozzáadás, id: ${item.id}, POST indul`)
     setItems(cur => {
       if (cur.some(i => i.id === item.id)) return cur
       return [...cur, item]
@@ -125,13 +116,9 @@ export function useServerCrud<T extends { id: string }>(
       body: JSON.stringify(item),
     }).then(created => {
       pendingIds.current.delete(item.id)
-      if (resource === 'orders') console.log(`[ServerCrud/orders] POST sikeres, szerver visszaigazolta, id: ${item.id}`)
       if (created) {
         setItems(cur => {
           const exists = cur.some(it => it.id === item.id)
-          if (!exists && resource === 'orders') {
-            console.warn(`[ServerCrud/orders] POST után az elem már NEM volt az UI-ban → visszatesszük. id: ${item.id}`)
-          }
           if (exists) return cur.map(it => it.id === item.id ? created : it)
           return [...cur, created]
         })
