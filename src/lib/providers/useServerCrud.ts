@@ -12,6 +12,7 @@
  * @param sseEventTypes - SSE event típusok, amelyek esetén újratölt (pl. ['shift'])
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { toast } from 'sonner'
 import type { CrudApi } from './createCrudHook'
 import { subscribeSSE } from './sseClient'
 
@@ -59,12 +60,19 @@ export function useServerCrud<T extends { id: string }>(
   const reload = useCallback(async () => {
     try {
       const data = await apiFetch<T[]>(apiUrl(resource))
+      // Pillanatkép a pendingIds-ről SZINKRON, az apiFetch után, de setItems
+      // ELŐTT. Ez megakadályozza a TOCTOU versenyhelyzetet: ha a POST .then()
+      // futott le elsőnek (pendingIds.delete), és a React az updater-t csak
+      // ezután dolgozza fel, a snapshot még az "in-flight" állapotot tükrözi.
+      const pendingSnapshot = new Set(pendingIds.current)
       setItems(cur => {
-        // Szerver-lista alapja
         const serverMap = new Map((data ?? []).map(i => [i.id, i]))
-        // Megőrizzük a pending (in-flight POST) elemeket, ha a szerver még
-        // nem adja vissza őket — így nem tűnnek el az UI-ból.
-        const pending = cur.filter(i => pendingIds.current.has(i.id) && !serverMap.has(i.id))
+        // Kétszeres védelem:
+        //  pendingSnapshot — a fetch ELŐTT pending elemek (TOCTOU-biztos)
+        //  pendingIds.current — azóta is pendingek (közben érkező add)
+        const pending = cur.filter(
+          i => (pendingSnapshot.has(i.id) || pendingIds.current.has(i.id)) && !serverMap.has(i.id)
+        )
         return [...(data ?? []), ...pending]
       })
       setError(null)
@@ -127,10 +135,13 @@ export function useServerCrud<T extends { id: string }>(
           return [...cur, created]
         })
       }
-    }).catch((err) => {
+    }).catch((err: Error) => {
       pendingIds.current.delete(item.id)
       console.error(`[API] POST /${resource} sikertelen:`, err, '\nKüldött adat:', item)
       setItems(cur => cur.filter(it => it.id !== item.id))
+      // Felhasználónak látható hibaüzenet — megmutatja, miért tűnt el az elem
+      const msg = err?.message ?? 'Ismeretlen hiba'
+      toast.error(`Mentés sikertelen (${resource}): ${msg}`, { duration: 8000 })
     })
   }, [resource])
 
