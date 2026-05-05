@@ -47,13 +47,26 @@ export function useServerCrud<T extends { id: string }>(
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
+  // Függőben lévő (optimista) add-ek id-halmaza.
+  // Ha egy SSE-triggerelt reload érkezik amíg egy POST még úton van,
+  // a szerver-lista nem tartalmazza az in-flight elemet → az UI-ból eltűnne.
+  // Ezt az id-szettel védjük: a reload megtartja a pending elemeket.
+  const pendingIds = useRef<Set<string>>(new Set())
+
   // Stable string for dep array
   const sseKey = sseEventTypes.join(',')
 
   const reload = useCallback(async () => {
     try {
       const data = await apiFetch<T[]>(apiUrl(resource))
-      setItems(data ?? [])
+      setItems(cur => {
+        // Szerver-lista alapja
+        const serverMap = new Map((data ?? []).map(i => [i.id, i]))
+        // Megőrizzük a pending (in-flight POST) elemeket, ha a szerver még
+        // nem adja vissza őket — így nem tűnnek el az UI-ból.
+        const pending = cur.filter(i => pendingIds.current.has(i.id) && !serverMap.has(i.id))
+        return [...(data ?? []), ...pending]
+      })
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)))
@@ -91,14 +104,31 @@ export function useServerCrud<T extends { id: string }>(
   const byId = useCallback((id: string) => idMap.get(id), [idMap])
 
   const add = useCallback((item: T) => {
-    setItems(cur => [...cur, item])
+    // Megjelöljük pending-ként MIELŐTT az optimista add megtörténik,
+    // hogy egy esetleges azonnali SSE-reload ne dobja el.
+    pendingIds.current.add(item.id)
+    setItems(cur => {
+      // Ha már benne van (pl. dupla hívás), ne adjuk hozzá mégegyszer
+      if (cur.some(i => i.id === item.id)) return cur
+      return [...cur, item]
+    })
     apiFetch<T>(apiUrl(resource), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
     }).then(created => {
-      if (created) setItems(cur => cur.map(it => it.id === item.id ? created : it))
+      pendingIds.current.delete(item.id)
+      if (created) {
+        setItems(cur => {
+          const exists = cur.some(it => it.id === item.id)
+          if (exists) return cur.map(it => it.id === item.id ? created : it)
+          // Ha egy közbülső reload eltávolította (pending guard ellenére),
+          // adjuk vissza a szerver által visszaigazolt verzióval.
+          return [...cur, created]
+        })
+      }
     }).catch((err) => {
+      pendingIds.current.delete(item.id)
       console.error(`[API] POST /${resource} sikertelen:`, err, '\nKüldött adat:', item)
       setItems(cur => cur.filter(it => it.id !== item.id))
     })
