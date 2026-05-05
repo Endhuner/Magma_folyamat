@@ -24,6 +24,7 @@ import { masterDataRoutes } from './routes/masterData.js'
 import { auditLogRoutes } from './routes/auditLog.js'
 import { eventsRoutes } from './routes/events.js'
 import { authRoutes } from './routes/auth.js'
+import { backupRoutes } from './routes/backup.js'
 import { registerRequestLogger } from './lib/requestLogger.js'
 import { registerAuthPlugins } from './lib/authPlugin.js'
 import { bootstrapAdmin } from './lib/bootstrap.js'
@@ -122,6 +123,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     await api.register(masterDataRoutes)
     await api.register(auditLogRoutes)
     await api.register(eventsRoutes)
+    await api.register(backupRoutes)
   }, { prefix: '/api/v1' })
 
   // 404-kezelő:
