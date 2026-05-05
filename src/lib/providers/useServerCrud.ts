@@ -60,19 +60,20 @@ export function useServerCrud<T extends { id: string }>(
   const reload = useCallback(async () => {
     try {
       const data = await apiFetch<T[]>(apiUrl(resource))
-      // Pillanatkép a pendingIds-ről SZINKRON, az apiFetch után, de setItems
-      // ELŐTT. Ez megakadályozza a TOCTOU versenyhelyzetet: ha a POST .then()
-      // futott le elsőnek (pendingIds.delete), és a React az updater-t csak
-      // ezután dolgozza fel, a snapshot még az "in-flight" állapotot tükrözi.
       const pendingSnapshot = new Set(pendingIds.current)
       setItems(cur => {
         const serverMap = new Map((data ?? []).map(i => [i.id, i]))
-        // Kétszeres védelem:
-        //  pendingSnapshot — a fetch ELŐTT pending elemek (TOCTOU-biztos)
-        //  pendingIds.current — azóta is pendingek (közben érkező add)
         const pending = cur.filter(
           i => (pendingSnapshot.has(i.id) || pendingIds.current.has(i.id)) && !serverMap.has(i.id)
         )
+        // DIAGNOSZTIKAI napló — konzolban látható, ha valami eltűnik
+        if (resource === 'orders') {
+          const removed = cur.filter(i => !serverMap.has(i.id) && !pendingSnapshot.has(i.id) && !pendingIds.current.has(i.id))
+          if (removed.length > 0) {
+            console.warn(`[ServerCrud/${resource}] reload: ${removed.length} elem NEM szerepel a szerveren és NEM pending → eltávolítva:`, removed.map(i => i.id))
+          }
+          console.log(`[ServerCrud/${resource}] reload kész — szerveren: ${data?.length ?? 0}, pending: ${pendingSnapshot.size}, eredmény: ${(data?.length ?? 0) + pending.length}`)
+        }
         return [...(data ?? []), ...pending]
       })
       setError(null)
@@ -112,11 +113,9 @@ export function useServerCrud<T extends { id: string }>(
   const byId = useCallback((id: string) => idMap.get(id), [idMap])
 
   const add = useCallback((item: T) => {
-    // Megjelöljük pending-ként MIELŐTT az optimista add megtörténik,
-    // hogy egy esetleges azonnali SSE-reload ne dobja el.
     pendingIds.current.add(item.id)
+    if (resource === 'orders') console.log(`[ServerCrud/orders] add() — optimista hozzáadás, id: ${item.id}, POST indul`)
     setItems(cur => {
-      // Ha már benne van (pl. dupla hívás), ne adjuk hozzá mégegyszer
       if (cur.some(i => i.id === item.id)) return cur
       return [...cur, item]
     })
@@ -126,20 +125,21 @@ export function useServerCrud<T extends { id: string }>(
       body: JSON.stringify(item),
     }).then(created => {
       pendingIds.current.delete(item.id)
+      if (resource === 'orders') console.log(`[ServerCrud/orders] POST sikeres, szerver visszaigazolta, id: ${item.id}`)
       if (created) {
         setItems(cur => {
           const exists = cur.some(it => it.id === item.id)
+          if (!exists && resource === 'orders') {
+            console.warn(`[ServerCrud/orders] POST után az elem már NEM volt az UI-ban → visszatesszük. id: ${item.id}`)
+          }
           if (exists) return cur.map(it => it.id === item.id ? created : it)
-          // Ha egy közbülső reload eltávolította (pending guard ellenére),
-          // adjuk vissza a szerver által visszaigazolt verzióval.
           return [...cur, created]
         })
       }
     }).catch((err: Error) => {
       pendingIds.current.delete(item.id)
-      console.error(`[API] POST /${resource} sikertelen:`, err, '\nKüldött adat:', item)
+      console.error(`[API] POST /${resource} SIKERTELEN:`, err, '\nKüldött adat:', item)
       setItems(cur => cur.filter(it => it.id !== item.id))
-      // Felhasználónak látható hibaüzenet — megmutatja, miért tűnt el az elem
       const msg = err?.message ?? 'Ismeretlen hiba'
       toast.error(`Mentés sikertelen (${resource}): ${msg}`, { duration: 8000 })
     })

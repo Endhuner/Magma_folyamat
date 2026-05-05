@@ -141,22 +141,32 @@ function App() {
 
   // Rendelések / vevők / termékek: ugyanaz a diff-alapú wrapper mint a készletnél.
   function makeSyncSetter<T extends { id: string }>(
-    api: { items: T[]; add: (i: T) => void; remove: (id: string) => void; replace: (i: T) => void }
+    api: { items: T[]; add: (i: T) => void; remove: (id: string) => void; replace: (i: T) => void },
+    debugName?: string
   ) {
     return (updater: T[] | ((prev: T[] | undefined) => T[])) => {
       const prev = api.items
       const next = typeof updater === 'function' ? updater(prev) : updater
       const prevMap = new Map(prev.map(i => [i.id, i]))
       const nextMap = new Map(next.map(i => [i.id, i]))
-      for (const item of prev) { if (!nextMap.has(item.id)) api.remove(item.id) }
+      for (const item of prev) {
+        if (!nextMap.has(item.id)) {
+          if (debugName) console.warn(`[makeSyncSetter/${debugName}] REMOVE hívás, id: ${item.id}`)
+          api.remove(item.id)
+        }
+      }
       for (const item of next) {
-        if (!prevMap.has(item.id)) api.add(item)
-        else if (JSON.stringify(prevMap.get(item.id)) !== JSON.stringify(item)) api.replace(item)
+        if (!prevMap.has(item.id)) {
+          if (debugName) console.log(`[makeSyncSetter/${debugName}] ADD hívás, id: ${item.id}`)
+          api.add(item)
+        } else if (JSON.stringify(prevMap.get(item.id)) !== JSON.stringify(item)) {
+          api.replace(item)
+        }
       }
     }
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const setOrders = useCallback(makeSyncSetter(ordersApi), [ordersApi.items, ordersApi.add, ordersApi.remove, ordersApi.replace])
+  const setOrders = useCallback(makeSyncSetter(ordersApi, 'orders'), [ordersApi.items, ordersApi.add, ordersApi.remove, ordersApi.replace])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const setCustomers = useCallback(makeSyncSetter(customersApi), [customersApi.items, customersApi.add, customersApi.remove, customersApi.replace])
   // eslint-disable-next-line react-hooks/exhaustive-deps
