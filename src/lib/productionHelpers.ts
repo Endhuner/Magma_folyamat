@@ -48,13 +48,31 @@ export function findProductForOrder(
     // Ha az id már nem létező termékre mutat (pl. törlés után), eshetünk
     // vissza a régi heurisztikára, hogy a UI ne maradjon adat nélkül.
   }
+  // Fallback: csak helyes mezőpárosítással keresünk (elkerüljük a cross-field hibát).
+  //
+  // Az adatmodell:
+  //   order.productName  = rajzszám (az OrderDialog a product.drawingNumber-t másolja ide)
+  //   order.designation  = termék neve (az OrderDialog a product.productName-t másolja ide)
+  //   product.drawingNumber = rajzszám
+  //   product.productName   = termék neve
+  //
+  // Helyes párosítások:
+  //   rajzszám ↔ rajzszám: product.drawingNumber === order.productName
+  //   terméknév ↔ terméknév: product.productName === order.designation
+  //
+  // KERÜLENDŐ (cross-field, false positive-ot okoz):
+  //   product.productName === order.productName  (terméknév vs rajzszám)
+  //   product.drawingNumber === order.designation (rajzszám vs terméknév)
+
   return products.find(
     (p) =>
       p.customer === order.customer &&
-      (p.productName === order.productName ||
-        p.drawingNumber === order.productName ||
-        p.productName === order.designation ||
-        p.drawingNumber === order.designation)
+      (
+        // Rajzszám egyezés (mindkét oldal rajzszám)
+        (order.productName && p.drawingNumber === order.productName) ||
+        // Terméknév egyezés (mindkét oldal terméknév)
+        (order.designation && p.productName === order.designation)
+      )
   )
 }
 

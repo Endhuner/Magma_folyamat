@@ -7,6 +7,8 @@
  *  - useAuth() hookkal exportálja a state-et + actionöket
  *  - useRequireRole(...allowed) — egy egyszerű guard, amely a UI-ban
  *    visszadob `null`-t (vagy fallbacket), ha a role nem egyezik
+ *  - Inaktivitás-figyelés: 5 óra után 1 perces visszaszámláló dialog,
+ *    utána automatikus kijelentkezés
  *
  * Külső redux/zustand nem kell — ez egy kis felület, a React context
  * elég. A storage-mentés tudatos hiánya: a JWT egyébként cookie-ban van,
@@ -26,6 +28,31 @@ import {
 import * as authApi from './authApi'
 import { BackendUnavailableError } from './authApi'
 import type { AuthState, CurrentUser, PublicUser, UserRole } from './types'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+
+/** 5 óra inaktivitás után figyelmeztetés — milliszekundumban. */
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 60 * 1000
+
+/** A figyelmeztetés után ennyi másodperccel lép ki automatikusan. */
+const WARNING_SECONDS = 60
+
+/** Az aktivitásnak minősülő böngésző-események listája. */
+const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
+  'mousemove',
+  'mousedown',
+  'keydown',
+  'touchstart',
+  'scroll',
+  'wheel',
+]
 
 interface AuthContextValue extends AuthState {
   login: (userId: string, pin: string) => Promise<CurrentUser>
@@ -51,6 +78,12 @@ const initialState: AuthState = {
 export function AuthProvider({ children }: { children: ReactNode }): ReactElement {
   const [state, setState] = useState<AuthState>(initialState)
   const bootedRef = useRef(false)
+
+  // Inaktivitás timer
+  const [showWarning, setShowWarning] = useState(false)
+  const [countdown, setCountdown] = useState(WARNING_SECONDS)
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -105,12 +138,77 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
   }, [])
 
   const doLogout = useCallback(async () => {
+    // Timer takarítás kijelentkezéskor
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current)
+    setShowWarning(false)
     try {
       await authApi.logout()
     } finally {
       setState((s) => ({ ...s, status: 'unauthenticated', user: null }))
     }
   }, [])
+
+  // ---------------------------------------------------------------------------
+  // Inaktivitás figyelő
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Elindítja (vagy újraindítja) az inaktivitás-timert.
+   * Ha a figyelmeztetés aktív volt, azt is bezárja.
+   */
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current)
+    setShowWarning(false)
+    setCountdown(WARNING_SECONDS)
+
+    inactivityTimerRef.current = setTimeout(() => {
+      // 5 óra eltelt aktivitás nélkül → figyelmeztetés megjelenítése
+      setShowWarning(true)
+      setCountdown(WARNING_SECONDS)
+
+      countdownIntervalRef.current = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(countdownIntervalRef.current!)
+            // Automatikus kijelentkezés
+            void doLogout()
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1_000)
+    }, INACTIVITY_TIMEOUT_MS)
+  }, [doLogout])
+
+  /**
+   * Bekapcsolja az aktivitás-figyelőket, ha a user be van jelentkezve.
+   * Kikapcsolja + törli a timereket, ha kijelentkezik.
+   */
+  useEffect(() => {
+    const isActive = state.status === 'authenticated'
+
+    if (!isActive) {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current)
+      setShowWarning(false)
+      return
+    }
+
+    // Első indítás bejelentkezéskor
+    resetInactivityTimer()
+
+    const handleActivity = () => resetInactivityTimer()
+    ACTIVITY_EVENTS.forEach((ev) => window.addEventListener(ev, handleActivity, { passive: true }))
+
+    return () => {
+      ACTIVITY_EVENTS.forEach((ev) => window.removeEventListener(ev, handleActivity))
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.status])
 
   useEffect(() => {
     if (bootedRef.current) return
@@ -143,7 +241,35 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
     [state, doLogin, doLogout, refresh, refreshPublicUsers, bypassAuth]
   )
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+
+      {/* Inaktivitás-figyelmeztetés dialog */}
+      <Dialog open={showWarning} onOpenChange={() => { /* csak gombbal zárható */ }}>
+        <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>⚠️ Automatikus kijelentkezés</DialogTitle>
+            <DialogDescription>
+              Hosszabb ideig nem volt aktivitás. Biztonsági okokból{' '}
+              <strong>{countdown} másodperc</strong> múlva automatikusan kijelentkezünk.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 justify-end mt-4">
+            <Button
+              variant="outline"
+              onClick={() => void doLogout()}
+            >
+              Kijelentkezés most
+            </Button>
+            <Button onClick={resetInactivityTimer}>
+              Maradok bejelentkezve
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth(): AuthContextValue {

@@ -55,6 +55,8 @@ export const orderCreateSchema = z.object({
   deliveryNote: z.string().default(''),
   cmr: z.string().default(''),
   status: orderStatusSchema.default('Felvéve'),
+  /** Pozíció / prioritás szám — opcionális egész. */
+  pos: z.number().int().nullable().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 })

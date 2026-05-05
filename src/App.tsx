@@ -417,13 +417,16 @@ function App() {
     // `productionHelpers.findProductForOrder` új implementációja már a
     // productId-t várja és így ne hivatkozzunk vissza a régi ágra.
     const matchByLegacy = (order: Order): Product | undefined => {
+      // Csak helyes mezőpárosítás — cross-field false positive-ot okozna:
+      //   order.productName = rajzszám, order.designation = terméknév
+      //   product.drawingNumber = rajzszám, product.productName = terméknév
       return products.find(
         (p) =>
           p.customer === order.customer &&
-          (p.productName === order.productName ||
-            p.drawingNumber === order.productName ||
-            p.productName === order.designation ||
-            p.drawingNumber === order.designation)
+          (
+            (order.productName && p.drawingNumber === order.productName) ||
+            (order.designation && p.productName === order.designation)
+          )
       )
     }
 
@@ -1240,13 +1243,16 @@ body {
       const exact = (products || []).find((p) => p.id === order.productId)
       if (exact) return exact
     }
+    // Fallback: csak helyes mezőpárosítással — cross-field illesztés false positive-ot okoz.
+    // order.productName = rajzszám, order.designation = terméknév (ld. OrderDialog)
+    // product.drawingNumber = rajzszám, product.productName = terméknév
     return (products || []).find(
       (p) =>
         p.customer === order.customer &&
-        (p.productName === order.productName ||
-          p.drawingNumber === order.productName ||
-          p.productName === order.designation ||
-          p.drawingNumber === order.designation)
+        (
+          (order.productName && p.drawingNumber === order.productName) ||
+          (order.designation && p.productName === order.designation)
+        )
     )
   }
 
@@ -1359,15 +1365,16 @@ body {
 
     setInventory((current) => {
       const list = current || []
+      // Ugyanaz a szigorú keresési sorrend mint applyProductionShiftToInventory-ban:
+      // 1. productId — 2. rajzszám+vevő (ha nem üres) — 3. terméknév+vevő (ha nincs rajzszám)
       const existing =
         list.find((i) => i.productId === productId) ||
-        list.find(
-          (i) =>
-            i.customer === customer &&
-            (i.productName === inventoryName ||
-              i.drawingNumber === drawingNumber ||
-              i.productName === order.productName)
-        )
+        (drawingNumber
+          ? list.find((i) => i.customer === customer && i.drawingNumber === drawingNumber)
+          : undefined) ||
+        (!drawingNumber && inventoryName
+          ? list.find((i) => i.customer === customer && i.productName === inventoryName)
+          : undefined)
       if (existing) {
         itemId = existing.id
         return list.map((i) =>
@@ -1532,15 +1539,18 @@ body {
 
     setInventory((current) => {
       const list = current || []
-      // Három szintű keresés: productId egyezés → (név+vevő) egyezés → (rajzszám+vevő) egyezés
+      // Háromszintű keresés — szigorú sorrendben, üres-string false positive nélkül:
+      // 1. productId egyezés (legbiztosabb)
+      // 2. Rajzszám + vevő (csak ha rajzszám nem üres — üres érték bármit egyeztetne)
+      // 3. Terméknév + vevő (csak ha nincs rajzszám — elkerüli az ambiguitást)
       const existing =
         list.find((i) => i.productId === productId) ||
-        list.find(
-          (i) => i.customer === customer &&
-            (i.productName === inventoryName ||
-              i.drawingNumber === drawingNumber ||
-              i.productName === order.productName)
-        )
+        (drawingNumber
+          ? list.find((i) => i.customer === customer && i.drawingNumber === drawingNumber)
+          : undefined) ||
+        (!drawingNumber && inventoryName
+          ? list.find((i) => i.customer === customer && i.productName === inventoryName)
+          : undefined)
       if (existing) {
         itemId = existing.id
         return list.map((i) =>

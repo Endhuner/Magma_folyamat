@@ -27,22 +27,22 @@ function dateToYMD(date: Date): string {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
-  return `${y}/${m}/${d}`
+  // YYYY-MM-DD formátum (ISO 8601)
+  return `${y}-${m}-${d}`
 }
 
 function ymdToInputDate(ymd: string): string {
   if (!ymd) return ''
-  const parts = ymd.split('/')
+  // Régi formátum: YYYY/MM/DD — új formátum: YYYY-MM-DD (mindkettő elfogadott)
+  const parts = ymd.split(/[\/\-]/)
   if (parts.length !== 3) return ''
   const [y, m, d] = parts
   return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
 
 function inputDateToYMD(value: string): string {
-  if (!value) return ''
-  const date = new Date(value)
-  if (isNaN(date.getTime())) return ''
-  return dateToYMD(date)
+  // Az input[type=date] értéke már YYYY-MM-DD — visszaadjuk változtatás nélkül
+  return value || ''
 }
 
 export function OrderDialog({ open, onClose, onSave, order, customers, products, orders }: OrderDialogProps) {
@@ -51,6 +51,7 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
     productName: '',
     designation: '',
     notes: '',
+    pos: null,
     ownOrderNumber: generateOwnOrderNumber(orders),
     material: '',
     orderNumber: '',
@@ -122,6 +123,7 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
         productName: '',
         designation: '',
         notes: '',
+        pos: null,
         ownOrderNumber: generateOwnOrderNumber(orders),
         material: '',
         orderNumber: '',
@@ -348,6 +350,21 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="pos">Pos (pozíció)</Label>
+                <Input
+                  id="pos"
+                  type="number"
+                  value={formData.pos ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value
+                    setFormData({ ...formData, pos: raw === '' ? null : parseIntSafe(raw, 0, { allowNegative: false }) })
+                  }}
+                  min={0}
+                  placeholder="pl. 1, 2, 3"
                 />
               </div>
 

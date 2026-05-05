@@ -191,6 +191,7 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
                 {isColumnVisible('productName') && <TableHead className="cursor-pointer" onClick={() => handleSort('productName')}>Termék neve</TableHead>}
                 {isColumnVisible('designation') && <TableHead className="cursor-pointer" onClick={() => handleSort('designation')}>Megnevezése</TableHead>}
                 {isColumnVisible('notes') && <TableHead>Megjegyzés</TableHead>}
+                {isColumnVisible('pos') && <TableHead className="cursor-pointer" onClick={() => handleSort('pos')}>Pos</TableHead>}
                 {isColumnVisible('ownOrderNumber') && <TableHead className="cursor-pointer" onClick={() => handleSort('ownOrderNumber')}>Saját rendelési szám</TableHead>}
                 {isColumnVisible('material') && <TableHead className="cursor-pointer" onClick={() => handleSort('material')}>Anyag</TableHead>}
                 {isColumnVisible('orderNumber') && <TableHead className="cursor-pointer" onClick={() => handleSort('orderNumber')}>Vevő rendelési száma</TableHead>}
@@ -232,10 +233,11 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
                   {isColumnVisible('notes') && <TableCell className="max-w-[200px]">
                     <div className="truncate" title={order.notes}>{order.notes}</div>
                   </TableCell>}
+                  {isColumnVisible('pos') && <TableCell className="text-center font-mono">{order.pos ?? ''}</TableCell>}
                   {isColumnVisible('ownOrderNumber') && <TableCell>{order.ownOrderNumber}</TableCell>}
                   {isColumnVisible('material') && <TableCell>{order.material}</TableCell>}
                   {isColumnVisible('orderNumber') && <TableCell className="font-mono text-sm">{order.orderNumber}</TableCell>}
-                  {isColumnVisible('amountPc') && <TableCell>{order.amountPc}</TableCell>}
+                  {isColumnVisible('amountPc') && <TableCell className="font-mono">{order.amountPc != null ? order.amountPc.toLocaleString('hu-HU') : ''}</TableCell>}
                   {isColumnVisible('orderDate') && <TableCell>{order.orderDate}</TableCell>}
                   {isColumnVisible('requiredDate') && <TableCell>{order.requiredDate}</TableCell>}
                   {isColumnVisible('pickupDate') && <TableCell>{order.pickupDate}</TableCell>}

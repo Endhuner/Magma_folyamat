@@ -38,6 +38,8 @@ export interface Order {
   deliveryNote: string
   cmr: string
   status: OrderStatus
+  /** Pozíció / prioritás szám — opcionális egész. */
+  pos?: number | null
   createdAt: string
   updatedAt: string
 }

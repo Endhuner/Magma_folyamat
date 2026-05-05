@@ -17,6 +17,7 @@ const AVAILABLE_COLUMNS = [
   { id: 'productName', label: 'Termék neve' },
   { id: 'designation', label: 'Megnevezése' },
   { id: 'notes', label: 'Megjegyzés' },
+  { id: 'pos', label: 'Pos (pozíció)' },
   { id: 'ownOrderNumber', label: 'Saját rendelési szám' },
   { id: 'material', label: 'Anyag' },
   { id: 'orderNumber', label: 'Vevő rendelési száma' },

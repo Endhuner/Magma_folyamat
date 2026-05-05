@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { parseFloatSafe } from '@/lib/helpers'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { CheckCircle, Info } from '@phosphor-icons/react'
+import { ArrowRight, CheckCircle, Info } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { shiftLabel } from '@/lib/shiftValidation'
 
@@ -32,8 +32,8 @@ interface QuickShiftEntryDialogProps {
 }
 
 /**
- * Gyors műszakrögzítő dialógus — csak a lövésszámot és egy opcionális megjegyzést kell megadni,
- * a dátum és műszak a bannerből érkezik. A `ProductionDetailDialog` teljes értékű párja.
+ * Gyors műszakrögzítő dialógus — kezdő és vég lövésszámot kell megadni,
+ * a dátum és műszak a bannerből érkezik.
  */
 export function QuickShiftEntryDialog({
   open,
@@ -45,7 +45,8 @@ export function QuickShiftEntryDialog({
   onSave,
   userId,
 }: QuickShiftEntryDialogProps) {
-  const [shotsCount, setShotsCount] = useState<string>('')
+  const [startShots, setStartShots] = useState<string>('')
+  const [endShots, setEndShots] = useState<string>('')
   const [notes, setNotes] = useState<string>('')
 
   const nestCountNum = useMemo(() => {
@@ -55,17 +56,26 @@ export function QuickShiftEntryDialog({
 
   useEffect(() => {
     if (!open) return
-    setShotsCount('')
+    setStartShots('')
+    setEndShots('')
     setNotes('')
   }, [open, order?.id, date, shift])
 
-  const shotsNum = parseFloatSafe(shotsCount, 0, { allowNegative: false })
+  const startNum = parseFloatSafe(startShots, 0, { allowNegative: false })
+  const endNum = parseFloatSafe(endShots, 0, { allowNegative: false })
+  const shotsNum = Math.max(0, endNum - startNum)
   const producedPreview = Math.max(0, Math.round(shotsNum * nestCountNum))
+
+  const fmtInt = (n: number) => Math.round(n).toLocaleString('hu-HU')
 
   const handleSubmit = () => {
     if (!order) return
+    if (endShots === '') {
+      toast.error('Add meg a vég lövésszámot')
+      return
+    }
     if (shotsNum <= 0) {
-      toast.error('A lövésszámnak 0-nál nagyobbnak kell lennie')
+      toast.error('A vég lövésszámnak nagyobbnak kell lennie a kezdő lövésszámnál')
       return
     }
     const now = new Date().toISOString()
@@ -90,40 +100,66 @@ export function QuickShiftEntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Hiányzó műszak pótlása</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg">Hiányzó műszak pótlása</DialogTitle>
+          <DialogDescription className="text-base">
             {order.productName} · {order.customer}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-5 py-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="font-mono">
+            <Badge variant="outline" className="font-mono text-base px-3 py-1">
               {date}
             </Badge>
-            <Badge variant="secondary">{shiftLabel(shift)}</Badge>
+            <Badge variant="secondary" className="text-base px-3 py-1">
+              {shiftLabel(shift)}
+            </Badge>
           </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="quick-shots">Lövésszám</Label>
-            <Input
-              id="quick-shots"
-              type="number"
-              min={0}
-              value={shotsCount}
-              onChange={(e) => setShotsCount(e.target.value)}
-              placeholder="pl. 120"
-              autoFocus
-            />
+          {/* Kezdő / Vég lövésszám */}
+          <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-end">
+            <div className="grid gap-2">
+              <Label htmlFor="qs-start" className="text-base font-medium">
+                Kezdő lövésszám
+              </Label>
+              <Input
+                id="qs-start"
+                type="number"
+                min={0}
+                className="text-xl font-mono h-13 text-center"
+                value={startShots}
+                placeholder="pl. 12 500"
+                onChange={(e) => setStartShots(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center justify-center pb-1">
+              <ArrowRight className="w-6 h-6 text-muted-foreground" weight="bold" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="qs-end" className="text-base font-medium">
+                Vég lövésszám
+              </Label>
+              <Input
+                id="qs-end"
+                type="number"
+                min={0}
+                className="text-xl font-mono h-13 text-center"
+                value={endShots}
+                placeholder="pl. 12 620"
+                onChange={(e) => setEndShots(e.target.value)}
+              />
+            </div>
           </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="quick-notes">Megjegyzés (opcionális)</Label>
+          <div className="grid gap-2">
+            <Label htmlFor="qs-notes" className="text-base">Megjegyzés (opcionális)</Label>
             <Textarea
-              id="quick-notes"
+              id="qs-notes"
               rows={2}
+              className="text-base"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
@@ -132,26 +168,36 @@ export function QuickShiftEntryDialog({
           {!product && (
             <Alert>
               <Info className="w-4 h-4" weight="fill" />
-              <AlertDescription className="text-xs">
+              <AlertDescription className="text-sm">
                 Termék fészekszám nincs rögzítve, a darabszám a lövésszámmal egyenlő.
               </AlertDescription>
             </Alert>
           )}
 
-          <div className="text-sm bg-muted/50 rounded-md p-3 flex items-center justify-between">
-            <span className="text-muted-foreground">Kalkulált darab:</span>
-            <span className="font-mono font-semibold">
-              {shotsNum || 0} × {nestCountNum} = {producedPreview} db
-            </span>
+          <div className="bg-muted/50 rounded-lg p-4 space-y-1">
+            <div className="flex items-center justify-between text-base">
+              <span className="text-muted-foreground">Műszak lövései:</span>
+              <span className="font-mono font-semibold">
+                {endShots && startShots ? `${fmtInt(endNum)} − ${fmtInt(startNum)} = ` : ''}
+                {fmtInt(shotsNum)} lövés
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground text-base">Gyártott darab:</span>
+              <span className="font-mono font-bold text-2xl">
+                {fmtInt(shotsNum)} × {nestCountNum} ={' '}
+                <span className="text-accent">{fmtInt(producedPreview)} db</span>
+              </span>
+            </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" size="lg" className="text-base" onClick={onClose}>
             Mégse
           </Button>
-          <Button onClick={handleSubmit} disabled={shotsNum <= 0}>
-            <CheckCircle className="w-4 h-4 mr-1" weight="fill" />
+          <Button size="lg" className="text-base" onClick={handleSubmit} disabled={shotsNum <= 0}>
+            <CheckCircle className="w-5 h-5 mr-2" weight="fill" />
             Rögzítés
           </Button>
         </DialogFooter>

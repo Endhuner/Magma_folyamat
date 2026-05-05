@@ -41,6 +41,7 @@ import {
   Trash,
   CheckCircle,
   Warning,
+  ArrowRight,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -78,7 +79,8 @@ function toISODate(d: Date): string {
 
 /**
  * A rendeléshez tartozó műszakok listázására + egy új műszak rögzítésére / szerkesztésére.
- * A darabszám a `shotsCount × nestCount` képlet szerint számolódik a mentéskor.
+ * A lövésszámot kezdő és vég számlálóból számítjuk (vég − kezdő = műszak lövéseinek száma),
+ * majd a darabszám: lövések × fészekszám.
  */
 export function ProductionDetailDialog({
   open,
@@ -98,7 +100,8 @@ export function ProductionDetailDialog({
 }: ProductionDetailDialogProps) {
   const [date, setDate] = useState<string>(toISODate(new Date()))
   const [shift, setShift] = useState<'de' | 'du'>('de')
-  const [shotsCount, setShotsCount] = useState<string>('')
+  const [startShots, setStartShots] = useState<string>('')
+  const [endShots, setEndShots] = useState<string>('')
   const [notes, setNotes] = useState<string>('')
   const [editingId, setEditingId] = useState<string | null>(null)
   // Selejt-dialógus állapota
@@ -110,12 +113,13 @@ export function ProductionDetailDialog({
     return n > 0 ? n : 1
   }, [product])
 
-  // Reset form whenever the dialog opens, prefills are recalculated.
+  // Reset form whenever the dialog opens or prefills change.
   useEffect(() => {
     if (!open) return
     setDate(prefillDate || toISODate(new Date()))
     setShift(prefillShift || 'de')
-    setShotsCount('')
+    setStartShots('')
+    setEndShots('')
     setNotes('')
     setEditingId(null)
   }, [open, prefillDate, prefillShift, order?.id])
@@ -153,10 +157,13 @@ export function ProductionDetailDialog({
     [orderDefects]
   )
 
-  const shotsNum = parseFloatSafe(shotsCount, 0, { allowNegative: false })
+  const startNum = parseFloatSafe(startShots, 0, { allowNegative: false })
+  const endNum = parseFloatSafe(endShots, 0, { allowNegative: false })
+  /** Műszak lövésszáma = vég − kezdő (nem lehet negatív) */
+  const shotsNum = Math.max(0, endNum - startNum)
   const producedPreview = Math.max(0, Math.round(shotsNum * nestCountNum))
 
-  // Figyelmeztetés: van-e már ezen a napon + műszakban rögzítés (és nem ugyanaz a rekord, mint amit szerkesztünk)
+  /** Figyelmeztetés: van-e már ezen a napon + műszakban rögzítés */
   const duplicate = useMemo(() => {
     return orderShifts.find(
       (s) => s.date === date && s.shift === shift && s.id !== editingId
@@ -165,8 +172,12 @@ export function ProductionDetailDialog({
 
   const handleSubmit = () => {
     if (!order) return
+    if (endShots === '') {
+      toast.error('Add meg a vég lövésszámot')
+      return
+    }
     if (shotsNum <= 0) {
-      toast.error('A lövésszámnak 0-nál nagyobbnak kell lennie')
+      toast.error('A vég lövésszámnak nagyobbnak kell lennie a kezdő lövésszámnál')
       return
     }
     if (duplicate) {
@@ -200,7 +211,8 @@ export function ProductionDetailDialog({
         ? 'Műszak módosítva'
         : `Műszak rögzítve: ${producedPreview} db (${shotsNum} lövés × ${nestCountNum} fészek)`
     )
-    setShotsCount('')
+    setStartShots('')
+    setEndShots('')
     setNotes('')
     setEditingId(null)
   }
@@ -208,7 +220,9 @@ export function ProductionDetailDialog({
   const handleEdit = (s: ProductionShift) => {
     setDate(s.date)
     setShift(s.shift)
-    setShotsCount(String(s.shotsCount))
+    // Szerkesztéskor: kezdő = 0, vég = shotsCount (az eredeti start/end nem tárolt)
+    setStartShots('0')
+    setEndShots(String(s.shotsCount))
     setNotes(s.notes)
     setEditingId(s.id)
   }
@@ -216,7 +230,8 @@ export function ProductionDetailDialog({
   const handleCancelEdit = () => {
     setDate(toISODate(new Date()))
     setShift('de')
-    setShotsCount('')
+    setStartShots('')
+    setEndShots('')
     setNotes('')
     setEditingId(null)
   }
@@ -236,7 +251,6 @@ export function ProductionDetailDialog({
 
   /**
    * A három gyártásvezérlő gomb mindegyike egy adott státuszba helyezi a rendelést.
-   * Ez határozza meg, hogy a Gyártás nézetben melyik csoportban jelenjen meg a kártya.
    */
   const handleStatusButton = (next: OrderStatus, label: string) => {
     if (!order) return
@@ -258,44 +272,44 @@ export function ProductionDetailDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Factory className="w-5 h-5" weight="duotone" />
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Factory className="w-6 h-6" weight="duotone" />
             Gyártási műszakok — {order.productName}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-base">
             {order.customer} · Rend. szám: {order.orderNumber || '-'} · Mennyiség:{' '}
-            {fmtInt(order.amountPc)} db
+            <strong>{fmtInt(order.amountPc)} db</strong>
           </DialogDescription>
         </DialogHeader>
 
         {/* Összesítő */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 py-3">
-          <div className="bg-muted/50 rounded-md p-3">
-            <div className="text-xs text-muted-foreground">Összes lövés</div>
-            <div className="text-2xl font-bold font-mono">{fmtInt(totalShots)}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-3">
+          <div className="bg-muted/50 rounded-lg p-4">
+            <div className="text-sm text-muted-foreground mb-1">Összes lövés</div>
+            <div className="text-3xl font-bold font-mono">{fmtInt(totalShots)}</div>
           </div>
-          <div className="bg-muted/50 rounded-md p-3">
-            <div className="text-xs text-muted-foreground">Gyártott darab</div>
-            <div className="text-2xl font-bold font-mono">{fmtInt(totalProduced)}</div>
+          <div className="bg-muted/50 rounded-lg p-4">
+            <div className="text-sm text-muted-foreground mb-1">Gyártott darab</div>
+            <div className="text-3xl font-bold font-mono">{fmtInt(totalProduced)}</div>
           </div>
-          <div className="bg-muted/50 rounded-md p-3">
-            <div className="text-xs text-muted-foreground">Fészekszám</div>
-            <div className="text-2xl font-bold font-mono">{fmtInt(nestCountNum)}</div>
+          <div className="bg-muted/50 rounded-lg p-4">
+            <div className="text-sm text-muted-foreground mb-1">Fészekszám</div>
+            <div className="text-3xl font-bold font-mono">{fmtInt(nestCountNum)}</div>
           </div>
           <div
-            className={`rounded-md p-3 ${
+            className={`rounded-lg p-4 ${
               totalDefects > 0
                 ? 'bg-destructive/10 ring-1 ring-destructive/20'
                 : 'bg-muted/50'
             }`}
           >
-            <div className="text-xs text-muted-foreground flex items-center gap-1">
-              <Warning className="w-3 h-3" weight="fill" /> Selejt (db)
+            <div className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+              <Warning className="w-4 h-4" weight="fill" /> Selejt (db)
             </div>
             <div
-              className={`text-2xl font-bold font-mono ${
+              className={`text-3xl font-bold font-mono ${
                 totalDefects > 0 ? 'text-destructive' : ''
               }`}
             >
@@ -308,63 +322,112 @@ export function ProductionDetailDialog({
           <Alert>
             <Info className="w-4 h-4" weight="fill" />
             <AlertDescription>
-              Nem található hozzárendelt termék („{order.productName}" — {order.customer}).
-              A fészekszám alapértelmezetten 1, a darabszám a lövésszámmal egyenlő.
-              A termékek fülön rögzítsd a rajzszámot és a fészekszámot a pontos készletfrissítéshez.
+              Nem található hozzárendelt termék. A fészekszám alapértelmezetten 1, a darabszám a lövésszámmal egyenlő.
             </AlertDescription>
           </Alert>
         )}
 
-        {/* Új / szerkesztett műszak űrlap */}
-        <div className="bg-card border rounded-md p-4 space-y-4">
+        {/* Műszak rögzítő form */}
+        <div className="bg-card border-2 rounded-xl p-5 space-y-5">
           <div className="flex items-center gap-2">
-            <PlayCircle className="w-5 h-5 text-accent" weight="duotone" />
-            <h3 className="font-semibold">
+            <PlayCircle className="w-6 h-6 text-accent" weight="duotone" />
+            <h3 className="text-lg font-semibold">
               {editingId ? 'Műszak szerkesztése' : 'Új műszak rögzítése'}
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="shift-date">Dátum</Label>
+          {/* Dátum + Műszak sor */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="shift-date" className="text-base font-medium">Dátum</Label>
               <Input
                 id="shift-date"
                 type="date"
+                className="text-base h-11"
                 value={date}
                 max={toISODate(new Date())}
                 onChange={(e) => setDate(e.target.value)}
               />
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="shift-type">Műszak</Label>
+            <div className="grid gap-2">
+              <Label htmlFor="shift-type" className="text-base font-medium">Műszak</Label>
               <Select value={shift} onValueChange={(v) => setShift(v as 'de' | 'du')}>
-                <SelectTrigger id="shift-type">
+                <SelectTrigger id="shift-type" className="text-base h-11">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="de">Délelőtt (de)</SelectItem>
-                  <SelectItem value="du">Délután (du)</SelectItem>
+                  <SelectItem value="de" className="text-base">Délelőtt (de)</SelectItem>
+                  <SelectItem value="du" className="text-base">Délután (du)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="shots-count">Lövésszám</Label>
+          </div>
+
+          {/* Kezdő / Vég lövésszám sor */}
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-end">
+            <div className="grid gap-2">
+              <Label htmlFor="start-shots" className="text-base font-medium">
+                Kezdő lövésszám (számláló állás)
+              </Label>
               <Input
-                id="shots-count"
+                id="start-shots"
                 type="number"
                 min={0}
-                value={shotsCount}
-                placeholder="pl. 120"
-                onChange={(e) => setShotsCount(e.target.value)}
+                className="text-xl font-mono h-14 text-center"
+                value={startShots}
+                placeholder="pl. 12 500"
+                onChange={(e) => setStartShots(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center justify-center pb-1">
+              <ArrowRight className="w-7 h-7 text-muted-foreground" weight="bold" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="end-shots" className="text-base font-medium">
+                Vég lövésszám (számláló állás)
+              </Label>
+              <Input
+                id="end-shots"
+                type="number"
+                min={0}
+                className="text-xl font-mono h-14 text-center"
+                value={endShots}
+                placeholder="pl. 12 620"
+                onChange={(e) => setEndShots(e.target.value)}
               />
             </div>
           </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="shift-notes">Megjegyzés</Label>
+          {/* Kalkuláció előnézet */}
+          <div className="bg-muted/40 rounded-lg p-4 space-y-1">
+            <div className="flex items-center justify-between text-base">
+              <span className="text-muted-foreground">Műszak lövéseinek száma:</span>
+              <span className="font-mono font-bold text-lg">
+                {endShots !== '' && startShots !== ''
+                  ? `${fmtInt(endNum)} − ${fmtInt(startNum)} = `
+                  : ''}
+                <span className={shotsNum > 0 ? 'text-foreground' : 'text-muted-foreground'}>
+                  {fmtInt(shotsNum)} lövés
+                </span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-base">
+              <span className="text-muted-foreground">Gyártott darabszám:</span>
+              <span className="font-mono font-bold text-2xl">
+                {fmtInt(shotsNum)} × {fmtInt(nestCountNum)} ={' '}
+                <span className="text-accent">{fmtInt(producedPreview)} db</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="shift-notes" className="text-base font-medium">
+              Megjegyzés (opcionális)
+            </Label>
             <Textarea
               id="shift-notes"
               rows={2}
+              className="text-base"
               value={notes}
               placeholder="Pl. leállás, anyagmozgatás, műszakváltás..."
               onChange={(e) => setNotes(e.target.value)}
@@ -374,32 +437,28 @@ export function ProductionDetailDialog({
           {duplicate && (
             <Alert variant="destructive">
               <Warning className="w-4 h-4" weight="fill" />
-              <AlertDescription>
-                Erre a napra és műszakra már van egy rögzítés ({duplicate.shotsCount}{' '}
-                lövés, {duplicate.producedQuantity} db). Válaszd azt szerkesztésre a
-                lenti listában.
+              <AlertDescription className="text-base">
+                Erre a napra és műszakra már van rögzítés ({fmtInt(duplicate.shotsCount)} lövés,{' '}
+                {fmtInt(duplicate.producedQuantity)} db). Szerkeszd meg vagy töröld a lenti listában.
               </AlertDescription>
             </Alert>
           )}
 
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="text-sm text-muted-foreground">
-              Kalkulált darabszám:{' '}
-              <span className="font-mono font-semibold text-foreground">
-                {fmtInt(shotsNum || 0)} × {fmtInt(nestCountNum)} = {fmtInt(producedPreview)} db
-              </span>
-            </div>
-            <div className="flex gap-2">
-              {editingId && (
-                <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
-                  Mégse
-                </Button>
-              )}
-              <Button size="sm" onClick={handleSubmit} disabled={shotsNum <= 0}>
-                <CheckCircle className="w-4 h-4 mr-1" weight="fill" />
-                {editingId ? 'Módosítás mentése' : 'Rögzítés'}
+          <div className="flex justify-end gap-3">
+            {editingId && (
+              <Button variant="ghost" size="lg" onClick={handleCancelEdit} className="text-base">
+                Mégse
               </Button>
-            </div>
+            )}
+            <Button
+              size="lg"
+              className="text-base px-8"
+              onClick={handleSubmit}
+              disabled={shotsNum <= 0}
+            >
+              <CheckCircle className="w-5 h-5 mr-2" weight="fill" />
+              {editingId ? 'Módosítás mentése' : 'Rögzítés'}
+            </Button>
           </div>
         </div>
 
@@ -407,12 +466,12 @@ export function ProductionDetailDialog({
 
         {/* Meglévő műszakok listája */}
         <div>
-          <h3 className="font-semibold text-sm mb-3">
+          <h3 className="text-base font-semibold mb-3">
             Rögzített műszakok ({orderShifts.length})
           </h3>
-          <ScrollArea className="max-h-[300px] pr-2">
+          <ScrollArea className="max-h-[320px] pr-2">
             {orderShifts.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm border border-dashed rounded-md">
+              <div className="text-center py-8 text-muted-foreground text-base border border-dashed rounded-md">
                 Ehhez a rendeléshez még nincs rögzített műszak
               </div>
             ) : (
@@ -420,35 +479,33 @@ export function ProductionDetailDialog({
                 {orderShifts.map((s) => (
                   <div
                     key={s.id}
-                    className={`flex items-center gap-3 border rounded-md p-3 text-sm ${
+                    className={`flex items-center gap-3 border rounded-lg p-3 ${
                       editingId === s.id ? 'border-primary bg-primary/5' : ''
                     }`}
                   >
                     <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-2 items-center">
-                      <div className="font-mono">
+                      <div className="font-mono text-base">
                         {format(new Date(s.date), 'yyyy-MM-dd')}
                       </div>
                       <Badge
                         variant="outline"
-                        className={
-                          s.shift === 'de'
-                            ? 'justify-center'
-                            : 'justify-center bg-accent/10'
-                        }
+                        className={`justify-center text-sm py-1 ${
+                          s.shift === 'de' ? '' : 'bg-accent/10'
+                        }`}
                       >
                         {shiftLabel(s.shift)}
                       </Badge>
-                      <div>
+                      <div className="text-base">
                         <span className="text-muted-foreground">Lövés: </span>
-                        <span className="font-mono font-medium">{fmtInt(s.shotsCount)}</span>
+                        <span className="font-mono font-semibold">{fmtInt(s.shotsCount)}</span>
                       </div>
-                      <div>
+                      <div className="text-base">
                         <span className="text-muted-foreground">Darab: </span>
-                        <span className="font-mono font-medium">
+                        <span className="font-mono font-semibold text-accent">
                           {fmtInt(s.producedQuantity)}
                         </span>
                       </div>
-                      <div className="text-xs text-muted-foreground truncate col-span-2 md:col-span-1">
+                      <div className="text-sm text-muted-foreground truncate col-span-2 md:col-span-1">
                         {s.notes || '-'}
                       </div>
                     </div>
@@ -456,6 +513,7 @@ export function ProductionDetailDialog({
                       <Button
                         size="sm"
                         variant="ghost"
+                        className="text-base"
                         onClick={() => handleEdit(s)}
                         disabled={editingId === s.id}
                       >
@@ -467,7 +525,7 @@ export function ProductionDetailDialog({
                         className="text-destructive hover:text-destructive"
                         onClick={() => handleDelete(s)}
                       >
-                        <Trash className="w-4 h-4" />
+                        <Trash className="w-5 h-5" />
                       </Button>
                     </div>
                   </div>
@@ -481,32 +539,32 @@ export function ProductionDetailDialog({
         {onSaveDefect && (
           <>
             <Separator />
-            <div className="bg-card border rounded-md p-4 space-y-3">
+            <div className="bg-card border rounded-xl p-5 space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
-                  <Warning className="w-5 h-5 text-destructive" weight="duotone" />
-                  <h3 className="font-semibold">Selejt</h3>
+                  <Warning className="w-6 h-6 text-destructive" weight="duotone" />
+                  <h3 className="text-lg font-semibold">Selejt</h3>
                   {totalDefects > 0 && (
-                    <Badge variant="destructive" className="font-mono">
+                    <Badge variant="destructive" className="font-mono text-sm">
                       {fmtInt(totalDefects)} db összesen
                     </Badge>
                   )}
                 </div>
                 <Button
-                  size="sm"
+                  size="lg"
                   onClick={() => {
                     setEditingDefect(null)
                     setDefectDialogOpen(true)
                   }}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  className="text-base bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  <Warning className="w-4 h-4 mr-1.5" weight="fill" />
+                  <Warning className="w-5 h-5 mr-2" weight="fill" />
                   Selejt rögzítése
                 </Button>
               </div>
 
               {orderDefects.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground text-sm border border-dashed rounded-md">
+                <div className="text-center py-4 text-muted-foreground text-base border border-dashed rounded-md">
                   Még nincs rögzített selejt ehhez a rendeléshez
                 </div>
               ) : (
@@ -515,19 +573,19 @@ export function ProductionDetailDialog({
                     {orderDefects.map((d) => (
                       <div
                         key={d.id}
-                        className="flex items-start gap-3 border rounded-md p-3 text-sm bg-destructive/5"
+                        className="flex items-start gap-3 border rounded-lg p-3 text-sm bg-destructive/5"
                       >
                         <div className="flex-1 min-w-0 grid grid-cols-3 md:grid-cols-4 gap-2 items-start">
-                          <div className="font-mono text-xs text-muted-foreground">
+                          <div className="font-mono text-base text-muted-foreground">
                             {format(new Date(d.date), 'yyyy-MM-dd')}
                           </div>
-                          <div>
+                          <div className="text-base">
                             <span className="text-muted-foreground">Mennyiség: </span>
                             <span className="font-mono font-bold text-destructive">
                               {fmtInt(d.quantity)} db
                             </span>
                           </div>
-                          <div className="col-span-3 md:col-span-2 text-xs text-muted-foreground">
+                          <div className="col-span-3 md:col-span-2 text-sm text-muted-foreground">
                             <span className="font-medium text-foreground">Indok: </span>
                             {d.reason || '-'}
                           </div>
@@ -559,7 +617,7 @@ export function ProductionDetailDialog({
                                 toast.success('Selejt törölve')
                               }}
                             >
-                              <Trash className="w-4 h-4" />
+                              <Trash className="w-5 h-5" />
                             </Button>
                           )}
                         </div>
@@ -572,58 +630,58 @@ export function ProductionDetailDialog({
           </>
         )}
 
-        {/* Gyártásvezérlő gombok — legalul, a státusz alapján kerül a kártya a megfelelő csoportba. */}
+        {/* Gyártásvezérlő gombok */}
         {onStatusChange && (
           <>
             <Separator />
-            <div className="border rounded-md p-3 bg-card">
-              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                <div className="text-sm font-semibold flex items-center gap-2">
-                  <Factory className="w-4 h-4" weight="duotone" />
+            <div className="border-2 rounded-xl p-4 bg-card">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <div className="text-base font-semibold flex items-center gap-2">
+                  <Factory className="w-5 h-5" weight="duotone" />
                   Gyártás állapota
                 </div>
-                <Badge variant="outline" className="font-mono text-xs">
+                <Badge variant="outline" className="font-mono text-sm px-3 py-1">
                   Jelenleg: {order.status}
                 </Badge>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Button
                   size="lg"
                   onClick={() => handleStatusButton('Folyamatban', 'Folyamatban')}
-                  className={`h-11 font-semibold text-white shadow-sm ${
+                  className={`h-14 font-semibold text-base text-white shadow-sm ${
                     isInProgress
                       ? 'bg-green-600 hover:bg-green-700 ring-2 ring-green-400 ring-offset-2'
                       : 'bg-green-600 hover:bg-green-700'
                   }`}
                   title="Gyártás indítása — a rendelés a Folyamatban csoportba kerül"
                 >
-                  <PlayCircle className="w-5 h-5 mr-2" weight="fill" />
+                  <PlayCircle className="w-6 h-6 mr-2" weight="fill" />
                   Gyártás indítása
                 </Button>
                 <Button
                   size="lg"
                   onClick={() => handleStatusButton('Szünetel', 'Szünetel')}
-                  className={`h-11 font-semibold text-white shadow-sm ${
+                  className={`h-14 font-semibold text-base text-white shadow-sm ${
                     isPaused
                       ? 'bg-amber-500 hover:bg-amber-600 ring-2 ring-amber-300 ring-offset-2'
                       : 'bg-amber-500 hover:bg-amber-600'
                   }`}
-                  title="Gyártás szüneteltetése — a rendelés a Szünetel csoportba kerül"
+                  title="Gyártás szüneteltetése"
                 >
-                  <PauseCircle className="w-5 h-5 mr-2" weight="fill" />
+                  <PauseCircle className="w-6 h-6 mr-2" weight="fill" />
                   Szünetelés
                 </Button>
                 <Button
                   size="lg"
                   onClick={() => handleStatusButton('Előkészítve', 'Előkészítve')}
-                  className={`h-11 font-semibold text-white shadow-sm ${
+                  className={`h-14 font-semibold text-base text-white shadow-sm ${
                     isStopped
                       ? 'bg-slate-700 hover:bg-slate-800 ring-2 ring-slate-400 ring-offset-2'
                       : 'bg-slate-700 hover:bg-slate-800'
                   }`}
-                  title="Gyártás leállítása / befejezése — a rendelés az Előkészítve csoportba kerül"
+                  title="Gyártás leállítása / befejezése"
                 >
-                  <StopCircle className="w-5 h-5 mr-2" weight="fill" />
+                  <StopCircle className="w-6 h-6 mr-2" weight="fill" />
                   Leállítás
                 </Button>
               </div>
@@ -632,14 +690,14 @@ export function ProductionDetailDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" size="lg" className="text-base" onClick={onClose}>
             Bezárás
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
 
-    {/* Selejt rögzítés/szerkesztés dialógus — a fő dialóg fölött jelenik meg. */}
+    {/* Selejt rögzítés/szerkesztés dialógus */}
     {onSaveDefect && (
       <DefectEntryDialog
         open={defectDialogOpen}

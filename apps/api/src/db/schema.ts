@@ -149,6 +149,8 @@ export const orders = sqliteTable('orders', {
   deliveryNote: text('delivery_note').notNull().default(''),
   cmr: text('cmr').notNull().default(''),
   status: text('status', { enum: ORDER_STATUSES }).notNull().default('Felvéve'),
+  /** Pozíció / prioritás szám — opcionális egész, a rendelések rendezéséhez. */
+  pos: integer('pos'),
   createdAt: text('created_at').notNull().default(nowDefault),
   updatedAt: text('updated_at').notNull().default(nowDefault),
 }, (t) => ({

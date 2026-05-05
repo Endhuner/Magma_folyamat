@@ -23,7 +23,7 @@ export async function ordersRoutes(app: FastifyInstance): Promise<void> {
     permissions: {
       read:   ['admin', 'operator'],  // operátor is látja a gyártáshoz szükséges rendeléseket
       create: ['admin'],
-      update: ['admin'],
+      update: ['admin', 'operator'],  // operátor státuszt válthat (gyártás indítás/szünetelés/leállítás)
       delete: ['admin'],
     },
   })
