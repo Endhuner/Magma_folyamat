@@ -239,17 +239,30 @@ export function registerCrudRoutes<
     )
 
     const db = getDb()
-    db.insert(table).values(row as never).run()
+    try {
+      db.insert(table).values(row as never).run()
+    } catch (dbErr: unknown) {
+      const msg = dbErr instanceof Error ? dbErr.message : String(dbErr)
+      console.error(`[crudFactory] DB insert hiba (${resource}):`, msg, '\nSor:',
+        Object.keys(row as object).join(', '))
+      return reply.code(500).send({ error: `DB insert sikertelen: ${msg}` })
+    }
+
     const created = redactOutput(deserializeJsonFields(row, jsonFields))
 
-    recordAudit({
-      entityType: auditEntity,
-      entityLabel: auditLabel,
-      entityId: row.id as string,
-      entityName: pickName(created, nameField),
-      action: 'create',
-      ...userOf(req),
-    })
+    try {
+      recordAudit({
+        entityType: auditEntity,
+        entityLabel: auditLabel,
+        entityId: row.id as string,
+        entityName: pickName(created, nameField),
+        action: 'create',
+        ...userOf(req),
+      })
+    } catch (auditErr: unknown) {
+      // Audit-log hiba nem akadályozza a sikeres választ — csak naplózzuk
+      console.error(`[crudFactory] Audit-log hiba (${resource}):`, auditErr)
+    }
     broadcast({ type: auditEntity, action: 'create', id: row.id as string })
 
     return reply.code(201).send(created)
