@@ -4,9 +4,10 @@
 # =============================================================================
 # 1. /data volume ellenőrzése (perzisztencia diagnózis)
 # 2. JWT_SECRET biztosítása
-# 3. SQLite backup az indítás előtt (max 7 napi backup megőrizve)
+# 3. SQLite backup az indítás előtt (max 14 backup megőrizve)
 # 4. DB migrációk futtatása (idempotens)
-# 5. Node.js szerver indítása
+# 5. Cron démon indítása (időszakos backup: 6:00 és 18:00)
+# 6. Node.js szerver indítása
 # =============================================================================
 
 set -e
@@ -78,11 +79,11 @@ if [ -f "$DB_FILE" ]; then
   cp "$DB_FILE" "$BACKUP_FILE"
   echo "[startup] Backup elkészítve: $BACKUP_FILE"
 
-  # Max 7 backup megőrzése
+  # Max 14 backup megőrzése (az időszakos cron is ide ment, 2/nap = ~7 nap)
   BACKUP_COUNT=$(ls -1 "$BACKUP_DIR"/*.sqlite 2>/dev/null | wc -l)
-  if [ "$BACKUP_COUNT" -gt 7 ]; then
-    ls -1t "$BACKUP_DIR"/*.sqlite | tail -n +8 | xargs rm -f
-    echo "[startup] Régi backupok törölve (max 7 megőrizve)."
+  if [ "$BACKUP_COUNT" -gt 14 ]; then
+    ls -1t "$BACKUP_DIR"/*.sqlite | tail -n +15 | xargs rm -f
+    echo "[startup] Régi backupok törölve (max 14 megőrizve)."
   fi
 fi
 
@@ -92,6 +93,13 @@ cd /app/apps/api
 node dist/db/migrate.js
 echo "[startup] Migrációk kész."
 
-# ── 5. Node.js szerver indítása ───────────────────────────────────────────
+# ── 5. Cron démon indítása (időszakos backupok: 6:00 és 18:00) ───────────
+# crond az Alpine busybox része — nincs extra csomag szükséges.
+# A crontab: /etc/crontabs/root (a Dockerfile másolja be)
+# Napló: /data/cron.log
+crond -l 8 -L /data/cron.log -b
+echo "[startup] Backup cron elindítva (06:00 és 18:00, napló: /data/cron.log)."
+
+# ── 6. Node.js szerver indítása ───────────────────────────────────────────
 echo "[startup] ProduktívPro szerver indul (port: ${PORT:-5050})..."
 exec node dist/index.js

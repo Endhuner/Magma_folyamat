@@ -1,0 +1,4 @@
+# ProduktívPro — időszakos biztonsági mentések
+# Reggel 6:00 és este 18:00
+0  6 * * * /backup.sh >> /data/backup.log 2>&1
+0 18 * * * /backup.sh >> /data/backup.log 2>&1

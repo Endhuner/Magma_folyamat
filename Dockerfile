@@ -91,6 +91,11 @@ COPY --from=build-frontend /app/dist ./public
 COPY deploy/unraid/startup.sh /startup.sh
 RUN chmod +x /startup.sh
 
+# ── Időszakos backup (crond: 6:00 és 18:00) ────────────────────────────────
+COPY deploy/unraid/backup.sh /backup.sh
+RUN chmod +x /backup.sh
+COPY deploy/unraid/crontab /etc/crontabs/root
+
 # /data volume: SQLite adatbázis + JWT secret perzisztencia
 VOLUME ["/data"]
 
