@@ -255,12 +255,12 @@ export function OrdersPanel({
             Tömeges Import
           </Button>
 
-          {/* ── Adatok lenyíló: sablon + export ── */}
+          {/* ── Expo-Impo lenyíló: sablon + export ── */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
                 <Export className="w-4 h-4" />
-                Adatok
+                Expo-Impo
                 <CaretDown className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
