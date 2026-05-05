@@ -41,6 +41,8 @@ import {
   X,
   ArrowCounterClockwise,
   CopySimple,
+  DownloadSimple,
+  Export,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { OrdersTable } from '@/components/OrdersTable'
@@ -51,6 +53,7 @@ import {
   type LabelTemplate,
 } from '@/lib/labelTemplate'
 import type { Order, OrderStatus, Customer, Product } from '@/lib/types'
+import { downloadOrderImportTemplate, exportOrdersToExcel } from '@/lib/orderExcelExport'
 
 export interface OrderColumnFilter {
   id: string
@@ -251,6 +254,77 @@ export function OrdersPanel({
             <Upload className="w-5 h-5 mr-2" />
             Tömeges Import
           </Button>
+
+          {/* ── Adatok lenyíló: sablon + export ── */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Export className="w-4 h-4" />
+                Adatok
+                <CaretDown className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-64">
+              <DropdownMenuItem
+                onSelect={async () => {
+                  try {
+                    await downloadOrderImportTemplate()
+                    toast.success('Import sablon letöltve')
+                  } catch {
+                    toast.error('Sablon letöltése sikertelen')
+                  }
+                }}
+              >
+                <DownloadSimple className="w-4 h-4 mr-2" />
+                Import sablon letöltése (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={async () => {
+                  if (!filteredOrders || filteredOrders.length === 0) {
+                    toast.error('Nincs exportálható rendelés')
+                    return
+                  }
+                  try {
+                    await exportOrdersToExcel(filteredOrders)
+                    toast.success(`${filteredOrders.length} rendelés exportálva`)
+                  } catch {
+                    toast.error('Export sikertelen')
+                  }
+                }}
+              >
+                <Export className="w-4 h-4 mr-2" />
+                Összes rendelés exportálása
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={selectedOrderIds.length === 0}
+                onSelect={async () => {
+                  const selected = (filteredOrders || []).filter((o) =>
+                    selectedOrderIds.includes(o.id)
+                  )
+                  if (selected.length === 0) {
+                    toast.error('Nincsenek kiválasztott rendelések')
+                    return
+                  }
+                  try {
+                    const today = new Date()
+                    const d = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+                    await exportOrdersToExcel(selected, `rendeles_export_kivalasztott_${d}.xlsx`)
+                    toast.success(`${selected.length} rendelés exportálva`)
+                  } catch {
+                    toast.error('Export sikertelen')
+                  }
+                }}
+              >
+                <Export className="w-4 h-4 mr-2" />
+                Kijelölt rendelések exportálása
+                {selectedOrderIds.length > 0 && (
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {selectedOrderIds.length} db
+                  </span>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

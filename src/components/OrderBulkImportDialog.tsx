@@ -2,12 +2,13 @@ import { generateId } from '@/lib/generateId'
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Upload } from '@phosphor-icons/react'
+import { Upload, DownloadSimple } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Order } from '@/lib/types'
 import { getField, normalizeRow } from '@/lib/importHelpers'
 import { parseFloatSafe, parseIntSafe } from '@/lib/helpers'
 import * as XLSX from 'xlsx'
+import { downloadOrderImportTemplate } from '@/lib/orderExcelExport'
 
 interface OrderBulkImportDialogProps {
   open: boolean
@@ -132,14 +133,30 @@ export function OrderBulkImportDialog({ open, onClose, onImport }: OrderBulkImpo
             </ul>
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose}>
-              Mégse
+          <div className="flex justify-between gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  await downloadOrderImportTemplate()
+                  toast.success('Import sablon letöltve')
+                } catch {
+                  toast.error('Sablon letöltése sikertelen')
+                }
+              }}
+            >
+              <DownloadSimple className="w-4 h-4 mr-2" />
+              Sablon letöltése
             </Button>
-            <Button onClick={handleImport} disabled={!file || isProcessing}>
-              <Upload className="w-4 h-4 mr-2" />
-              {isProcessing ? 'Importálás...' : 'Importálás'}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onClose}>
+                Mégse
+              </Button>
+              <Button onClick={handleImport} disabled={!file || isProcessing}>
+                <Upload className="w-4 h-4 mr-2" />
+                {isProcessing ? 'Importálás...' : 'Importálás'}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
