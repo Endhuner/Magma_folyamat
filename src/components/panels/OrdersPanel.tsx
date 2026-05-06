@@ -250,12 +250,7 @@ export function OrdersPanel({
             <Plus className="w-5 h-5 mr-2" />
             Új rendelés
           </Button>
-          <Button variant="secondary" onClick={() => setOrderBulkImportDialogOpen(true)}>
-            <Upload className="w-5 h-5 mr-2" />
-            Tömeges Import
-          </Button>
-
-          {/* ── Expo-Impo lenyíló: sablon + export ── */}
+          {/* ── Expo-Impo lenyíló: tömeges import + sablon + export ── */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
@@ -265,6 +260,10 @@ export function OrdersPanel({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64">
+              <DropdownMenuItem onSelect={() => setOrderBulkImportDialogOpen(true)}>
+                <Upload className="w-4 h-4 mr-2" />
+                Tömeges Import (.xlsx)
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={async () => {
                   try {
