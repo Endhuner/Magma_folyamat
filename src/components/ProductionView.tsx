@@ -25,6 +25,7 @@ import {
   Factory,
   Warning,
   Hammer,
+  Info,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -149,7 +150,15 @@ export function ProductionView({
     )
 
     if (daysUntilDue < 0) {
-      return <Badge variant="destructive" className="text-xs">KÉSÉSBEN</Badge>
+      return (
+        <button
+          className="text-muted-foreground hover:text-foreground transition-colors"
+          title="Részletek megtekintése"
+          onClick={() => setDetailOrderId(order.id)}
+        >
+          <Info className="w-5 h-5" weight="duotone" />
+        </button>
+      )
     } else if (daysUntilDue <= 3) {
       return <Badge variant="destructive" className="text-xs">Sürgős</Badge>
     } else if (daysUntilDue <= 7) {
@@ -187,7 +196,7 @@ export function ProductionView({
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <CardTitle className="text-base font-semibold truncate">
+              <CardTitle className="text-[19px] font-bold truncate">
                 {order.productName}
               </CardTitle>
               <p className="text-sm text-muted-foreground truncate">{order.customer}</p>
@@ -251,8 +260,8 @@ export function ProductionView({
 
             <Separator className="my-2" />
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Határidő:</span>
-              <span className="font-semibold">
+              <span className="text-[19px] font-bold text-muted-foreground">Határidő:</span>
+              <span className="text-[19px] font-bold">
                 {order.requiredDate
                   ? format(new Date(order.requiredDate), 'yyyy-MM-dd')
                   : '-'}
