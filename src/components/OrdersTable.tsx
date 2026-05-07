@@ -38,6 +38,7 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
   'Folyamatban': 'oklch(0.90 0.08 155)',
   'Előkészítve': 'oklch(0.91 0.08 230)',
   'Javítás alatt': 'oklch(0.93 0.08 350)',
+  'Elkészült': 'oklch(0.88 0.10 145)',
 }
 
 function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onStatusChange, selectedIds, onSelectionChange, visibleColumns }: OrdersTableProps) {

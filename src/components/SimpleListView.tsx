@@ -145,6 +145,11 @@ interface SimpleListViewProps<T extends SimpleRecord> {
    * A backend-hibás esetet a komponens NEM tóst-olja (a hívó dolga).
    */
   successMessages?: { create?: string; update?: string; delete?: string }
+  /**
+   * Soronként extra akció gombok a Műveletek oszlopban (szerkesztés/törlés előtt).
+   * Pl. részletek gomb megnyitásához.
+   */
+  extraActions?: (item: T) => React.ReactNode
 }
 
 /** Bármely oszlopértéket stringként olvassuk ki a sorból. */
@@ -167,6 +172,7 @@ export function SimpleListView<T extends SimpleRecord>({
   addDialogTitle,
   editDialogTitle,
   successMessages,
+  extraActions,
 }: SimpleListViewProps<T>) {
   const [search, setSearch] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -458,6 +464,7 @@ export function SimpleListView<T extends SimpleRecord>({
                         })}
                         <TableCell className="text-right sticky right-0 bg-card">
                           <div className="flex items-center justify-end gap-1">
+                            {extraActions && extraActions(item)}
                             <Button
                               variant="ghost"
                               size="icon"

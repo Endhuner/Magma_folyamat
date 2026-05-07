@@ -1,4 +1,4 @@
-export type OrderStatus = 
+export type OrderStatus =
   | 'Felvéve'
   | 'Szünetel'
   | 'Kiszállítva'
@@ -6,6 +6,7 @@ export type OrderStatus =
   | 'Folyamatban'
   | 'Előkészítve'
   | 'Javítás alatt'
+  | 'Elkészült'
 
 export interface Order {
   id: string
@@ -210,6 +211,36 @@ export interface ProductionLog {
 }
 
 /**
+ * Gép karbantartási tétel (olaj, kiegészítő).
+ */
+export interface MachineItem {
+  id: string
+  name: string
+  drawingNumber: string
+  quantity: number
+  unit: string
+  source: string
+  notes: string
+  createdAt: string
+}
+
+/**
+ * Gép javítási tétel — dátummal és állapottal.
+ */
+export interface MachineRepair {
+  id: string
+  name: string
+  drawingNumber: string
+  quantity: number
+  unit: string
+  source: string
+  date: string
+  status: 'tervezett' | 'elvégzett'
+  notes: string
+  createdAt: string
+}
+
+/**
  * Gép — egyszerű lista a műhely gépeiről.
  */
 export interface Machine {
@@ -219,6 +250,9 @@ export interface Machine {
   type: string
   capacity: string
   notes: string
+  oils?: MachineItem[]
+  accessories?: MachineItem[]
+  repairs?: MachineRepair[]
   createdAt: string
   updatedAt: string
 }

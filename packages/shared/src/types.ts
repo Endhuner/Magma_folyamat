@@ -209,6 +209,36 @@ export interface ProductionLog {
 }
 
 /**
+ * Gép karbantartási tétel (olaj, kiegészítő).
+ */
+export interface MachineItem {
+  id: string
+  name: string          // megnevezés
+  drawingNumber: string // rajzszám
+  quantity: number      // mennyiség
+  unit: string          // egység: db, l, kg, m, stb.
+  source: string        // honnan vettük
+  notes: string
+  createdAt: string
+}
+
+/**
+ * Gép javítási tétel — tartalmaz dátumot és állapotot.
+ */
+export interface MachineRepair {
+  id: string
+  name: string          // megnevezés
+  drawingNumber: string // rajzszám
+  quantity: number
+  unit: string
+  source: string        // honnan vettük
+  date: string          // YYYY-MM-DD
+  status: 'tervezett' | 'elvégzett'
+  notes: string
+  createdAt: string
+}
+
+/**
  * Gép — egyszerű lista a műhely gépeiről.
  */
 export interface Machine {
@@ -218,6 +248,12 @@ export interface Machine {
   type: string
   capacity: string
   notes: string
+  /** Olajok és kenőanyagok listája. */
+  oils?: MachineItem[]
+  /** Kiegészítő alkatrészek, szerszámok listája. */
+  accessories?: MachineItem[]
+  /** Javítási tételek listája. */
+  repairs?: MachineRepair[]
   createdAt: string
   updatedAt: string
 }

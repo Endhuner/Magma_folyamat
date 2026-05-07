@@ -50,6 +50,7 @@ import { useIsMobile } from '@/hooks/useMediaQuery'
 import { Order, OrderStatus, Customer, Product, DeliveryNote, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
 import { diffObjects, buildAuditEntry, pruneAuditLog, AUDIT_LOG_MAX_ENTRIES } from '@/lib/auditLog'
 import { SimpleListView, SimpleColumnDef } from '@/components/SimpleListView'
+import { MachineDetailDialog } from '@/components/MachineDetailDialog'
 import { InventoryHistoryDialog } from '@/components/InventoryHistoryDialog'
 import { WarehouseAddDialog } from '@/components/WarehouseAddDialog'
 import { calculateDashboardMetrics, parseYear, stripDiacritics, isDelivered } from '@/lib/helpers'
@@ -58,7 +59,7 @@ import { CmrLayoutSettings } from '@/lib/cmrTemplateBuilder'
 import { useAuth } from '@/lib/auth'
 import { listUsers, createUser, updateUser, deleteUser } from '@/lib/api/usersApi'
 import type { UserRole } from '@produktivpro/shared'
-import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database, Package } from '@phosphor-icons/react'
+import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database, Package, Wrench } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { exportCmrAsHtml } from '@/lib/cmrHtmlTemplate'
 import { exportDeliveryAsHtml, TemplateStyles } from '@/lib/deliveryHtmlTemplate'
@@ -165,6 +166,7 @@ function App() {
   // Változásnapló — minden lényeges adatmódosítás itt is rögzül (Dokumentumok → Változások).
   const [auditLog, setAuditLog] = useEntityKV<AuditLogEntry>(auditLogRepo)
   const [machines, setMachines] = useKV<Machine[]>('machines', [])
+  const [detailMachineId, setDetailMachineId] = useState<string | null>(null)
   // Felhasználók: a backend a forrás (auth + bcrypt PIN miatt nem lehet
   // local-only). A "Felhasználók" tab onSave/onDelete a `usersApi`-n
   // keresztül a `/api/v1/users` endpointtal beszél, mentés után
@@ -2569,6 +2571,24 @@ body {
               addDialogTitle="Új gép hozzáadása"
               editDialogTitle="Gép szerkesztése"
               emptyHint='Vegyen fel új gépet az "Új gép" gombbal.'
+              extraActions={(machine) => (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Olajok / Kiegészítések / Javítások"
+                  onClick={() => setDetailMachineId(machine.id)}
+                >
+                  <Wrench className="w-4 h-4 text-accent" />
+                </Button>
+              )}
+            />
+            <MachineDetailDialog
+              open={detailMachineId !== null}
+              onClose={() => setDetailMachineId(null)}
+              machine={(machines || []).find((m) => m.id === detailMachineId) ?? null}
+              onSave={(updated) => {
+                handleSaveMachine(updated)
+              }}
             />
           </TabsContent>
 
