@@ -40,9 +40,20 @@ import {
   Info,
   Trash,
   CheckCircle,
+  CheckFat,
   Warning,
   ArrowRight,
 } from '@phosphor-icons/react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { shiftLabel } from '@/lib/shiftValidation'
@@ -107,6 +118,9 @@ export function ProductionDetailDialog({
   // Selejt-dialógus állapota
   const [defectDialogOpen, setDefectDialogOpen] = useState(false)
   const [editingDefect, setEditingDefect] = useState<ProductionDefect | null>(null)
+  // Elkészült megerősítő popup
+  const [completionConfirmOpen, setCompletionConfirmOpen] = useState(false)
+  const [pendingNewTotalProduced, setPendingNewTotalProduced] = useState(0)
 
   const nestCountNum = useMemo(() => {
     const n = parseFloatSafe(product?.nestCount, 1, { allowNegative: false })
@@ -215,6 +229,15 @@ export function ProductionDetailDialog({
     setEndShots('')
     setNotes('')
     setEditingId(null)
+
+    // Auto-completion ellenőrzés: ha az új műszakkal eléri vagy meghaladja a rendelt mennyiséget
+    if (!editingId && order.amountPc > 0 && order.status !== 'Elkészült') {
+      const newTotal = totalProduced + producedPreview
+      if (newTotal >= order.amountPc) {
+        setPendingNewTotalProduced(newTotal)
+        setCompletionConfirmOpen(true)
+      }
+    }
   }
 
   const handleEdit = (s: ProductionShift) => {
@@ -712,6 +735,41 @@ export function ProductionDetailDialog({
         userId={userId}
       />
     )}
+
+    {/* Elkészült megerősítő popup */}
+    <AlertDialog open={completionConfirmOpen} onOpenChange={setCompletionConfirmOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2 text-green-700">
+            <CheckFat className="w-6 h-6" weight="duotone" />
+            Rendelés elkészült!
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-base space-y-2">
+            <p>
+              A legyártott mennyiség (<strong>{pendingNewTotalProduced.toLocaleString('hu-HU')} db</strong>)
+              elérte a rendelt mennyiséget (<strong>{order?.amountPc?.toLocaleString('hu-HU')} db</strong>).
+            </p>
+            <p>Átváltjuk az <strong>Elkészült</strong> státuszra?</p>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Nem most</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-green-700 hover:bg-green-800 text-white"
+            onClick={() => {
+              if (order && onStatusChange) {
+                onStatusChange(order.id, 'Elkészült')
+                toast.success(`${order.productName} → Elkészült`)
+              }
+              setCompletionConfirmOpen(false)
+            }}
+          >
+            <CheckFat className="w-4 h-4 mr-2" />
+            Igen, Elkészült
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
   )
 }

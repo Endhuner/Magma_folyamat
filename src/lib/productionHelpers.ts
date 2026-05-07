@@ -155,5 +155,6 @@ export function groupOrdersByStatus(orders: Order[]): Record<string, Order[]> {
     ready: orders.filter((o) => o.status === 'Előkészítve'),
     paused: orders.filter((o) => o.status === 'Szünetel'),
     repair: orders.filter((o) => o.status === 'Javítás alatt'),
+    done: orders.filter((o) => o.status === 'Elkészült'),
   }
 }

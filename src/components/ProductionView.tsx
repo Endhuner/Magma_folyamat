@@ -26,6 +26,9 @@ import {
   Warning,
   Hammer,
   Info,
+  CheckFat,
+  CaretDown,
+  CaretUp,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -79,6 +82,7 @@ export function ProductionView({
 }: ProductionViewProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
+  const [summaryOpen, setSummaryOpen] = useState(true)
 
   // Dialógus-állapotok a nézeten belül — egyszerűbb így, mint prop-ban felhúzni az App.tsx-ig.
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null)
@@ -119,6 +123,8 @@ export function ProductionView({
         return 'bg-warning text-warning-foreground'
       case 'Javítás alatt':
         return 'bg-destructive text-destructive-foreground'
+      case 'Elkészült':
+        return 'bg-green-700 text-white'
       default:
         return 'bg-muted text-muted-foreground'
     }
@@ -136,6 +142,8 @@ export function ProductionView({
         return <PauseCircle className="w-4 h-4" weight="duotone" />
       case 'Javítás alatt':
         return <Wrench className="w-4 h-4" weight="duotone" />
+      case 'Elkészült':
+        return <CheckFat className="w-4 h-4" weight="duotone" />
       default:
         return <Package className="w-4 h-4" weight="duotone" />
     }
@@ -351,6 +359,50 @@ export function ProductionView({
     ? orders.find((o) => o.id === quickEntry.orderId) ?? null
     : null
 
+  // ── Rendelésállomány összesítő ───────────────────────────────────────────
+  // Termékenkénti aggregálás: mennyiség, szükséges anyag, kalkulált gyártási idő
+  const summaryRows = useMemo(() => {
+    const map = new Map<string, {
+      productName: string
+      totalQty: number
+      totalMaterialKg: number
+      totalHours: number
+    }>()
+
+    for (const order of productionOrders) {
+      const key = order.productId || order.productName
+      const existing = map.get(key)
+      const product = findProduct(order)
+
+      // Idő kalkuláció: ha van ciklusidő és fészekszám, számítjuk; különben plannedProductionHours
+      let hours = 0
+      const cycleTimeSec = product?.cycleTime ? parseFloat(product.cycleTime) : 0
+      const nestCount = product?.nestCount ? parseInt(product.nestCount, 10) : 0
+      if (cycleTimeSec > 0 && nestCount > 0) {
+        const pcsPerHour = (3600 / cycleTimeSec) * nestCount
+        hours = order.amountPc / pcsPerHour
+      } else if (order.plannedProductionHours) {
+        hours = parseFloat(order.plannedProductionHours) || 0
+      }
+
+      const materialKg = parseFloat(order.requiredMaterialKg) || 0
+
+      if (existing) {
+        existing.totalQty += order.amountPc
+        existing.totalMaterialKg += materialKg
+        existing.totalHours += hours
+      } else {
+        map.set(key, {
+          productName: order.productName,
+          totalQty: order.amountPc,
+          totalMaterialKg: materialKg,
+          totalHours: hours,
+        })
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty)
+  }, [productionOrders, products])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -372,6 +424,86 @@ export function ProductionView({
         missing={missingShifts}
         onQuickEntry={(m) => setQuickEntry(m)}
       />
+
+      {/* ── Rendelésállomány összesítő ── */}
+      <div className="bg-card border rounded-lg overflow-hidden">
+        <button
+          className="w-full flex items-center justify-between px-4 py-3 border-b bg-muted/30 hover:bg-muted/50 transition-colors"
+          onClick={() => setSummaryOpen((v) => !v)}
+        >
+          <div className="flex items-center gap-2 font-semibold text-base">
+            <Factory className="w-5 h-5 text-accent" weight="duotone" />
+            Rendelésállomány összesítő
+            <span className="text-muted-foreground font-normal text-sm ml-1">
+              ({summaryRows.length} termék)
+            </span>
+          </div>
+          {summaryOpen
+            ? <CaretUp className="w-4 h-4 text-muted-foreground" />
+            : <CaretDown className="w-4 h-4 text-muted-foreground" />
+          }
+        </button>
+        {summaryOpen && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/20 text-muted-foreground">
+                  <th className="text-left px-4 py-2 font-medium">Termék</th>
+                  <th className="text-right px-4 py-2 font-medium">Rendelt (db)</th>
+                  <th className="text-right px-4 py-2 font-medium">Szükséges anyag (kg)</th>
+                  <th className="text-right px-4 py-2 font-medium">Kalkulált idő</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summaryRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-center py-4 text-muted-foreground">
+                      Nincs aktív gyártási rendelés
+                    </td>
+                  </tr>
+                ) : (
+                  summaryRows.map((row, i) => (
+                    <tr key={i} className="border-b last:border-0 hover:bg-muted/10">
+                      <td className="px-4 py-2 font-medium">{row.productName}</td>
+                      <td className="px-4 py-2 text-right font-mono">{fmtInt(row.totalQty)}</td>
+                      <td className="px-4 py-2 text-right font-mono">
+                        {row.totalMaterialKg > 0 ? `${row.totalMaterialKg.toFixed(1)} kg` : '—'}
+                      </td>
+                      <td className="px-4 py-2 text-right font-mono">
+                        {row.totalHours > 0
+                          ? row.totalHours >= 1
+                            ? `${Math.round(row.totalHours)} ó`
+                            : `${Math.round(row.totalHours * 60)} perc`
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              {summaryRows.length > 1 && (
+                <tfoot>
+                  <tr className="border-t-2 bg-muted/20 font-semibold">
+                    <td className="px-4 py-2">Összesen</td>
+                    <td className="px-4 py-2 text-right font-mono">
+                      {fmtInt(summaryRows.reduce((s, r) => s + r.totalQty, 0))}
+                    </td>
+                    <td className="px-4 py-2 text-right font-mono">
+                      {summaryRows.reduce((s, r) => s + r.totalMaterialKg, 0) > 0
+                        ? `${summaryRows.reduce((s, r) => s + r.totalMaterialKg, 0).toFixed(1)} kg`
+                        : '—'}
+                    </td>
+                    <td className="px-4 py-2 text-right font-mono">
+                      {summaryRows.reduce((s, r) => s + r.totalHours, 0) > 0
+                        ? `${Math.round(summaryRows.reduce((s, r) => s + r.totalHours, 0))} ó`
+                        : '—'}
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="bg-card border rounded-lg p-4 space-y-3">
         <div className="flex flex-col md:flex-row gap-3">
@@ -433,6 +565,12 @@ export function ProductionView({
           groupedOrders.repair,
           <Wrench className="w-5 h-5 text-destructive" weight="duotone" />,
           'bg-destructive/10'
+        )}
+        {renderSection(
+          'Elkészült',
+          groupedOrders.done,
+          <CheckFat className="w-5 h-5 text-green-600" weight="duotone" />,
+          'bg-green-700/10'
         )}
       </div>
 

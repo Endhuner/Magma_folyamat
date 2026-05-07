@@ -26,6 +26,7 @@ const ORDER_STATUSES = [
   'Folyamatban',
   'Előkészítve',
   'Javítás alatt',
+  'Elkészült',
 ] as const
 
 const AUDIT_ENTITY_TYPES = [

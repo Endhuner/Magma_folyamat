@@ -6,6 +6,7 @@ export type OrderStatus =
   | 'Folyamatban'
   | 'Előkészítve'
   | 'Javítás alatt'
+  | 'Elkészült'
 
 export interface Order {
   id: string

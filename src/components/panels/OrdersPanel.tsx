@@ -239,6 +239,7 @@ export function OrdersPanel({
               <SelectItem value="Folyamatban">Folyamatban</SelectItem>
               <SelectItem value="Előkészítve">Előkészítve</SelectItem>
               <SelectItem value="Javítás alatt">Javítás alatt</SelectItem>
+              <SelectItem value="Elkészült">Elkészült</SelectItem>
             </SelectContent>
           </Select>
         </div>
