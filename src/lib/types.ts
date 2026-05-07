@@ -253,6 +253,8 @@ export interface Machine {
   oils?: MachineItem[]
   accessories?: MachineItem[]
   repairs?: MachineRepair[]
+  /** A tételt létrehozó felhasználó ID-ja — jogosultság-ellenőrzéshez. */
+  createdBy?: string
   createdAt: string
   updatedAt: string
 }
@@ -291,6 +293,8 @@ export interface Material {
   unitPrice: string
   unit: string
   notes: string
+  /** A tételt létrehozó felhasználó ID-ja — jogosultság-ellenőrzéshez. */
+  createdBy?: string
   createdAt: string
   updatedAt: string
 }

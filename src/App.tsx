@@ -1789,21 +1789,25 @@ body {
   // ---- Egyszerű listák (Gépek, Felhasználók, Anyaglista) -------------------
   const handleSaveMachine = (m: Machine) => {
     const before = (machines || []).find((x) => x.id === m.id)
+    // Új gépnél tároljuk a létrehozó user ID-ját
+    const record: Machine = before
+      ? m
+      : { ...m, createdBy: auth.user?.id }
     setMachines((current) => {
       const list = current || []
-      const exists = list.some((x) => x.id === m.id)
-      return exists ? list.map((x) => (x.id === m.id ? m : x)) : [...list, m]
+      const exists = list.some((x) => x.id === record.id)
+      return exists ? list.map((x) => (x.id === record.id ? record : x)) : [...list, record]
     })
     if (before) {
       const changes = diffObjects(
         before as unknown as Record<string, unknown>,
-        m as unknown as Record<string, unknown>
+        record as unknown as Record<string, unknown>
       )
       if (changes.length > 0) {
-        appendAudit('machine', 'Gép', m.id, m.name || m.id, 'update', { changes })
+        appendAudit('machine', 'Gép', record.id, record.name || record.id, 'update', { changes })
       }
     } else {
-      appendAudit('machine', 'Gép', m.id, m.name || m.id, 'create', { notes: m.type })
+      appendAudit('machine', 'Gép', record.id, record.name || record.id, 'create', { notes: record.type })
     }
   }
   const handleDeleteMachine = (id: string) => {
@@ -1922,21 +1926,25 @@ body {
 
   const handleSaveMaterial = (m: Material) => {
     const before = (materials || []).find((x) => x.id === m.id)
+    // Új anyagnál tároljuk a létrehozó user ID-ját
+    const record: Material = before
+      ? m
+      : { ...m, createdBy: auth.user?.id }
     setMaterials((current) => {
       const list = current || []
-      const exists = list.some((x) => x.id === m.id)
-      return exists ? list.map((x) => (x.id === m.id ? m : x)) : [...list, m]
+      const exists = list.some((x) => x.id === record.id)
+      return exists ? list.map((x) => (x.id === record.id ? record : x)) : [...list, record]
     })
     if (before) {
       const changes = diffObjects(
         before as unknown as Record<string, unknown>,
-        m as unknown as Record<string, unknown>
+        record as unknown as Record<string, unknown>
       )
       if (changes.length > 0) {
-        appendAudit('material', 'Anyag', m.id, m.name || m.id, 'update', { changes })
+        appendAudit('material', 'Anyag', record.id, record.name || record.id, 'update', { changes })
       }
     } else {
-      appendAudit('material', 'Anyag', m.id, m.name || m.id, 'create', { notes: m.type })
+      appendAudit('material', 'Anyag', record.id, record.name || record.id, 'create', { notes: record.type })
     }
   }
   const handleDeleteMaterial = (id: string) => {
@@ -2387,7 +2395,7 @@ body {
             </TabsList>
 
             <div className="flex items-center gap-2 ml-auto">
-              {auth.user?.role === 'admin' && <DropdownMenu>
+              {(auth.user?.role === 'admin' || auth.user?.role === 'operator') && <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2">
                     <Database className="w-4 h-4" />
@@ -2396,18 +2404,18 @@ body {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => setCurrentTab('customers')}>
+                  {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('customers')}>
                     Vevők
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setCurrentTab('products')}>
+                  </DropdownMenuItem>}
+                  {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('products')}>
                     Termékek
-                  </DropdownMenuItem>
+                  </DropdownMenuItem>}
                   <DropdownMenuItem onSelect={() => setCurrentTab('machines')}>
                     Gépek
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setCurrentTab('users')}>
+                  {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('users')}>
                     Felhasználók
-                  </DropdownMenuItem>
+                  </DropdownMenuItem>}
                   <DropdownMenuItem onSelect={() => setCurrentTab('materials')}>
                     Anyaglista
                   </DropdownMenuItem>
@@ -2571,6 +2579,11 @@ body {
               addDialogTitle="Új gép hozzáadása"
               editDialogTitle="Gép szerkesztése"
               emptyHint='Vegyen fel új gépet az "Új gép" gombbal.'
+              canDelete={(m) =>
+                auth.user?.role === 'admin' ||
+                !m.createdBy ||
+                m.createdBy === auth.user?.id
+              }
               extraActions={(machine) => (
                 <Button
                   variant="ghost"
@@ -2636,6 +2649,11 @@ body {
               addDialogTitle="Új anyag hozzáadása"
               editDialogTitle="Anyag szerkesztése"
               emptyHint='Vegyen fel új anyagot az "Új anyag" gombbal.'
+              canDelete={(m) =>
+                auth.user?.role === 'admin' ||
+                !m.createdBy ||
+                m.createdBy === auth.user?.id
+              }
             />
           </TabsContent>
 

@@ -150,6 +150,11 @@ interface SimpleListViewProps<T extends SimpleRecord> {
    * Pl. részletek gomb megnyitásához.
    */
   extraActions?: (item: T) => React.ReactNode
+  /**
+   * Ha megadott és false-t ad vissza, a törlés gomb elrejtésre kerül az adott sornál.
+   * Pl. operátor csak saját tételét törölheti.
+   */
+  canDelete?: (item: T) => boolean
 }
 
 /** Bármely oszlopértéket stringként olvassuk ki a sorból. */
@@ -173,6 +178,7 @@ export function SimpleListView<T extends SimpleRecord>({
   editDialogTitle,
   successMessages,
   extraActions,
+  canDelete,
 }: SimpleListViewProps<T>) {
   const [search, setSearch] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -473,15 +479,17 @@ export function SimpleListView<T extends SimpleRecord>({
                             >
                               <PencilSimple className="w-4 h-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeleteId(item.id)}
-                              aria-label="Törlés"
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash className="w-4 h-4" />
-                            </Button>
+                            {(canDelete === undefined || canDelete(item)) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeleteId(item.id)}
+                                aria-label="Törlés"
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
