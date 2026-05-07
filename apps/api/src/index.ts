@@ -25,6 +25,9 @@ import { auditLogRoutes } from './routes/auditLog.js'
 import { eventsRoutes } from './routes/events.js'
 import { authRoutes } from './routes/auth.js'
 import { backupRoutes } from './routes/backup.js'
+import { settingsRoutes } from './routes/settings.js'
+import { customerSequencesRoutes } from './routes/customerSequences.js'
+import { templatesRoutes } from './routes/templates.js'
 import { registerRequestLogger } from './lib/requestLogger.js'
 import { registerAuthPlugins } from './lib/authPlugin.js'
 import { bootstrapAdmin } from './lib/bootstrap.js'
@@ -124,6 +127,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     await api.register(auditLogRoutes)
     await api.register(eventsRoutes)
     await api.register(backupRoutes)
+    await api.register(settingsRoutes)
+    await api.register(customerSequencesRoutes)
+    await api.register(templatesRoutes)
   }, { prefix: '/api/v1' })
 
   // 404-kezelő:

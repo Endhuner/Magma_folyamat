@@ -347,6 +347,75 @@ export const auditLog = sqliteTable('audit_log', {
   byCreated: index('audit_created_idx').on(t.createdAt),
 }))
 
+// ----------------------------------------------------------------------
+// App settings — általános kulcs-érték tároló alkalmazás-szintű beállításokhoz.
+// Pl. cmr-layout-settings, delivery-html-styles, delivery-settings, stb.
+// Mindenki ugyanazt látja (shared config).
+// ----------------------------------------------------------------------
+export const appSettings = sqliteTable('app_settings', {
+  key: text('key').primaryKey(),
+  /** JSON-szerializált érték — bármilyen objektum tárolható. */
+  value: text('value').notNull().default('{}'),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+})
+
+// ----------------------------------------------------------------------
+// Label templates — cimkenyomtatás sablonjainak tárolása.
+// A LabelTemplate interfésznek megfelelő mezők JSON-ben a komplex struktúráknál.
+// ----------------------------------------------------------------------
+export const labelTemplates = sqliteTable('label_templates', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull().default(''),
+  type: text('type').notNull().default('label'),
+  html: text('html').notNull().default(''),
+  css: text('css').notNull().default(''),
+  timestamp: text('timestamp').notNull().default(''),
+  description: text('description'),
+  /** JSON: { top, right, bottom, left } */
+  margins: text('margins').notNull().default('{}'),
+  labelsPerPage: integer('labels_per_page'),
+  labelsPerRow: integer('labels_per_row'),
+  labelsPerColumn: integer('labels_per_column'),
+  /** JSON: CellSettings objektum */
+  cellSettings: text('cell_settings'),
+  /** JSON: FontSettings objektum */
+  fontSettings: text('font_settings'),
+  /** JSON: AlignmentSettings objektum */
+  alignmentSettings: text('alignment_settings'),
+  /** JSON: PrintSettings objektum */
+  printSettings: text('print_settings'),
+  /** JSON: PaddingSettings objektum */
+  paddingSettings: text('padding_settings'),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+})
+
+// ----------------------------------------------------------------------
+// Customer sequences — szállítólevél sorszámok vevőnként.
+// Kulcs: vevőnév (string), érték: aktuális sorszám (egész).
+// ----------------------------------------------------------------------
+export const customerSequences = sqliteTable('customer_sequences', {
+  customerId: text('customer_id').primaryKey(),
+  sequence: integer('sequence').notNull().default(0),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+})
+
+// ----------------------------------------------------------------------
+// Saved document templates — HTML/CSS sablonok szállítólevélhez és CMR-hez.
+// App.tsx + GithubStyleTemplateEditor + TemplateBackupRestore használja.
+// ----------------------------------------------------------------------
+export const savedTemplates = sqliteTable('saved_templates', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull().default(''),
+  type: text('type').notNull().default('delivery'),
+  /** JSON: teljes sablon adat (html, css, margins, stb.) */
+  data: text('data').notNull().default('{}'),
+  timestamp: text('timestamp').notNull().default(''),
+  size: integer('size').notNull().default(0),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+})
+
 // Hagyományos numerikus mezőkhöz, ha valaha kellene `real`-t használni
 // (pl. súlyok), itt egy hint:
 // example: weightKg: real('weight_kg').notNull().default(0),

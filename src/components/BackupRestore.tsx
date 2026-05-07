@@ -1,12 +1,8 @@
 import { useState } from 'react'
 import { useKV } from '@/hooks/useKV'
-import { useEntityKV } from '@/hooks/useEntityKV'
-import {
-  ordersRepo,
-  customersRepo,
-  productsRepo,
-  deliveryNotesRepo,
-} from '@/lib/db/repos'
+import { useServerCrud } from '@/lib/providers/useServerCrud'
+import { useCustomerSequences } from '@/hooks/useCustomerSequences'
+import { useAppSetting } from '@/hooks/useAppSetting'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -43,15 +39,17 @@ interface SavedBackup {
 }
 
 export function BackupRestore() {
-  // Az entitások már IndexedDB-ből jönnek (useEntityKV adapter), de a backup
-  // fájl-formátum változatlan — exporthoz az értékeket olvassuk, importhoz
-  // a settert hívjuk (a setter diff-et számol a Dexie alá).
-  const [orders, setOrders] = useEntityKV<Order>(ordersRepo)
-  const [customers, setCustomers] = useEntityKV<Customer>(customersRepo)
-  const [products, setProducts] = useEntityKV<Product>(productsRepo)
-  const [deliveryNotes, setDeliveryNotes] = useEntityKV<DeliveryNote>(deliveryNotesRepo)
-  const [customerSequences] = useKV<Record<string, number>>('customerSequences', {})
-  const [cmrSettings] = useKV<CmrLayoutSettings>('cmr-layout-settings', {
+  // Szerver-alapú adatok: backup exporthoz olvassuk, restore-hoz diff-sync
+  const ordersApi = useServerCrud<Order>('orders', ['order'])
+  const orders = ordersApi.items
+  const customersApi = useServerCrud<Customer>('customers', ['customer'])
+  const customers = customersApi.items
+  const productsApi = useServerCrud<Product>('products', ['product'])
+  const products = productsApi.items
+  const deliveryNotesApi = useServerCrud<DeliveryNote>('delivery-notes', ['order'])
+  const deliveryNotes = deliveryNotesApi.items
+  const [customerSequences] = useCustomerSequences()
+  const [cmrSettings] = useAppSetting<CmrLayoutSettings>('cmr-layout-settings', {
     senderName: 'Magma Kft',
     senderAddress: 'H-1211 Budapest, Déli utca 13.',
     senderTaxNumber: 'HU10368152-2-43',
@@ -66,6 +64,20 @@ export function BackupRestore() {
     carrierAddress: '',
     vehiclePlate: '',
   })
+
+  // Restore helper: diff-alapú szinkronizálás a szerverrel (töröl + létrehoz)
+  const syncToServer = <T extends { id: string }>(
+    api: { items: T[]; add: (i: T) => void; remove: (id: string) => void; replace: (i: T) => void },
+    next: T[]
+  ) => {
+    const prevMap = new Map(api.items.map(i => [i.id, i]))
+    const nextMap = new Map(next.map(i => [i.id, i]))
+    for (const item of api.items) { if (!nextMap.has(item.id)) api.remove(item.id) }
+    for (const item of next) {
+      if (!prevMap.has(item.id)) api.add(item)
+      else if (JSON.stringify(prevMap.get(item.id)) !== JSON.stringify(item)) api.replace(item)
+    }
+  }
   const [savedBackups, setSavedBackups] = useKV<SavedBackup[]>('backups', [])
   const [isExporting, setIsExporting] = useState(false)
   const [isRestoring, setIsRestoring] = useState(false)
@@ -183,10 +195,10 @@ export function BackupRestore() {
   const handleRestoreData = async (data: BackupData) => {
     setIsRestoring(true)
     try {
-      setOrders(data.orders || [])
-      setCustomers(data.customers || [])
-      setProducts(data.products || [])
-      setDeliveryNotes(data.deliveryNotes || [])
+      syncToServer(ordersApi, data.orders || [])
+      syncToServer(customersApi, data.customers || [])
+      syncToServer(productsApi, data.products || [])
+      syncToServer(deliveryNotesApi, data.deliveryNotes || [])
       
       toast.success(
         <div className="flex flex-col gap-1">

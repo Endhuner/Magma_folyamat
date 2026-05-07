@@ -265,6 +265,61 @@ export const materialCreateSchema = z.object({
 export const materialUpdateSchema = materialCreateSchema.partial()
 
 // ----------------------------------------------------------------------
+// App settings — kulcs-érték beállítások (cmrSettings, deliveryStyles, stb.)
+// ----------------------------------------------------------------------
+export const appSettingUpsertSchema = z.object({
+  /** JSON-szerializált érték — bármilyen JSON-kompatibilis objektum. */
+  value: z.unknown(),
+})
+
+// ----------------------------------------------------------------------
+// Label templates
+// ----------------------------------------------------------------------
+export const labelTemplateCreateSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1),
+  type: z.string().default('label'),
+  html: z.string().default(''),
+  css: z.string().default(''),
+  timestamp: z.string().default(''),
+  description: z.string().optional(),
+  margins: z.record(z.string()).optional(),
+  labelsPerPage: z.number().int().optional(),
+  labelsPerRow: z.number().int().optional(),
+  labelsPerColumn: z.number().int().optional(),
+  cellSettings: z.record(z.unknown()).optional(),
+  fontSettings: z.record(z.unknown()).optional(),
+  alignmentSettings: z.record(z.unknown()).optional(),
+  printSettings: z.record(z.unknown()).optional(),
+  paddingSettings: z.record(z.unknown()).optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+})
+export const labelTemplateUpdateSchema = labelTemplateCreateSchema.partial()
+
+// ----------------------------------------------------------------------
+// Customer sequences — vevőnkénti sorszámok
+// ----------------------------------------------------------------------
+export const customerSequenceUpsertSchema = z.object({
+  sequence: z.number().int().min(0),
+})
+
+// ----------------------------------------------------------------------
+// Saved document templates — HTML/CSS szállítólevél + CMR sablonok
+// ----------------------------------------------------------------------
+export const savedTemplateCreateSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1),
+  type: z.string().default('delivery'),
+  data: z.record(z.unknown()).optional(),
+  timestamp: z.string().default(''),
+  size: z.number().int().default(0),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+})
+export const savedTemplateUpdateSchema = savedTemplateCreateSchema.partial()
+
+// ----------------------------------------------------------------------
 // Audit log — csak olvasásra/listázásra; írni csak a backend írhat.
 // ----------------------------------------------------------------------
 export const auditLogQuerySchema = z.object({

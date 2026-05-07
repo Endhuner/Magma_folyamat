@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { useKV } from '@/hooks/useKV'
+import { useAppSetting } from '@/hooks/useAppSetting'
 import { FloppyDisk, ArrowCounterClockwise, BuildingOffice, Truck } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { parseIntSafe } from '@/lib/helpers'
@@ -37,7 +37,7 @@ const DEFAULT_DELIVERY_SETTINGS: DeliverySettings = {
 }
 
 export function DeliverySettingsDialog({ open, onClose }: DeliverySettingsDialogProps) {
-  const [deliverySettings, setDeliverySettings] = useKV<DeliverySettings>('delivery-settings', DEFAULT_DELIVERY_SETTINGS)
+  const [deliverySettings, setDeliverySettings] = useAppSetting<DeliverySettings>('delivery-settings', DEFAULT_DELIVERY_SETTINGS)
   const [localSettings, setLocalSettings] = useState<DeliverySettings>(DEFAULT_DELIVERY_SETTINGS)
   const [hasChanges, setHasChanges] = useState(false)
 
@@ -57,7 +57,7 @@ export function DeliverySettingsDialog({ open, onClose }: DeliverySettingsDialog
   }
 
   const handleSave = () => {
-    setDeliverySettings(localSettings)
+    void setDeliverySettings(localSettings)
     setHasChanges(false)
     toast.success('Szállítólevél beállítások mentve')
     onClose()

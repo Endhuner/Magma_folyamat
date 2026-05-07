@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useKV } from '@/hooks/useKV'
+import { useServerCrud } from '@/lib/providers/useServerCrud'
+import { useAppSetting } from '@/hooks/useAppSetting'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -32,8 +34,21 @@ interface SavedTemplate {
 
 export function TemplateBackupRestore() {
   const [templates] = useKV<TemplateData[]>('github-style-templates', [])
-  const [savedTemplates, setSavedTemplates] = useKV<SavedTemplate[]>('saved-templates', [])
-  const [activeTemplates, setActiveTemplates] = useKV<{ cmr?: string, delivery?: string }>('active-templates', {})
+  const savedTemplatesApi = useServerCrud<SavedTemplate>('saved-templates', ['order'])
+  const savedTemplates = savedTemplatesApi.items
+  const setSavedTemplates = (updater: SavedTemplate[] | ((prev: SavedTemplate[]) => SavedTemplate[])) => {
+    const current = savedTemplatesApi.items
+    const next = typeof updater === 'function' ? updater(current) : updater
+    const prevMap = new Map(current.map(i => [i.id, i]))
+    const nextMap = new Map(next.map(i => [i.id, i]))
+    for (const item of current) { if (!nextMap.has(item.id)) savedTemplatesApi.remove(item.id) }
+    for (const item of next) {
+      if (!prevMap.has(item.id)) savedTemplatesApi.add(item)
+      else if (JSON.stringify(prevMap.get(item.id)) !== JSON.stringify(item)) savedTemplatesApi.replace(item)
+    }
+  }
+  // active-templates: UI preferencia, marad lokálisan (melyik sablon aktív CMR/szállítóhoz)
+  const [activeTemplates, setActiveTemplates] = useAppSetting<{ cmr?: string, delivery?: string }>('active-templates', {})
   
   const [saveName, setSaveName] = useState('')
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
@@ -100,10 +115,10 @@ export function TemplateBackupRestore() {
     const templateData = templateToRestore.data
     
     if (templateData.type === 'cmr') {
-      setActiveTemplates((current) => ({ ...current, cmr: templateToRestore.id }))
+      void setActiveTemplates({ ...activeTemplates, cmr: templateToRestore.id })
       toast.success('CMR sablon aktiválva')
     } else {
-      setActiveTemplates((current) => ({ ...current, delivery: templateToRestore.id }))
+      void setActiveTemplates({ ...activeTemplates, delivery: templateToRestore.id })
       toast.success('Szállítólevél sablon aktiválva')
     }
 

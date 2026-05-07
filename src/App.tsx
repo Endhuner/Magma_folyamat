@@ -3,10 +3,11 @@ import { useState, useMemo, useEffect, useRef, Suspense, useCallback } from 'rea
 import { useKV } from '@/hooks/useKV'
 import { useEntityKV } from '@/hooks/useEntityKV'
 import {
-  deliveryNotesRepo,
   auditLogRepo,
 } from '@/lib/db/repos'
 import { useServerCrud } from '@/lib/providers/useServerCrud'
+import { useAppSetting } from '@/hooks/useAppSetting'
+import { useCustomerSequences } from '@/hooks/useCustomerSequences'
 import { runMigrationIfNeeded } from '@/lib/db/migrate'
 import { isMigrationDone, markMigrationDone, migrateLocalDataToServer } from '@/lib/db/migrateToServer'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -99,7 +100,8 @@ function App() {
   const customers = customersApi.items
   const productsApi = useServerCrud<Product>('products', ['product'])
   const products = productsApi.items
-  const [deliveryNotes, setDeliveryNotes] = useEntityKV<DeliveryNote>(deliveryNotesRepo)
+  const deliveryNotesApi = useServerCrud<DeliveryNote>('delivery-notes', ['order'])
+  const deliveryNotes = deliveryNotesApi.items
 
   // Gyártás + Készlet: szerver-alapú (SQLite), SSE valós idejű szinkronnal.
   // Minden felhasználó (admin + operátor) azonnal látja egymás adatait.
@@ -163,6 +165,7 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const setProducts = useCallback(makeSyncSetter(productsApi), [productsApi.items, productsApi.add, productsApi.remove, productsApi.replace])
 
+
   // Változásnapló — minden lényeges adatmódosítás itt is rögzül (Dokumentumok → Változások).
   const [auditLog, setAuditLog] = useEntityKV<AuditLogEntry>(auditLogRepo)
   const machinesApi = useServerCrud<Machine>('machines', ['machine'])
@@ -197,9 +200,11 @@ function App() {
     // bypass-módban marad amit a user lát (üres) — bypass csak dev/offline.
   }, [auth.status])
   const materialsApi = useServerCrud<Material>('materials', ['material'])
-  const [customerSequences, setCustomerSequences] = useKV<Record<string, number>>('customerSequences', {})
-  const [savedTemplates, setSavedTemplates] = useKV<any[]>('saved-templates', [])
-  const [cmrSettings] = useKV<CmrLayoutSettings>('cmr-layout-settings', {
+  // customerSequences: szerver-alapú (megosztott sorszámok minden felhasználónak)
+  const [customerSequences, setCustomerSequences] = useCustomerSequences()
+  const savedTemplatesApi = useServerCrud<any>('saved-templates', ['order'])
+  const savedTemplates = savedTemplatesApi.items
+  const [cmrSettings] = useAppSetting<CmrLayoutSettings>('cmr-layout-settings', {
     senderName: 'Magma Kft',
     senderAddress: 'H-1211 Budapest, Déli utca 13.',
     senderTaxNumber: 'HU10368152-2-43',
@@ -251,7 +256,7 @@ function App() {
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
   const [pendingExportType, setPendingExportType] = useState<'cmr' | 'delivery' | null>(null)
   
-  const [deliveryStyles] = useKV<Partial<TemplateStyles>>('delivery-html-styles', {})
+  const [deliveryStyles] = useAppSetting<Partial<TemplateStyles>>('delivery-html-styles', {})
   
   const [documentFilters, setDocumentFilters] = useKV<Array<{id: string, name: string, columns: string[]}>>('document-filters', [])
   const [activeFilterId, setActiveFilterId] = useState<string | null>(null)
@@ -261,7 +266,12 @@ function App() {
   const [activeOrderFilterId, setActiveOrderFilterId] = useState<string | null>(null)
   const [newOrderFilterDialogOpen, setNewOrderFilterDialogOpen] = useState(false)
 
-  const [labelTemplates, setLabelTemplates] = useKV<LabelTemplate[]>('label-templates', [])
+  const labelTemplatesApi = useServerCrud<LabelTemplate>('label-templates', ['order'])
+  const labelTemplates = labelTemplatesApi.items
+  // makeSyncSetter adapter: LabelTemplatesPanel a régi funkcionális updater stílust vár
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const setLabelTemplates = useCallback(makeSyncSetter(labelTemplatesApi), [labelTemplatesApi.items, labelTemplatesApi.add, labelTemplatesApi.remove, labelTemplatesApi.replace])
+  // activeLabelTemplateId: user-specifikus UI beállítás, marad lokálisan
   const [activeLabelTemplateId, setActiveLabelTemplateId] = useKV<string | null>('active-label-template', null)
   const [labelTemplateDialogOpen, setLabelTemplateDialogOpen] = useState(false)
   const [selectedLabelTemplate, setSelectedLabelTemplate] = useState<LabelTemplate | null>(null)
@@ -514,7 +524,7 @@ function App() {
           }
         }
         
-        setSavedTemplates((current) => [...(current || []), newTemplate])
+        savedTemplatesApi.add(newTemplate)
         console.log('✅ Szállítólevél sablon inicializálva:', deliveryTemplateName)
       }
 
@@ -947,15 +957,16 @@ body {
           }
         }
         
-        setSavedTemplates((current) => [...(current || []), newCmrTemplate])
+        savedTemplatesApi.add(newCmrTemplate)
         console.log('✅ CMR sablon inicializálva:', cmrTemplateName)
       }
     }
     
-    if (savedTemplates !== undefined) {
+    if (savedTemplatesApi.items !== undefined) {
       initializeDefaultTemplates()
     }
-  }, [savedTemplates, setSavedTemplates])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedTemplatesApi.items.length])
 
   const handleSaveOrder = (orderData: Partial<Order>) => {
     if (selectedOrder) {
@@ -2045,16 +2056,15 @@ body {
   }
 
   const handleDeleteDeliveryNote = (id: string) => {
-    setDeliveryNotes((current) => (current || []).filter((dn) => dn.id !== id))
+    deliveryNotesApi.remove(id)
     toast.success('Szállítólevél sikeresen törölve')
   }
 
   const handleUpdateDeliveryNote = (id: string, updatedData: Record<string, string | number | null | undefined>[]) => {
-    setDeliveryNotes((current) =>
-      (current || []).map((dn) =>
-        dn.id === id ? { ...dn, exportData: updatedData, updatedAt: new Date().toISOString() } : dn
-      )
-    )
+    const existing = deliveryNotesApi.items.find((dn) => dn.id === id)
+    if (existing) {
+      deliveryNotesApi.replace({ ...existing, exportData: updatedData, updatedAt: new Date().toISOString() })
+    }
     toast.success('Szállítólevél sikeresen frissítve')
   }
 
@@ -2103,7 +2113,7 @@ body {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }
-        setDeliveryNotes((current) => [...(current || []), newNote as any])
+        deliveryNotesApi.add(newNote as DeliveryNote)
 
         if (sequenceNumber) {
           const orderIdsToUpdate = selectedOrders.map((o) => o.id)
@@ -2202,7 +2212,7 @@ body {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }
-        setDeliveryNotes((current) => [...(current || []), newNote as any])
+        deliveryNotesApi.add(newNote as DeliveryNote)
 
         if (sequenceNumber) {
           const orderIdsToUpdate = selectedOrders.map(o => o.id)
@@ -2985,14 +2995,10 @@ body {
             }}
             onSave={(template) => {
               if (selectedLabelTemplate) {
-                setLabelTemplates((current) =>
-                  (current || []).map((t) =>
-                    t.id === selectedLabelTemplate.id ? template : t
-                  )
-                )
+                labelTemplatesApi.replace(template)
                 toast.success('Sablon frissítve')
               } else {
-                setLabelTemplates((current) => [...(current || []), template])
+                labelTemplatesApi.add(template)
                 toast.success('Sablon létrehozva')
               }
               setLabelTemplateDialogOpen(false)

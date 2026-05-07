@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { useKV } from '@/hooks/useKV'
+import { useAppSetting } from '@/hooks/useAppSetting'
 import { CmrLayoutSettings } from '@/lib/cmrTemplateBuilder'
 import { GearSix, FloppyDisk, ArrowCounterClockwise, CheckCircle, BuildingOffice } from '@phosphor-icons/react'
 import { toast } from 'sonner'
@@ -31,7 +31,7 @@ const DEFAULT_CMR_SETTINGS: CmrLayoutSettings = {
 }
 
 export function CmrSettingsDialog({ open, onClose }: CmrSettingsDialogProps) {
-  const [cmrSettings, setCmrSettings] = useKV<CmrLayoutSettings>('cmr-layout-settings', DEFAULT_CMR_SETTINGS)
+  const [cmrSettings, setCmrSettings] = useAppSetting<CmrLayoutSettings>('cmr-layout-settings', DEFAULT_CMR_SETTINGS)
   const [localSettings, setLocalSettings] = useState<CmrLayoutSettings>(DEFAULT_CMR_SETTINGS)
   const [hasChanges, setHasChanges] = useState(false)
 
@@ -51,7 +51,7 @@ export function CmrSettingsDialog({ open, onClose }: CmrSettingsDialogProps) {
   }
 
   const handleSave = () => {
-    setCmrSettings(localSettings)
+    void setCmrSettings(localSettings)
     setHasChanges(false)
     toast.success('CMR beállítások mentve')
     onClose()

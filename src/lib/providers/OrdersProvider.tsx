@@ -19,7 +19,7 @@
  */
 import { createContext, useContext, useMemo, type ReactElement, type ReactNode } from 'react'
 import type { Order, OrderStatus } from '@/lib/types'
-import { useKV } from '@/hooks/useKV'
+import { useCustomerSequences } from '@/hooks/useCustomerSequences'
 import { useCrudKV, type CrudApi } from './createCrudHook'
 
 type CustomerSequenceMap = Record<string, number>
@@ -52,10 +52,7 @@ const OrdersContext = createContext<OrdersContextValue | null>(null)
 
 export function OrdersProvider({ children }: { children: ReactNode }): ReactElement {
   const crud = useCrudKV<Order>('orders', [])
-  const [customerSequences, setCustomerSequences] = useKV<CustomerSequenceMap>(
-    'customerSequences',
-    {}
-  )
+  const [customerSequences, setCustomerSequences] = useCustomerSequences()
 
   const activeOrders = useMemo(
     () => crud.items.filter((o) => o.status !== 'Kiszállítva'),

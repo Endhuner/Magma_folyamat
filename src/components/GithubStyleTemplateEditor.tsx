@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useKV } from '@/hooks/useKV'
+import { useServerCrud } from '@/lib/providers/useServerCrud'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -48,10 +49,26 @@ const DEFAULT_DELIVERY_HTML = ``
 const DEFAULT_DELIVERY_CSS = ``
 
 export function GithubStyleTemplateEditor() {
-  const [savedTemplates, setSavedTemplates] = useKV<SavedTemplate[]>('saved-templates', [])
-  const [orders] = useKV<Order[]>('orders', [])
-  const [customers] = useKV<Customer[]>('customers', [])
-  const [products] = useKV<Product[]>('products', [])
+  const savedTemplatesApi = useServerCrud<SavedTemplate>('saved-templates', ['order'])
+  const savedTemplates = savedTemplatesApi.items
+  // Adapter: functional updater stílus → API hívások
+  const setSavedTemplates = (updater: SavedTemplate[] | ((prev: SavedTemplate[]) => SavedTemplate[])) => {
+    const current = savedTemplatesApi.items
+    const next = typeof updater === 'function' ? updater(current) : updater
+    const prevMap = new Map(current.map(i => [i.id, i]))
+    const nextMap = new Map(next.map(i => [i.id, i]))
+    for (const item of current) { if (!nextMap.has(item.id)) savedTemplatesApi.remove(item.id) }
+    for (const item of next) {
+      if (!prevMap.has(item.id)) savedTemplatesApi.add(item)
+      else if (JSON.stringify(prevMap.get(item.id)) !== JSON.stringify(item)) savedTemplatesApi.replace(item)
+    }
+  }
+  const ordersApi = useServerCrud<Order>('orders', ['order'])
+  const orders = ordersApi.items
+  const customersApi = useServerCrud<Customer>('customers', ['customer'])
+  const customers = customersApi.items
+  const productsApi = useServerCrud<Product>('products', ['product'])
+  const products = productsApi.items
   const [selectedTemplateId, setSelectedTemplateId] = useKV<string | null>('selected-template-id', null)
   const [draftHtml, setDraftHtml] = useKV<Record<string, string>>('template-draft-html', {})
   const [draftCss, setDraftCss] = useKV<Record<string, string>>('template-draft-css', {})
