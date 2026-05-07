@@ -274,6 +274,13 @@ export const machines = sqliteTable('machines', {
   type: text('type').notNull().default(''),
   capacity: text('capacity').notNull().default(''),
   notes: text('notes').notNull().default(''),
+  /** JSON tömb: MachineItem[] */
+  oils: text('oils').notNull().default('[]'),
+  /** JSON tömb: MachineItem[] */
+  accessories: text('accessories').notNull().default('[]'),
+  /** JSON tömb: MachineRepair[] */
+  repairs: text('repairs').notNull().default('[]'),
+  createdBy: text('created_by'),
   createdAt: text('created_at').notNull().default(nowDefault),
   updatedAt: text('updated_at').notNull().default(nowDefault),
 })
@@ -314,6 +321,7 @@ export const materials = sqliteTable('materials', {
   unitPrice: text('unit_price').notNull().default(''),
   unit: text('unit').notNull().default(''),
   notes: text('notes').notNull().default(''),
+  createdBy: text('created_by'),
   createdAt: text('created_at').notNull().default(nowDefault),
   updatedAt: text('updated_at').notNull().default(nowDefault),
 })

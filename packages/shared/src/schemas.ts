@@ -212,6 +212,10 @@ export const machineCreateSchema = z.object({
   type: z.string().default(''),
   capacity: z.string().default(''),
   notes: z.string().default(''),
+  oils: z.array(z.any()).optional(),
+  accessories: z.array(z.any()).optional(),
+  repairs: z.array(z.any()).optional(),
+  createdBy: z.string().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 })
@@ -254,6 +258,7 @@ export const materialCreateSchema = z.object({
   unitPrice: z.string().default(''),
   unit: z.string().default(''),
   notes: z.string().default(''),
+  createdBy: z.string().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 })

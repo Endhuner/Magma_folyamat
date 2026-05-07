@@ -41,6 +41,7 @@ export async function masterDataRoutes(app: FastifyInstance): Promise<void> {
     auditEntity: 'machine',
     auditLabel: 'Gép',
     nameField: 'name',
+    jsonFields: ['oils', 'accessories', 'repairs'],
   })
   registerCrudRoutes(app, {
     resource: 'users',

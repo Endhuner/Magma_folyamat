@@ -165,7 +165,7 @@ function App() {
 
   // Változásnapló — minden lényeges adatmódosítás itt is rögzül (Dokumentumok → Változások).
   const [auditLog, setAuditLog] = useEntityKV<AuditLogEntry>(auditLogRepo)
-  const [machines, setMachines] = useKV<Machine[]>('machines', [])
+  const machinesApi = useServerCrud<Machine>('machines', ['machine'])
   const [detailMachineId, setDetailMachineId] = useState<string | null>(null)
   // Felhasználók: a backend a forrás (auth + bcrypt PIN miatt nem lehet
   // local-only). A "Felhasználók" tab onSave/onDelete a `usersApi`-n
@@ -196,7 +196,7 @@ function App() {
     }
     // bypass-módban marad amit a user lát (üres) — bypass csak dev/offline.
   }, [auth.status])
-  const [materials, setMaterials] = useKV<Material[]>('materials', [])
+  const materialsApi = useServerCrud<Material>('materials', ['material'])
   const [customerSequences, setCustomerSequences] = useKV<Record<string, number>>('customerSequences', {})
   const [savedTemplates, setSavedTemplates] = useKV<any[]>('saved-templates', [])
   const [cmrSettings] = useKV<CmrLayoutSettings>('cmr-layout-settings', {
@@ -1788,17 +1788,13 @@ body {
 
   // ---- Egyszerű listák (Gépek, Felhasználók, Anyaglista) -------------------
   const handleSaveMachine = (m: Machine) => {
-    const before = (machines || []).find((x) => x.id === m.id)
+    const before = machinesApi.items.find((x) => x.id === m.id)
     // Új gépnél tároljuk a létrehozó user ID-ját
     const record: Machine = before
       ? m
       : { ...m, createdBy: auth.user?.id }
-    setMachines((current) => {
-      const list = current || []
-      const exists = list.some((x) => x.id === record.id)
-      return exists ? list.map((x) => (x.id === record.id ? record : x)) : [...list, record]
-    })
     if (before) {
+      machinesApi.replace(record)
       const changes = diffObjects(
         before as unknown as Record<string, unknown>,
         record as unknown as Record<string, unknown>
@@ -1807,12 +1803,13 @@ body {
         appendAudit('machine', 'Gép', record.id, record.name || record.id, 'update', { changes })
       }
     } else {
+      machinesApi.add(record)
       appendAudit('machine', 'Gép', record.id, record.name || record.id, 'create', { notes: record.type })
     }
   }
   const handleDeleteMachine = (id: string) => {
-    const existing = (machines || []).find((x) => x.id === id)
-    setMachines((current) => (current || []).filter((x) => x.id !== id))
+    const existing = machinesApi.items.find((x) => x.id === id)
+    machinesApi.remove(id)
     if (existing) {
       appendAudit('machine', 'Gép', id, existing.name || id, 'delete', { notes: existing.type })
     }
@@ -1925,17 +1922,13 @@ body {
   }
 
   const handleSaveMaterial = (m: Material) => {
-    const before = (materials || []).find((x) => x.id === m.id)
+    const before = materialsApi.items.find((x) => x.id === m.id)
     // Új anyagnál tároljuk a létrehozó user ID-ját
     const record: Material = before
       ? m
       : { ...m, createdBy: auth.user?.id }
-    setMaterials((current) => {
-      const list = current || []
-      const exists = list.some((x) => x.id === record.id)
-      return exists ? list.map((x) => (x.id === record.id ? record : x)) : [...list, record]
-    })
     if (before) {
+      materialsApi.replace(record)
       const changes = diffObjects(
         before as unknown as Record<string, unknown>,
         record as unknown as Record<string, unknown>
@@ -1944,12 +1937,13 @@ body {
         appendAudit('material', 'Anyag', record.id, record.name || record.id, 'update', { changes })
       }
     } else {
+      materialsApi.add(record)
       appendAudit('material', 'Anyag', record.id, record.name || record.id, 'create', { notes: record.type })
     }
   }
   const handleDeleteMaterial = (id: string) => {
-    const existing = (materials || []).find((x) => x.id === id)
-    setMaterials((current) => (current || []).filter((x) => x.id !== id))
+    const existing = materialsApi.items.find((x) => x.id === id)
+    materialsApi.remove(id)
     if (existing) {
       appendAudit('material', 'Anyag', id, existing.name || id, 'delete', { notes: existing.type })
     }
@@ -2571,7 +2565,7 @@ body {
               title="Gépek"
               description="Termelőgépek és berendezések adatai"
               icon={<Factory className="w-16 h-16 text-muted-foreground mb-4" weight="duotone" />}
-              items={machines || []}
+              items={machinesApi.items}
               columns={machineColumns}
               onSave={handleSaveMachine}
               onDelete={handleDeleteMachine}
@@ -2598,7 +2592,7 @@ body {
             <MachineDetailDialog
               open={detailMachineId !== null}
               onClose={() => setDetailMachineId(null)}
-              machine={(machines || []).find((m) => m.id === detailMachineId) ?? null}
+              machine={machinesApi.items.find((m) => m.id === detailMachineId) ?? null}
               onSave={(updated) => {
                 handleSaveMachine(updated)
               }}
@@ -2641,7 +2635,7 @@ body {
               title="Anyaglista"
               description="Alapanyagok és granulátumok nyilvántartása"
               icon={<Package className="w-16 h-16 text-muted-foreground mb-4" weight="duotone" />}
-              items={materials || []}
+              items={materialsApi.items}
               columns={materialColumns}
               onSave={handleSaveMaterial}
               onDelete={handleDeleteMaterial}
