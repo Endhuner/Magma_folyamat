@@ -696,7 +696,14 @@ export function ProductionDetailDialog({
                 </Button>
                 <Button
                   size="lg"
-                  onClick={() => handleStatusButton('Előkészítve', 'Előkészítve')}
+                  onClick={() => {
+                    const isComplete = order.amountPc > 0 && totalProduced >= order.amountPc
+                    if (isComplete) {
+                      handleStatusButton('Elkészült', 'Elkészült')
+                    } else {
+                      handleStatusButton('Előkészítve', 'Előkészítve')
+                    }
+                  }}
                   className={`h-14 font-semibold text-base text-white shadow-sm ${
                     isStopped
                       ? 'bg-slate-700 hover:bg-slate-800 ring-2 ring-slate-400 ring-offset-2'
