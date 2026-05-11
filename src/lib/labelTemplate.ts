@@ -600,30 +600,12 @@ export function generateLabelHTML(labels: LabelData[]): string {
     const rows: string[] = []
     
     for (let row = 0; row < labelsPerColumn; row++) {
-      const rowLabels: LabelData[] = []
+      const cells: string[] = []
       for (let col = 0; col < labelsPerRow; col++) {
         const index = row * labelsPerRow + col
         if (index < pageLabels.length) {
-          rowLabels.push(pageLabels[index])
-        } else {
-          rowLabels.push({ 
-            productName: '', 
-            ownOrderNumber: '',
-            orderNumber: '',
-            requiredDate: '',
-            drawingNumber: '',
-            piecesPerBox: '',
-            customerName: '',
-            orderNotes: '',
-            productNotes: '',
-            boxesCount: ''
-          })
-        }
-      }
-      
-      rows.push(`
-        <tr>
-          ${rowLabels.map(label => `
+          const label = pageLabels[index]
+          cells.push(`
             <td class="label-cell">
               <div class="label-content">
                 <div class="label-product">${escapeHtml(label.productName)}</div>
@@ -640,7 +622,15 @@ export function generateLabelHTML(labels: LabelData[]): string {
                 </div>
               </div>
             </td>
-          `).join('')}
+          `)
+        } else {
+          cells.push(`<td class="label-cell"></td>`)
+        }
+      }
+
+      rows.push(`
+        <tr>
+          ${cells.join('')}
         </tr>
       `)
     }
