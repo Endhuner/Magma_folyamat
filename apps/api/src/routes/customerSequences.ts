@@ -9,7 +9,7 @@ import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { customerSequenceUpsertSchema } from '@produktivpro/shared'
 import { customerSequences } from '../db/schema.js'
-import { getDb } from '../db/index.js'
+import { getDb } from '../db/connection.js'
 
 export async function customerSequencesRoutes(app: FastifyInstance): Promise<void> {
   // GET /customer-sequences → { [customerId]: sequence }

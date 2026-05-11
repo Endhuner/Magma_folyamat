@@ -12,7 +12,7 @@ import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { appSettingUpsertSchema } from '@produktivpro/shared'
 import { appSettings } from '../db/schema.js'
-import { getDb } from '../db/index.js'
+import { getDb } from '../db/connection.js'
 
 const keyParamSchema = z.object({ key: z.string().min(1) })
 
