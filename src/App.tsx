@@ -258,7 +258,7 @@ function App() {
   
   const [deliveryStyles] = useAppSetting<Partial<TemplateStyles>>('delivery-html-styles', {})
   // Aktív sablonok (melyik saved-template van CMR/szállítólevélhez beállítva)
-  const [activeTemplates] = useAppSetting<{ cmr?: string; delivery?: string }>('active-templates', {})
+  const [activeTemplates, setActiveTemplates] = useAppSetting<{ cmr?: string; delivery?: string }>('active-templates', {})
   
   const [documentFilters, setDocumentFilters] = useKV<Array<{id: string, name: string, columns: string[]}>>('document-filters', [])
   const [activeFilterId, setActiveFilterId] = useState<string | null>(null)
@@ -2675,7 +2675,10 @@ body {
 
           <TabsContent value="template-saves" className="space-y-6">
             <Suspense fallback={<div className="text-muted-foreground p-4">Sablonkezelő betöltése…</div>}>
-              <TemplateBackupRestore />
+              <TemplateBackupRestore
+                activeTemplates={activeTemplates}
+                setActiveTemplates={setActiveTemplates}
+              />
             </Suspense>
           </TabsContent>
 

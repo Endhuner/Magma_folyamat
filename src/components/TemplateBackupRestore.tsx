@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { useServerCrud } from '@/lib/providers/useServerCrud'
-import { useAppSetting } from '@/hooks/useAppSetting'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -32,7 +31,12 @@ interface SavedTemplate {
   data: TemplateData
 }
 
-export function TemplateBackupRestore() {
+interface TemplateBackupRestoreProps {
+  activeTemplates: { cmr?: string; delivery?: string }
+  setActiveTemplates: (v: { cmr?: string; delivery?: string }) => Promise<void>
+}
+
+export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: TemplateBackupRestoreProps) {
   const [templates] = useKV<TemplateData[]>('github-style-templates', [])
   const savedTemplatesApi = useServerCrud<SavedTemplate>('saved-templates', ['order'])
   const savedTemplates = savedTemplatesApi.items
@@ -47,8 +51,6 @@ export function TemplateBackupRestore() {
       else if (JSON.stringify(prevMap.get(item.id)) !== JSON.stringify(item)) savedTemplatesApi.replace(item)
     }
   }
-  // active-templates: UI preferencia, marad lokálisan (melyik sablon aktív CMR/szállítóhoz)
-  const [activeTemplates, setActiveTemplates] = useAppSetting<{ cmr?: string, delivery?: string }>('active-templates', {})
   
   const [saveName, setSaveName] = useState('')
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
