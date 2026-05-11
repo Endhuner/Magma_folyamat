@@ -531,7 +531,11 @@ export async function exportDeliveryAsHtml(
   products: Product[],
   deliveryNotes: DeliveryNote[],
   onExportSaved?: (deliveryNote: Partial<DeliveryNote>, deliveryNoteNumber?: string) => void,
-  customStyles?: Partial<TemplateStyles>
+  customStyles?: Partial<TemplateStyles>,
+  /** Szerver-alapú sablonlista — ha átadják, nem olvas localStorage-ból */
+  savedTemplatesOverride?: any[],
+  /** Szerver-alapú aktív sablonok — ha átadják, nem olvas localStorage-ból */
+  activeTemplatesOverride?: { cmr?: string; delivery?: string }
 ) {
   if (!orders.length) {
     toast.error('Nincsenek exportálandó rendelések')
@@ -550,8 +554,8 @@ export async function exportDeliveryAsHtml(
   let usedMargins: any = null
 
   try {
-    const activeTemplates = kvStore.get<{ cmr?: string, delivery?: string }>('active-templates')
-    const savedTemplates = kvStore.get<any[]>('saved-templates')
+    const activeTemplates = activeTemplatesOverride ?? kvStore.get<{ cmr?: string, delivery?: string }>('active-templates')
+    const savedTemplates = savedTemplatesOverride ?? kvStore.get<any[]>('saved-templates')
 
     const firstOrder = orders[0]
     const customer = customers.find(c => c.name === firstOrder?.customer)

@@ -80,7 +80,8 @@ export async function exportLabelsAsPDF(
   orders: Order[],
   customers: Customer[],
   products: Product[],
-  customTemplate?: LabelTemplate
+  customTemplate?: LabelTemplate,
+  labelTemplatesOverride?: LabelTemplate[]
 ) {
   const labels = generateLabelsData(orders, customers, products)
   
@@ -109,7 +110,7 @@ export async function exportLabelsAsPDF(
     
     if (customer?.labelTemplateId) {
       try {
-        const labelTemplates = kvStore.get<LabelTemplate[]>('label-templates')
+        const labelTemplates = labelTemplatesOverride ?? kvStore.get<LabelTemplate[]>('label-templates')
         templateToUse = labelTemplates?.find(t => t.id === customer.labelTemplateId)
       } catch (error) {
         console.warn('Nem sikerült betölteni a vevő címke sablonját', error)
@@ -118,8 +119,8 @@ export async function exportLabelsAsPDF(
   }
 
   const { generateCustomLabelHTML, generateLabelHTML } = await import('./labelTemplate')
-  
-  const html = templateToUse 
+
+  const html = templateToUse
     ? generateCustomLabelHTML(labels, templateToUse as any)
     : generateLabelHTML(labels)
 
@@ -141,7 +142,8 @@ export async function exportLabelsAsPNG(
   orders: Order[],
   customers: Customer[],
   products: Product[],
-  customTemplate?: LabelTemplate
+  customTemplate?: LabelTemplate,
+  labelTemplatesOverride?: LabelTemplate[]
 ) {
   const labels = generateLabelsData(orders, customers, products)
   
@@ -170,7 +172,7 @@ export async function exportLabelsAsPNG(
     
     if (customer?.labelTemplateId) {
       try {
-        const labelTemplates = kvStore.get<LabelTemplate[]>('label-templates')
+        const labelTemplates = labelTemplatesOverride ?? kvStore.get<LabelTemplate[]>('label-templates')
         templateToUse = labelTemplates?.find(t => t.id === customer.labelTemplateId)
       } catch (error) {
         console.warn('Nem sikerült betölteni a vevő címke sablonját', error)
@@ -179,8 +181,8 @@ export async function exportLabelsAsPNG(
   }
 
   const { generateCustomLabelHTML, generateLabelHTML } = await import('./labelTemplate')
-  
-  const html = templateToUse 
+
+  const html = templateToUse
     ? generateCustomLabelHTML(labels, templateToUse as any)
     : generateLabelHTML(labels)
 

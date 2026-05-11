@@ -78,7 +78,9 @@ export async function generateLabels(
   orders: Order[],
   customers: Customer[],
   products: Product[],
-  customTemplate?: LabelTemplate
+  customTemplate?: LabelTemplate,
+  /** Szerver-alapú cimkesablon lista — ha átadják, nem olvas localStorage-ból */
+  labelTemplatesOverride?: LabelTemplate[]
 ) {
   const labels: LabelData[] = []
 
@@ -252,9 +254,9 @@ export async function generateLabels(
     
     if (customer?.labelTemplateId) {
       try {
-        const labelTemplates = kvStore.get<LabelTemplate[]>('label-templates')
+        const labelTemplates = labelTemplatesOverride ?? kvStore.get<LabelTemplate[]>('label-templates')
         templateToUse = labelTemplates?.find(t => t.id === customer.labelTemplateId)
-        
+
         if (templateToUse) {
           console.log('=== Címke Export Vevő-Specifikus Sablonnal ===')
           console.log('Vevő neve:', customer.name)
@@ -287,7 +289,8 @@ export async function previewLabels(
   orders: Order[],
   customers: Customer[],
   products: Product[],
-  customTemplate?: LabelTemplate
+  customTemplate?: LabelTemplate,
+  labelTemplatesOverride?: LabelTemplate[]
 ): Promise<string> {
   const labels: LabelData[] = []
 
@@ -1067,7 +1070,8 @@ export async function generateLabelsWithPrintSettings(
   customers: Customer[],
   products: Product[],
   customTemplate?: LabelTemplate,
-  printSettings?: PrintSettings
+  printSettings?: PrintSettings,
+  labelTemplatesOverride?: LabelTemplate[]
 ) {
   const labels: LabelData[] = []
   
@@ -1140,7 +1144,7 @@ export async function generateLabelsWithPrintSettings(
     
     if (customer?.labelTemplateId) {
       try {
-        const labelTemplates = kvStore.get<LabelTemplate[]>('label-templates')
+        const labelTemplates = labelTemplatesOverride ?? kvStore.get<LabelTemplate[]>('label-templates')
         templateToUse = labelTemplates?.find(t => t.id === customer.labelTemplateId)
       } catch (error) {
         console.warn('Nem sikerült betölteni a vevő címke sablonját', error)
@@ -1216,7 +1220,8 @@ function generateCustomLabelHTMLWithPrintSettings(labels: LabelData[], template:
 export async function generateLabelsByCustomer(
   orders: Order[],
   customers: Customer[],
-  products: Product[]
+  products: Product[],
+  labelTemplatesOverride?: LabelTemplate[]
 ) {
   const customerGroups = new Map<string, Order[]>()
   
@@ -1240,7 +1245,7 @@ export async function generateLabelsByCustomer(
     console.log(`   ${customerName}: ${orders.length} rendelés`)
   })
 
-  const labelTemplates = kvStore.get<LabelTemplate[]>('label-templates')
+  const labelTemplates = labelTemplatesOverride ?? kvStore.get<LabelTemplate[]>('label-templates')
   let generatedCount = 0
   let customersWithTemplates = 0
   let customersWithoutTemplates = 0

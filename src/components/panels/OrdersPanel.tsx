@@ -463,7 +463,8 @@ export function OrdersPanel({
                         selectedOrders,
                         customers || [],
                         products || [],
-                        activeTemplate
+                        activeTemplate,
+                        labelTemplates || []
                       )
                     }}
                     className="pl-6"
@@ -481,7 +482,8 @@ export function OrdersPanel({
                         selectedOrders,
                         customers || [],
                         products || [],
-                        activeTemplate
+                        activeTemplate,
+                        labelTemplates || []
                       )
                     }}
                     className="pl-6"

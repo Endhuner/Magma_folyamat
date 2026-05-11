@@ -257,6 +257,8 @@ function App() {
   const [pendingExportType, setPendingExportType] = useState<'cmr' | 'delivery' | null>(null)
   
   const [deliveryStyles] = useAppSetting<Partial<TemplateStyles>>('delivery-html-styles', {})
+  // Aktív sablonok (melyik saved-template van CMR/szállítólevélhez beállítva)
+  const [activeTemplates] = useAppSetting<{ cmr?: string; delivery?: string }>('active-templates', {})
   
   const [documentFilters, setDocumentFilters] = useKV<Array<{id: string, name: string, columns: string[]}>>('document-filters', [])
   const [activeFilterId, setActiveFilterId] = useState<string | null>(null)
@@ -2126,7 +2128,9 @@ body {
           )
         }
       },
-      deliveryStyles
+      deliveryStyles,
+      savedTemplates,
+      activeTemplates
     )
   }
 
@@ -2225,10 +2229,12 @@ body {
           )
         }
       },
-      cmrSettings
+      cmrSettings,
+      savedTemplates,
+      activeTemplates
     )
   }
-  
+
   const handleValidationContinue = async () => {
     setValidationDialogOpen(false)
     
@@ -3012,7 +3018,7 @@ body {
                   toast.info('Nincs rendelés az előnézethez')
                   return
                 }
-                const html = await previewLabels(demoOrders, customers || [], products || [], template)
+                const html = await previewLabels(demoOrders, customers || [], products || [], template, labelTemplates)
                 const win = window.open('', '_blank')
                 if (win) {
                   win.document.write(html)
@@ -3020,7 +3026,7 @@ body {
                 }
               } else {
                 const selectedOrders = (orders || []).filter(o => selectedOrderIds.includes(o.id))
-                const html = await previewLabels(selectedOrders, customers || [], products || [], template)
+                const html = await previewLabels(selectedOrders, customers || [], products || [], template, labelTemplates)
                 const win = window.open('', '_blank')
                 if (win) {
                   win.document.write(html)
@@ -3122,7 +3128,8 @@ body {
             customers || [],
             products || [],
             activeTemplate,
-            printSettings
+            printSettings,
+            labelTemplates
           )
         }}
         defaultCopies={1}
