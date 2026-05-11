@@ -462,12 +462,6 @@ export function OrdersPanel({
                   >
                     Címkék vevőnként (külön fájlok)
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => setCurrentTab('label-templates')}
-                    className="pl-6"
-                  >
-                    Címke sablon kezelése
-                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </>
