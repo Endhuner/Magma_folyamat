@@ -378,36 +378,38 @@ export function OrdersPanel({
         <div className="flex gap-2">
           {selectedOrderIds.length > 0 && (
             <>
-              {/* Dokumentumok lenyíló */}
+              {/* Dokumentáció készítés lenyíló */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2">
                     <FileText className="w-4 h-4" />
-                    Dokumentumok
+                    Dokumentáció készítés
                     <CaretDown className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
+                    disabled
+                    className="font-semibold text-foreground opacity-100"
+                  >
+                    Szállítási dokumentumok
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
                     onSelect={handleExportDelivery}
-                    className="gap-2 text-accent-foreground bg-accent/10 hover:bg-accent/20 focus:bg-accent/20"
+                    className="pl-6 gap-2 text-accent-foreground bg-accent/10 hover:bg-accent/20 focus:bg-accent/20"
                   >
                     <Truck className="w-4 h-4" />
                     Szállító (HTML)
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={handleExportCmr}
-                    className="gap-2 text-secondary-foreground bg-secondary/10 hover:bg-secondary/20 focus:bg-secondary/20"
+                    className="pl-6 gap-2 text-secondary-foreground bg-secondary/10 hover:bg-secondary/20 focus:bg-secondary/20"
                   >
                     <FileText className="w-4 h-4" />
                     CMR (HTML)
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={async () => {
-                      if (selectedOrderIds.length === 0) {
-                        toast.error('Nincsenek kiválasztott rendelések')
-                        return
-                      }
                       const { exportLabelsAsPDF } = await import('@/lib/labelExportFormats')
                       await exportLabelsAsPDF(
                         selectedOrders,
@@ -417,27 +419,14 @@ export function OrdersPanel({
                         labelTemplates || []
                       )
                     }}
-                    className="gap-2 text-orange-700 bg-orange-50 hover:bg-orange-100 focus:bg-orange-100 dark:text-orange-300 dark:bg-orange-950/30 dark:hover:bg-orange-950/50"
+                    className="pl-6 gap-2 text-orange-700 bg-orange-50 hover:bg-orange-100 focus:bg-orange-100 dark:text-orange-300 dark:bg-orange-950/30 dark:hover:bg-orange-950/50"
                   >
                     <FilePdf className="w-4 h-4" />
                     Címke export PDF-be
                   </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Dokumentáció készítés lenyíló — csak címke funkciók */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Tag className="w-4 h-4" />
-                    Dokumentáció készítés
-                    <CaretDown className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
                   <DropdownMenuItem
                     disabled
-                    className="font-semibold text-foreground opacity-100"
+                    className="font-semibold text-foreground opacity-100 mt-1"
                   >
                     Címke készítés
                   </DropdownMenuItem>
@@ -449,10 +438,6 @@ export function OrdersPanel({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => {
-                      if (selectedOrderIds.length === 0) {
-                        toast.error('Nincsenek kiválasztott rendelések')
-                        return
-                      }
                       generateLabels(
                         selectedOrders,
                         customers || [],
@@ -466,10 +451,6 @@ export function OrdersPanel({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={async () => {
-                      if (selectedOrderIds.length === 0) {
-                        toast.error('Nincsenek kiválasztott rendelések')
-                        return
-                      }
                       await generateLabelsByCustomer(
                         selectedOrders,
                         customers || [],
