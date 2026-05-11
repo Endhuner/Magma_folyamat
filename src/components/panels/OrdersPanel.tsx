@@ -439,7 +439,8 @@ export function OrdersPanel({
                       await generateLabelsByCustomer(
                         selectedOrders,
                         customers || [],
-                        products || []
+                        products || [],
+                        labelTemplates || []
                       )
                     }}
                     className="pl-6"
@@ -526,7 +527,8 @@ export function OrdersPanel({
                         selectedOrders,
                         customers || [],
                         products || [],
-                        activeTemplate
+                        activeTemplate,
+                        labelTemplates || []
                       )
                       const win = window.open('', '_blank')
                       if (win) {
