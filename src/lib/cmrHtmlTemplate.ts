@@ -688,7 +688,13 @@ export async function exportCmrAsHtml(
     
     if (!templateToUse && activeTemplates?.cmr) {
       activeTemplate = savedTemplates?.find((t: any) => t.id === activeTemplates.cmr)
-      
+
+      if (!activeTemplate) {
+        console.warn('⚠️ Aktív CMR sablon ID nem található a mentett sablonok között!')
+        console.warn('  Keresett ID:', activeTemplates.cmr)
+        console.warn('  Elérhető saved-templates IDs:', savedTemplates?.map((t: any) => t.id))
+      }
+
       if (activeTemplate && activeTemplate.data && activeTemplate.data.html) {
         console.log('=== CMR Export Aktív Sablonnal ===')
         console.log('Sablon forrás: Aktív sablon mentésből')
@@ -696,41 +702,48 @@ export async function exportCmrAsHtml(
         console.log('Sablon ID:', activeTemplate.id)
         templateSource = 'aktív sablon: ' + activeTemplate.name
         usedMargins = activeTemplate.data.margins
-        
+
         html = applyTemplateData(
-          activeTemplate.data.html, 
-          activeTemplate.data.css, 
-          orders, 
-          customers, 
-          products, 
-          deliveryNotes, 
-          sequenceNumber, 
+          activeTemplate.data.html,
+          activeTemplate.data.css,
+          orders,
+          customers,
+          products,
+          deliveryNotes,
+          sequenceNumber,
           userSettings,
           activeTemplate.data.margins
         )
       }
     }
-    
+
     if (!templateToUse && (!activeTemplate || !activeTemplate.data || !activeTemplate.data.html)) {
       const cmrTemplates = savedTemplates?.filter((t: any) => t.data?.type === 'cmr') || []
-      
+
       if (cmrTemplates.length > 0) {
-        const defaultTemplate = cmrTemplates[0]
+        // Legfrissebb CMR sablon használata (timestamp szerint rendezve, csökkenő)
+        const sortedCmrTemplates = [...cmrTemplates].sort((a: any, b: any) => {
+          const ta = a.data?.timestamp || a.timestamp || ''
+          const tb = b.data?.timestamp || b.timestamp || ''
+          return tb.localeCompare(ta)
+        })
+        const defaultTemplate = sortedCmrTemplates[0]
         console.log('=== CMR Export Mentett Sablonnal (nincs aktív beállítva) ===')
-        console.log('Sablon forrás: Sablon Mentések (első CMR sablon)')
+        console.log('Sablon forrás: Sablon Mentések (legfrissebb CMR sablon)')
         console.log('Sablon neve:', defaultTemplate.name)
         console.log('Sablon ID:', defaultTemplate.id)
+        console.log('Összes CMR sablon:', cmrTemplates.map((t: any) => `${t.id} (${t.name})`))
         templateSource = 'mentett sablon: ' + defaultTemplate.name
         usedMargins = defaultTemplate.data.margins
-        
+
         html = applyTemplateData(
-          defaultTemplate.data.html, 
-          defaultTemplate.data.css, 
-          orders, 
-          customers, 
-          products, 
-          deliveryNotes, 
-          sequenceNumber, 
+          defaultTemplate.data.html,
+          defaultTemplate.data.css,
+          orders,
+          customers,
+          products,
+          deliveryNotes,
+          sequenceNumber,
           userSettings,
           defaultTemplate.data.margins
         )
