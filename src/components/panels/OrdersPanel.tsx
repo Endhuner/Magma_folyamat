@@ -37,6 +37,8 @@ import {
   Funnel,
   Truck,
   FileText,
+  FilePdf,
+  Tag,
   CaretDown,
   X,
   ArrowCounterClockwise,
@@ -376,26 +378,58 @@ export function OrdersPanel({
         <div className="flex gap-2">
           {selectedOrderIds.length > 0 && (
             <>
-              <Button
-                variant="default"
-                onClick={handleExportDelivery}
-                className="bg-accent text-accent-foreground"
-              >
-                <Truck className="w-5 h-5 mr-2" />
-                Szállító (HTML)
-              </Button>
-              <Button
-                variant="default"
-                onClick={handleExportCmr}
-                className="bg-secondary text-secondary-foreground"
-              >
-                <FileText className="w-5 h-5 mr-2" />
-                CMR (HTML)
-              </Button>
+              {/* Dokumentumok lenyíló */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2">
                     <FileText className="w-4 h-4" />
+                    Dokumentumok
+                    <CaretDown className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onSelect={handleExportDelivery}
+                    className="gap-2 text-accent-foreground bg-accent/10 hover:bg-accent/20 focus:bg-accent/20"
+                  >
+                    <Truck className="w-4 h-4" />
+                    Szállító (HTML)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={handleExportCmr}
+                    className="gap-2 text-secondary-foreground bg-secondary/10 hover:bg-secondary/20 focus:bg-secondary/20"
+                  >
+                    <FileText className="w-4 h-4" />
+                    CMR (HTML)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={async () => {
+                      if (selectedOrderIds.length === 0) {
+                        toast.error('Nincsenek kiválasztott rendelések')
+                        return
+                      }
+                      const { exportLabelsAsPDF } = await import('@/lib/labelExportFormats')
+                      await exportLabelsAsPDF(
+                        selectedOrders,
+                        customers || [],
+                        products || [],
+                        activeTemplate,
+                        labelTemplates || []
+                      )
+                    }}
+                    className="gap-2 text-orange-700 bg-orange-50 hover:bg-orange-100 focus:bg-orange-100 dark:text-orange-300 dark:bg-orange-950/30 dark:hover:bg-orange-950/50"
+                  >
+                    <FilePdf className="w-4 h-4" />
+                    Címke export PDF-be
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Dokumentáció készítés lenyíló — csak címke funkciók */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Tag className="w-4 h-4" />
                     Dokumentáció készítés
                     <CaretDown className="w-4 h-4" />
                   </Button>
@@ -448,110 +482,10 @@ export function OrdersPanel({
                     Címkék vevőnként (külön fájlok)
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    disabled
-                    className="font-semibold text-foreground opacity-100"
-                  >
-                    Export formátumok
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={async () => {
-                      if (selectedOrderIds.length === 0) {
-                        toast.error('Nincsenek kiválasztott rendelések')
-                        return
-                      }
-                      const { exportLabelsAsPDF } = await import('@/lib/labelExportFormats')
-                      await exportLabelsAsPDF(
-                        selectedOrders,
-                        customers || [],
-                        products || [],
-                        activeTemplate,
-                        labelTemplates || []
-                      )
-                    }}
-                    className="pl-6"
-                  >
-                    Export PDF-be
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={async () => {
-                      if (selectedOrderIds.length === 0) {
-                        toast.error('Nincsenek kiválasztott rendelések')
-                        return
-                      }
-                      const { exportLabelsAsPNG } = await import('@/lib/labelExportFormats')
-                      await exportLabelsAsPNG(
-                        selectedOrders,
-                        customers || [],
-                        products || [],
-                        activeTemplate,
-                        labelTemplates || []
-                      )
-                    }}
-                    className="pl-6"
-                  >
-                    Export PNG-be
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={async () => {
-                      if (selectedOrderIds.length === 0) {
-                        toast.error('Nincsenek kiválasztott rendelések')
-                        return
-                      }
-                      const { exportLabelsAsCSV } = await import('@/lib/labelExportFormats')
-                      exportLabelsAsCSV(selectedOrders, customers || [], products || [])
-                    }}
-                    className="pl-6"
-                  >
-                    Export CSV-be
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={async () => {
-                      if (selectedOrderIds.length === 0) {
-                        toast.error('Nincsenek kiválasztott rendelések')
-                        return
-                      }
-                      const { exportLabelsAsExcel } = await import('@/lib/labelExportFormats')
-                      await exportLabelsAsExcel(selectedOrders, customers || [], products || [])
-                    }}
-                    className="pl-6"
-                  >
-                    Export Excel-be
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={async () => {
-                      if (selectedOrderIds.length === 0) {
-                        toast.error('Nincsenek kiválasztott rendelések')
-                        return
-                      }
-                      const html = await previewLabels(
-                        selectedOrders,
-                        customers || [],
-                        products || [],
-                        activeTemplate,
-                        labelTemplates || []
-                      )
-                      const win = window.open('', '_blank')
-                      if (win) {
-                        win.document.write(html)
-                        win.document.close()
-                      }
-                    }}
-                    className="pl-6"
-                  >
-                    Előnézet megnyitása
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
                     onSelect={() => setCurrentTab('label-templates')}
                     className="pl-6"
                   >
                     Címke sablon kezelése
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      toast.info('Szállítási dokumentumok - hamarosan')
-                    }}
-                  >
-                    Szállítási dokumentumok készítése
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
