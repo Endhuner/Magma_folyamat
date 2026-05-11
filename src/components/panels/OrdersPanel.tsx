@@ -11,8 +11,19 @@
  * mutáció a hívó (App.tsx) handler-jein keresztül történik, hogy a panel
  * tisztán prezentációs maradjon.
  */
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { TabsContent } from '@/components/ui/tabs'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -160,6 +171,7 @@ export function OrdersPanel({
   handleExportDelivery,
   handleExportCmr,
 }: OrdersPanelProps) {
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const activeTemplate = labelTemplates?.find((t) => t.id === activeLabelTemplateId)
   const selectedOrders = (orders || []).filter((o) => selectedOrderIds.includes(o.id))
 
@@ -561,9 +573,11 @@ export function OrdersPanel({
                 <CopySimple className="w-5 h-5 mr-2" />
                 Kijelölt duplikálása
               </Button>
-              <Button variant="destructive" onClick={handleDeleteSelectedOrders}>
-                Kijelöltek törlése ({selectedOrderIds.length})
-              </Button>
+              <div className="ml-auto">
+                <Button variant="destructive" onClick={() => setDeleteConfirmOpen(true)}>
+                  Kijelöltek törlése ({selectedOrderIds.length})
+                </Button>
+              </div>
             </>
           )}
         </div>
@@ -584,6 +598,33 @@ export function OrdersPanel({
             : undefined
         }
       />
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Törlés megerősítése</AlertDialogTitle>
+            <AlertDialogDescription>
+              Biztos törölni akarod{' '}
+              {selectedOrderIds.length === 1
+                ? 'a kijelölt tételt'
+                : `a kijelölt ${selectedOrderIds.length} tételt`}
+              ? Ez a művelet nem vonható vissza.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Mégsem</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                handleDeleteSelectedOrders()
+                setDeleteConfirmOpen(false)
+              }}
+            >
+              Törlés
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TabsContent>
   )
 }
