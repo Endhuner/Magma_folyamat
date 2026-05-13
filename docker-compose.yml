@@ -1,0 +1,61 @@
+# =============================================================================
+# ProduktívPro — Docker Compose (helyi build + futtatás)
+# =============================================================================
+#
+# Indítás (build + start):
+#   docker compose up -d --build
+#
+# Leállítás:
+#   docker compose down
+#
+# Csak újraindítás (rebuild nélkül):
+#   docker compose restart
+#
+# Logok:
+#   docker compose logs -f
+#
+# FONTOS: az "appdata" nevű named volume tárolja az adatbázist.
+# Ez a kötet a Docker által kezelt, újraindítás után is megmarad.
+# Helye: /var/lib/docker/volumes/produktivpro_appdata/_data/
+#
+# Ha Unraid-en futtatod, használd helyette a deploy/unraid/produktivpro.xml
+# sablont, vagy add meg az Unraid host path-t a volumes szekcióban.
+# =============================================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Ha hálózati problémád van npm ci közben (pl. proxy mögött):
+      # network: host
+    image: produktivpro:latest
+    container_name: produktivpro
+    restart: unless-stopped
+    ports:
+      - "8080:5050"
+    volumes:
+      # Named volume — adatbázis + JWT secret + backupok megőrzése újraindítás után
+      - appdata:/data
+    environment:
+      # Admin PIN — csak az első indításkor használja (ha nincs admin a DB-ben)
+      DEFAULT_ADMIN_PIN: "1234"
+      DEFAULT_ADMIN_NAME: "Admin"
+      # Ha saját JWT_SECRET-et akarsz (különben automatikusan generál egyet):
+      # JWT_SECRET: "minimum-32-karakteres-titkos-kulcs-ide"
+      NODE_ENV: production
+      LOG_LEVEL: info
+      CORS_ORIGIN: "*"
+      SESSION_TTL_SECONDS: "28800"
+      COOKIE_SECURE: "false"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5050/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  # Named volume — Docker kezeli, automatikusan perzisztens
+  appdata:
+    name: produktivpro_appdata

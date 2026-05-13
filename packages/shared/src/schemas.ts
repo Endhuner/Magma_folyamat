@@ -212,6 +212,8 @@ export const machineCreateSchema = z.object({
   type: z.string().default(''),
   capacity: z.string().default(''),
   notes: z.string().default(''),
+  /** Base64 data URI vagy üres string — a frontend canvas-on kicsinyíti feltöltés előtt. */
+  photoUrl: z.string().default(''),
   oils: z.array(z.any()).optional(),
   accessories: z.array(z.any()).optional(),
   repairs: z.array(z.any()).optional(),
