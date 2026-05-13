@@ -35,15 +35,22 @@ if ! touch "$DATA_DIR/.write_test" 2>/dev/null; then
 fi
 rm -f "$DATA_DIR/.write_test"
 
-# Ellenőrzés: valódi bind mount-e vagy image belső rétege?
+# Ellenőrzés: valódi bind mount / named volume-e, vagy image belső rétege?
 # Ha a MARKER_FILE létezik, már volt sikeres indítás ebben a data könyvtárban.
 if [ ! -f "$MARKER_FILE" ]; then
-  echo "[startup] FIGYELMEZTETÉS: Első indítás ezen az adatkönyvtáron."
-  echo "[startup] Ha ez nem az első futtatás, a volume mount NINCS helyesen bekötve!"
-  echo "[startup] Ellenőrizd: -v /mnt/user/appdata/produktivpro:/data"
+  echo "[startup] ============================================"
+  echo "[startup] *** FIGYELMEZTETÉS: ELSŐ INDÍTÁS ezen az adatkönyvtáron ***"
+  echo "[startup] Ha ez NEM az első futtatás, az adatok NEM maradnak meg újraindítás után!"
+  echo "[startup]"
+  echo "[startup] Megoldás — válassz egyet:"
+  echo "[startup]   1) docker compose up -d --build   (ajánlott, named volume)"
+  echo "[startup]   2) docker run -v produktivpro_data:/data ..."
+  echo "[startup]   3) Unraid: ellenőrizd az Appdata Path beállítást"
+  echo "[startup] ============================================"
   date > "$MARKER_FILE"
 else
-  echo "[startup] Volume OK — perzisztens adatkönyvtár ($(cat $MARKER_FILE | tr -d '\n'))."
+  echo "[startup] Volume OK — adatok megmaradnak újraindítás után."
+  echo "[startup] Könyvtár első sikeres indítása: $(cat $MARKER_FILE | tr -d '\n')"
 fi
 
 # Megmutatjuk hol van az adatbázis és mekkora

@@ -1803,9 +1803,12 @@ body {
   // ---- Egyszerű listák (Gépek, Felhasználók, Anyaglista) -------------------
   const handleSaveMachine = (m: Machine) => {
     const before = machinesApi.items.find((x) => x.id === m.id)
-    // Új gépnél tároljuk a létrehozó user ID-ját
+    // Szerkesztésnél merge-eljük a meglévő rekorddal, hogy az oils/accessories/
+    // repairs/photoUrl mezők ne veszjenek el — a SimpleListView csak az alap
+    // oszlopokat (name/type/capacity/notes) adja vissza.
+    // Új gépnél tároljuk a létrehozó user ID-ját.
     const record: Machine = before
-      ? m
+      ? { ...before, ...m }
       : { ...m, createdBy: auth.user?.id }
     if (before) {
       machinesApi.replace(record)

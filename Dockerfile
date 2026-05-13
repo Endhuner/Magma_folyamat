@@ -96,8 +96,11 @@ COPY deploy/unraid/backup.sh /backup.sh
 RUN chmod +x /backup.sh
 COPY deploy/unraid/crontab /etc/crontabs/root
 
-# /data volume: SQLite adatbázis + JWT secret perzisztencia
-VOLUME ["/data"]
+# FONTOS: NE használjunk névtelen VOLUME-ot itt.
+# A névtelen volume per-container-instance — docker rm után elveszik az adat.
+# Ehelyett a docker-compose.yml named volume-ja (produktivpro_appdata:/data)
+# vagy a kézi -v flag gondoskodik a perzisztenciáról.
+# VOLUME ["/data"]  ← SZÁNDÉKOSAN KIKOMMENTEZVE
 
 EXPOSE 5050
 
