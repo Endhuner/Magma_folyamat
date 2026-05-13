@@ -101,62 +101,74 @@ interface OrderRowProps {
 
 function OrderRow({ order, assignment, dragging, onDragStart, onDragEnd, onRemove }: OrderRowProps) {
   const hours = assignment?.plannedHoursOverride || order.plannedProductionHours
+  const hoursStr = formatHours(hours)
+  const year = getYear(order)
+  const productLabel = [order.productName, order.designation].filter(Boolean).join(' / ')
+
   return (
     <div
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       className={`
-        group flex items-center gap-2 rounded-md border bg-card px-2 py-1.5 text-xs
-        cursor-grab active:cursor-grabbing select-none transition-opacity
+        group flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border bg-card
+        px-2 py-1.5 text-xs cursor-grab active:cursor-grabbing select-none transition-opacity
         ${dragging ? 'opacity-40' : 'hover:border-primary/50 hover:shadow-sm'}
       `}
     >
-      {/* Grip indicator */}
+      {/* Grip */}
       <span className="text-muted-foreground/40 group-hover:text-muted-foreground shrink-0">⠿</span>
 
-      {/* Év */}
-      <span className="text-muted-foreground shrink-0 w-8">{getYear(order)}</span>
+      {/* Év — csak ha van */}
+      {year !== '—' && (
+        <span className="text-muted-foreground shrink-0">{year}</span>
+      )}
 
       {/* Vevő */}
-      <span className="font-medium shrink-0 max-w-[80px] truncate" title={order.customer}>
-        {order.customer || '—'}
-      </span>
-
-      {/* Termék neve / megnevezés */}
-      <span className="text-muted-foreground truncate flex-1" title={`${order.productName} / ${order.designation}`}>
-        {order.productName || order.designation || '—'}
-      </span>
-
-      {/* Saját rendelési szám */}
-      {order.ownOrderNumber && (
-        <span className="text-muted-foreground/70 shrink-0 hidden sm:block">
-          {order.ownOrderNumber}
+      {order.customer && (
+        <span className="font-medium shrink-0 max-w-[100px] truncate" title={order.customer}>
+          {order.customer}
         </span>
       )}
 
-      {/* Mennyiség */}
-      <span className="shrink-0 text-right w-12">
-        {order.amountPc > 0 ? `${order.amountPc.toLocaleString('hu')} db` : '—'}
-      </span>
+      {/* Termék / megnevezés */}
+      {productLabel && (
+        <span className="text-muted-foreground truncate min-w-0 flex-1" title={productLabel}>
+          {productLabel}
+        </span>
+      )}
+
+      {/* Saját rendelési szám */}
+      {order.ownOrderNumber && (
+        <span className="text-muted-foreground/70 shrink-0 font-mono text-[10px]">
+          #{order.ownOrderNumber}
+        </span>
+      )}
+
+      {/* Mennyiség — csak ha > 0 */}
+      {order.amountPc > 0 && (
+        <span className="shrink-0 text-right">
+          {order.amountPc.toLocaleString('hu')} db
+        </span>
+      )}
 
       {/* Szükséges szállítás */}
       {order.requiredDate && (
-        <span className="shrink-0 text-muted-foreground hidden md:block w-20 text-right">
+        <span className="shrink-0 text-muted-foreground">
           {order.requiredDate.slice(0, 10)}
         </span>
       )}
 
-      {/* Tervezett gyártási idő */}
-      <span className="shrink-0 w-10 text-right font-mono">
-        {formatHours(hours)}
-      </span>
+      {/* Tervezett gyártási idő — csak ha van */}
+      {hoursStr !== '—' && (
+        <span className="shrink-0 font-mono text-primary/70">{hoursStr}</span>
+      )}
 
-      {/* Eltávolítás gomb (csak hozzárendelt sorokban) */}
+      {/* Eltávolítás (csak hozzárendelt sorokban) */}
       {onRemove && (
         <button
           onClick={(e) => { e.stopPropagation(); onRemove() }}
-          className="ml-1 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+          className="ml-auto shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
           title="Eltávolítás a gépről"
         >
           <X size={12} />
@@ -205,7 +217,7 @@ function MachineCard({
     dragSource?.kind === 'assigned' && dragSource.machineId === machine.id
 
   return (
-    <Card className="flex flex-col w-72 shrink-0 h-full">
+    <Card className="flex flex-col w-72 shrink-0">
       {/* Header */}
       <CardHeader className="pb-2 pt-3 px-3">
         <div className="flex items-center gap-2">
@@ -248,8 +260,8 @@ function MachineCard({
         </div>
       </CardHeader>
 
-      {/* Drop zone + assigned orders */}
-      <CardContent className="flex-1 px-2 pb-2 overflow-auto">
+      {/* Drop zone + assigned orders — belső scroll max 400px */}
+      <CardContent className="px-2 pb-2 overflow-y-auto max-h-[400px]">
         {/* Top drop zone */}
         <div
           className={`h-1.5 rounded transition-all mb-1 ${
@@ -610,12 +622,12 @@ export function ProductionPlanningView({ machines, orders }: Props) {
   }
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+    <div className="flex gap-4 items-start">
       {/* ── Main area ── */}
-      <div className="flex flex-col flex-1 min-w-0 gap-4 overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 gap-4">
 
-        {/* ── Machines row ── */}
-        <div className="flex-1 overflow-hidden">
+        {/* ── Machines row — vízszintes scroll, kártyák természetes magassággal ── */}
+        <div>
           <div className="flex items-center gap-2 mb-2">
             <GearSix size={16} className="text-muted-foreground" />
             <h2 className="text-sm font-semibold">Gépek</h2>
@@ -629,34 +641,31 @@ export function ProductionPlanningView({ machines, orders }: Props) {
               <p className="text-xs mt-1">Adatkezelés → Gépek menüpontban add hozzá</p>
             </div>
           ) : (
-            <ScrollArea className="h-full">
-              <div className="flex gap-3 pb-3 h-full">
-                {machines.map((machine) => (
-                  <MachineCard
-                    key={machine.id}
-                    machine={machine}
-                    assignments={assignments.filter((a) => a.machineId === machine.id)}
-                    orderMap={orderMap}
-                    dragSource={dragSource}
-                    onDragStartAssigned={handleDragStartAssigned}
-                    onDragEnd={handleDragEnd}
-                    onDrop={handleDropOnMachine}
-                    onRemoveAssignment={handleRemoveAssignment}
-                    onOpenLog={setLogMachine}
-                  />
-                ))}
-              </div>
-            </ScrollArea>
+            /* overflow-x-auto: vízszintesen görgethető ha sok gép van */
+            <div className="flex gap-3 overflow-x-auto pb-2 items-start">
+              {machines.map((machine) => (
+                <MachineCard
+                  key={machine.id}
+                  machine={machine}
+                  assignments={assignments.filter((a) => a.machineId === machine.id)}
+                  orderMap={orderMap}
+                  dragSource={dragSource}
+                  onDragStartAssigned={handleDragStartAssigned}
+                  onDragEnd={handleDragEnd}
+                  onDrop={handleDropOnMachine}
+                  onRemoveAssignment={handleRemoveAssignment}
+                  onOpenLog={setLogMachine}
+                />
+              ))}
+            </div>
           )}
         </div>
 
-        {/* ── Unassigned orders ── */}
+        {/* ── Nem hozzárendelt rendelések — közvetlenül a gépek alatt ── */}
         <div
-          className={`
-            flex flex-col rounded-lg border transition-colors
-            ${dragSource?.kind === 'assigned' ? 'border-destructive/40 bg-destructive/5' : 'border-border'}
-          `}
-          style={{ maxHeight: '220px' }}
+          className={`rounded-lg border transition-colors ${
+            dragSource?.kind === 'assigned' ? 'border-destructive/40 bg-destructive/5' : 'border-border'
+          }`}
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDropOnUnassigned}
         >
@@ -677,7 +686,8 @@ export function ProductionPlanningView({ machines, orders }: Props) {
             </div>
           </div>
 
-          <ScrollArea className="flex-1">
+          {/* Max 320px, saját scrollbar */}
+          <div className="overflow-y-auto max-h-80">
             <div className="px-2 py-1.5 space-y-0.5">
               {unassignedOrders.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-3">
@@ -695,7 +705,7 @@ export function ProductionPlanningView({ machines, orders }: Props) {
                 ))
               )}
             </div>
-          </ScrollArea>
+          </div>
 
           {dragSource?.kind === 'assigned' && (
             <div className="px-3 py-1.5 text-xs text-destructive/70 border-t text-center">
@@ -705,9 +715,9 @@ export function ProductionPlanningView({ machines, orders }: Props) {
         </div>
       </div>
 
-      {/* ── Log side panel ── */}
+      {/* ── Log side panel — sticky a viewport tetejéhez képest ── */}
       {logMachine && (
-        <div className="w-72 shrink-0 flex flex-col rounded-lg border overflow-hidden">
+        <div className="w-72 shrink-0 rounded-lg border overflow-hidden sticky top-4">
           <LogPanel machine={logMachine} onClose={() => setLogMachine(null)} />
         </div>
       )}
