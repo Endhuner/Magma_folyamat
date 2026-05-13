@@ -67,6 +67,8 @@ interface MachineDetailDialogProps {
   onClose: () => void
   machine: Machine | null
   onSave: (machine: Machine) => void
+  /** Melyik tabra nyíljon meg alapból. Default: 'photo' */
+  initialTab?: 'photo' | 'oils' | 'accessories' | 'repairs'
 }
 
 // ── Üres form értékek ────────────────────────────────────────────────────────
@@ -700,7 +702,7 @@ function PhotoTab({ photoUrl, machineName, onSave }: PhotoTabProps) {
 
 // ── Fő dialógus ──────────────────────────────────────────────────────────────
 
-export function MachineDetailDialog({ open, onClose, machine, onSave }: MachineDetailDialogProps) {
+export function MachineDetailDialog({ open, onClose, machine, onSave, initialTab = 'photo' }: MachineDetailDialogProps) {
   if (!machine) return null
 
   const oils = machine.oils ?? []
@@ -730,7 +732,7 @@ export function MachineDetailDialog({ open, onClose, machine, onSave }: MachineD
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="oils" className="mt-2">
+        <Tabs defaultValue={initialTab} className="mt-2">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="photo" className="gap-2">
               <Camera className="w-4 h-4" />
