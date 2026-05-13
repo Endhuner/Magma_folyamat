@@ -47,6 +47,7 @@ import { DocumentFilterDialog } from '@/components/DocumentFilterDialog'
 import { OrderColumnFilterDialog } from '@/components/OrderColumnFilterDialog'
 import { ProductionView } from '@/components/ProductionView'
 import { MobileProductionView } from '@/components/MobileProductionView'
+import { ProductionPlanningView } from '@/components/ProductionPlanningView'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { Order, OrderStatus, Customer, Product, DeliveryNote, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
 import { diffObjects, buildAuditEntry, pruneAuditLog, AUDIT_LOG_MAX_ENTRIES } from '@/lib/auditLog'
@@ -2397,9 +2398,10 @@ body {
       <div className="flex-1 container mx-auto px-6 py-8">
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
           <div className="flex items-center gap-3 flex-wrap">
-            <TabsList className={`grid w-full md:w-auto md:inline-grid ${auth.user?.role === 'operator' ? 'grid-cols-2 md:grid-cols-2' : 'grid-cols-4 md:grid-cols-4'}`}>
+            <TabsList className={`grid w-full md:w-auto md:inline-grid ${auth.user?.role === 'operator' ? 'grid-cols-3 md:grid-cols-3' : 'grid-cols-5 md:grid-cols-5'}`}>
               {auth.user?.role !== 'operator' && <TabsTrigger value="dashboard">Áttekintés</TabsTrigger>}
               <TabsTrigger value="production">Gyártás</TabsTrigger>
+              <TabsTrigger value="planning">Gy. tervezés</TabsTrigger>
               {auth.user?.role !== 'operator' && <TabsTrigger value="orders">Rendelések</TabsTrigger>}
               <TabsTrigger value="inventory">Készlet</TabsTrigger>
             </TabsList>
@@ -2511,6 +2513,13 @@ body {
             handleSaveDefect={handleSaveDefect}
             handleDeleteDefect={handleDeleteDefect}
           />
+
+          <TabsContent value="planning">
+            <ProductionPlanningView
+              machines={machinesApi.items || []}
+              orders={orders || []}
+            />
+          </TabsContent>
 
           <OrdersPanel
             filteredOrders={filteredOrders}

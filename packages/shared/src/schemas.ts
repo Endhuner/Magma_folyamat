@@ -320,6 +320,45 @@ export const savedTemplateCreateSchema = z.object({
 export const savedTemplateUpdateSchema = savedTemplateCreateSchema.partial()
 
 // ----------------------------------------------------------------------
+// Gyártástervező — gép-rendelés hozzárendelések
+// ----------------------------------------------------------------------
+export const machinePlanningAssignmentCreateSchema = z.object({
+  id: z.string().optional(),
+  machineId: z.string().min(1),
+  orderId: z.string().min(1),
+  position: z.number().int().default(0),
+  plannedHoursOverride: z.string().default(''),
+  assignedAt: z.string(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+})
+export const machinePlanningAssignmentUpdateSchema = machinePlanningAssignmentCreateSchema.partial()
+
+export const machinePlanningReorderSchema = z.object({
+  /** Rendezett ID-lista az adott gépen (position = tömb index) */
+  orderedIds: z.array(z.string()),
+})
+
+// ----------------------------------------------------------------------
+// Gépalap log
+// ----------------------------------------------------------------------
+export const machinePlanningLogCreateSchema = z.object({
+  id: z.string().optional(),
+  machineId: z.string().min(1),
+  orderId: z.string().min(1),
+  action: z.enum(['assigned', 'removed', 'moved']),
+  productName: z.string().default(''),
+  designation: z.string().default(''),
+  ownOrderNumber: z.string().default(''),
+  customer: z.string().default(''),
+  fromMachineId: z.string().default(''),
+  userId: z.string().default(''),
+  userName: z.string().default(''),
+  timestamp: z.string(),
+  createdAt: z.string().optional(),
+})
+
+// ----------------------------------------------------------------------
 // Audit log — csak olvasásra/listázásra; írni csak a backend írhat.
 // ----------------------------------------------------------------------
 export const auditLogQuerySchema = z.object({

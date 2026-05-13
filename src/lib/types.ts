@@ -250,6 +250,7 @@ export interface Machine {
   type: string
   capacity: string
   notes: string
+  photoUrl?: string
   oils?: MachineItem[]
   accessories?: MachineItem[]
   repairs?: MachineRepair[]
@@ -257,6 +258,33 @@ export interface Machine {
   createdBy?: string
   createdAt: string
   updatedAt: string
+}
+
+export interface MachinePlanningAssignment {
+  id: string
+  machineId: string
+  orderId: string
+  position: number
+  plannedHoursOverride: string
+  assignedAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface MachinePlanningLogEntry {
+  id: string
+  machineId: string
+  orderId: string
+  action: 'assigned' | 'removed' | 'moved'
+  productName: string
+  designation: string
+  ownOrderNumber: string
+  customer: string
+  fromMachineId: string
+  userId: string
+  userName: string
+  timestamp: string
+  createdAt: string
 }
 
 /**

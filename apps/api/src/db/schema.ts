@@ -274,6 +274,8 @@ export const machines = sqliteTable('machines', {
   type: text('type').notNull().default(''),
   capacity: text('capacity').notNull().default(''),
   notes: text('notes').notNull().default(''),
+  /** Kép URL (opcionális) — külső link vagy feltöltött kép base64 */
+  photoUrl: text('photo_url').notNull().default(''),
   /** JSON tömb: MachineItem[] */
   oils: text('oils').notNull().default('[]'),
   /** JSON tömb: MachineItem[] */
@@ -414,6 +416,48 @@ export const savedTemplates = sqliteTable('saved_templates', {
   size: integer('size').notNull().default(0),
   createdAt: text('created_at').notNull().default(nowDefault),
   updatedAt: text('updated_at').notNull().default(nowDefault),
+})
+
+// ----------------------------------------------------------------------
+// Gyártástervező — gép-rendelés hozzárendelések (aktuális állapot)
+// Minden hozzárendelés exkluzív: egy rendelés egyszerre csak egy gépen lehet.
+// ----------------------------------------------------------------------
+export const machinePlanningAssignments = sqliteTable('machine_planning_assignments', {
+  id: text('id').primaryKey(),
+  /** Gép ID (machines.id) */
+  machineId: text('machine_id').notNull(),
+  /** Rendelés ID (orders.id) */
+  orderId: text('order_id').notNull(),
+  /** Sorrend a gépen belül (kisebb = előrébb) */
+  position: integer('position').notNull().default(0),
+  /** Felülírható tervezett gyártási idő (ha eltér a rendelés alapértékétől) */
+  plannedHoursOverride: text('planned_hours_override').notNull().default(''),
+  assignedAt: text('assigned_at').notNull(),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+})
+
+// ----------------------------------------------------------------------
+// Gépalap — audit log: mikor, melyik termék melyik gépre lett rendelve/mozgatva
+// Append-only tábla, soha nem törlünk belőle.
+// ----------------------------------------------------------------------
+export const machinePlanningLog = sqliteTable('machine_planning_log', {
+  id: text('id').primaryKey(),
+  machineId: text('machine_id').notNull(),
+  orderId: text('order_id').notNull(),
+  /** 'assigned' | 'removed' | 'moved' */
+  action: text('action').notNull(),
+  productName: text('product_name').notNull().default(''),
+  designation: text('designation').notNull().default(''),
+  ownOrderNumber: text('own_order_number').notNull().default(''),
+  customer: text('customer').notNull().default(''),
+  /** Mozgatásnál: az előző gép ID-je */
+  fromMachineId: text('from_machine_id').notNull().default(''),
+  userId: text('user_id').notNull().default(''),
+  userName: text('user_name').notNull().default(''),
+  /** ISO timestamp a log bejegyzéshez */
+  timestamp: text('timestamp').notNull(),
+  createdAt: text('created_at').notNull().default(nowDefault),
 })
 
 // Hagyományos numerikus mezőkhöz, ha valaha kellene `real`-t használni
