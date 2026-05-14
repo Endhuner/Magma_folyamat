@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value      TEXT NOT NULL DEFAULT '{}',
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
-
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS label_templates (
   id                 TEXT PRIMARY KEY,
   name               TEXT NOT NULL DEFAULT '',
@@ -26,13 +26,13 @@ CREATE TABLE IF NOT EXISTS label_templates (
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
-
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS customer_sequences (
   customer_id TEXT PRIMARY KEY,
   sequence    INTEGER NOT NULL DEFAULT 0,
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
-
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS saved_templates (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL DEFAULT '',

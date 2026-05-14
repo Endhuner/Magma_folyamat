@@ -14,10 +14,10 @@ CREATE TABLE IF NOT EXISTS machine_planning_assignments (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-
+--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mpa_order_id
   ON machine_planning_assignments(order_id);
-
+--> statement-breakpoint
 -- Gépalap audit log tábla
 CREATE TABLE IF NOT EXISTS machine_planning_log (
   id TEXT PRIMARY KEY,
@@ -34,12 +34,12 @@ CREATE TABLE IF NOT EXISTS machine_planning_log (
   timestamp TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_mpl_machine_id
   ON machine_planning_log(machine_id);
-
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_mpl_order_id
   ON machine_planning_log(order_id);
-
+--> statement-breakpoint
 -- Gép foto URL mező hozzáadása
 ALTER TABLE machines ADD COLUMN photo_url TEXT NOT NULL DEFAULT '';

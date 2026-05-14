@@ -102,14 +102,14 @@ COPY deploy/unraid/crontab /etc/crontabs/root
 # vagy a kézi -v flag gondoskodik a perzisztenciáról.
 # VOLUME ["/data"]  ← SZÁNDÉKOSAN KIKOMMENTEZVE
 
-EXPOSE 5050
+EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD wget -qO- http://127.0.0.1:5050/health || exit 1
+    CMD wget -qO- http://127.0.0.1:${PORT:-80}/health || exit 1
 
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=5050 \
+    PORT=80 \
     DATABASE_FILE=/data/produktivpro.sqlite \
     STATIC_DIR=/app/public \
     LOG_LEVEL=info \
