@@ -10,9 +10,11 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   GearSix, MagnifyingGlass, ClockCountdown,
   X, List, ArrowLeft, Package, Plus,
-  ArrowUp, ArrowDown, ArrowsDownUp,
+  ArrowUp, ArrowDown, ArrowsDownUp, Eye,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { useHasRole } from '@/lib/auth'
+import { useAppSetting } from '@/hooks/useAppSetting'
 import type { Order, Machine, MachinePlanningAssignment, MachinePlanningLogEntry } from '@/lib/types'
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -46,14 +48,6 @@ type DragPayload =
 type SortCol = 'ownOrderNumber' | 'customer' | 'productName' | 'amountPc' | 'requiredDate' | 'status'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const LS_KEY = 'gy-tervezes-selected-machines'
-function loadSelectedIds(): string[] {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]') } catch { return [] }
-}
-function saveSelectedIds(ids: string[]) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(ids)) } catch {}
-}
 
 function parseDT(e: React.DragEvent): DragPayload | null {
   try { return JSON.parse(e.dataTransfer.getData(DT_KEY)) as DragPayload } catch { return null }
@@ -118,8 +112,8 @@ function MachineSelector({ allMachines, selectedIds, onToggle }: {
 // ─── AssignedOrderRow ─────────────────────────────────────────────────────────
 // Kompakt sor a gépkártyán belül
 
-function AssignedOrderRow({ order, assignment, pos, dragging, onDragStart, onDragEnd, onRemove }: {
-  order: Order; assignment: MachinePlanningAssignment; pos: number; dragging: boolean
+function AssignedOrderRow({ order, assignment, pos, dragging, canEdit, onDragStart, onDragEnd, onRemove }: {
+  order: Order; assignment: MachinePlanningAssignment; pos: number; dragging: boolean; canEdit: boolean
   onDragStart: (e: React.DragEvent) => void; onDragEnd: () => void; onRemove: () => void
 }) {
   const rawHours = parseFloat(assignment.plannedHoursOverride || order.plannedProductionHours || '0')
@@ -131,11 +125,12 @@ function AssignedOrderRow({ order, assignment, pos, dragging, onDragStart, onDra
 
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      draggable={canEdit}
+      onDragStart={canEdit ? onDragStart : undefined}
+      onDragEnd={canEdit ? onDragEnd : undefined}
       className={`group flex items-start gap-2 rounded-md border bg-card px-2 py-2 text-xs
-        cursor-grab active:cursor-grabbing select-none transition-all
+        select-none transition-all
+        ${canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}
         ${dragging ? 'opacity-40' : 'hover:border-primary/50 hover:bg-accent/30'}`}
     >
       {/* Sorszám */}
@@ -168,13 +163,15 @@ function AssignedOrderRow({ order, assignment, pos, dragging, onDragStart, onDra
         {order.ownOrderNumber && (
           <span className="font-mono text-[10px] text-muted-foreground/70">#{order.ownOrderNumber}</span>
         )}
-        {/* Törlés — mindig látható */}
-        <button
-          onClick={e => { e.stopPropagation(); onRemove() }}
-          className="text-muted-foreground/50 hover:text-destructive transition-colors"
-          title="Eltávolítás a gépről">
-          <X size={13} />
-        </button>
+        {/* Törlés — csak admin jogosultsággal */}
+        {canEdit && (
+          <button
+            onClick={e => { e.stopPropagation(); onRemove() }}
+            className="text-muted-foreground/50 hover:text-destructive transition-colors"
+            title="Eltávolítás a gépről">
+            <X size={13} />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -182,11 +179,11 @@ function AssignedOrderRow({ order, assignment, pos, dragging, onDragStart, onDra
 
 // ─── MachineCard ─────────────────────────────────────────────────────────────
 
-function MachineCard({ machine, assignments, orderMap, activeDragOrderId,
+function MachineCard({ machine, assignments, orderMap, activeDragOrderId, canEdit,
   onDragStartAssigned, onDragEnd, onDrop, onRemoveAssignment, onOpenLog, onRemoveFromView,
 }: {
   machine: Machine; assignments: MachinePlanningAssignment[]
-  orderMap: Map<string, Order>; activeDragOrderId: string | null
+  orderMap: Map<string, Order>; activeDragOrderId: string | null; canEdit: boolean
   onDragStartAssigned: (e: React.DragEvent, a: MachinePlanningAssignment) => void
   onDragEnd: () => void
   onDrop: (machineId: string, afterAssignmentId: string | undefined, raw: string) => void
@@ -216,10 +213,10 @@ function MachineCard({ machine, assignments, orderMap, activeDragOrderId,
 
   return (
     <Card className={`flex flex-col min-w-[300px] flex-1 transition-all
-      ${isOver && isDragging ? 'ring-2 ring-primary ring-offset-1' : ''}`}
-      onDragOver={e => { allowDrop(e); setIsOver(true) }}
-      onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) { setIsOver(false); setDropTarget(null) } }}
-      onDrop={e => handleCardDrop(e)}
+      ${isOver && isDragging && canEdit ? 'ring-2 ring-primary ring-offset-1' : ''}`}
+      onDragOver={canEdit ? e => { allowDrop(e); setIsOver(true) } : undefined}
+      onDragLeave={canEdit ? e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) { setIsOver(false); setDropTarget(null) } } : undefined}
+      onDrop={canEdit ? e => handleCardDrop(e) : undefined}
     >
       {/* Fotó — teljes kép, max 160px magas */}
       {machine.photoUrl && (
@@ -267,9 +264,9 @@ function MachineCard({ machine, assignments, orderMap, activeDragOrderId,
         {/* Top drop zone */}
         <div
           className={`h-1.5 rounded mb-1.5 transition-all ${dropTarget === '__top__' ? 'bg-primary/50 h-3' : ''}`}
-          onDragOver={e => { allowDrop(e); setDropTarget('__top__') }}
-          onDragLeave={() => setDropTarget(null)}
-          onDrop={e => handleCardDrop(e, '__top__')}
+          onDragOver={canEdit ? e => { allowDrop(e); setDropTarget('__top__') } : undefined}
+          onDragLeave={canEdit ? () => setDropTarget(null) : undefined}
+          onDrop={canEdit ? e => handleCardDrop(e, '__top__') : undefined}
         />
 
         {sorted.length === 0 ? (
@@ -289,15 +286,16 @@ function MachineCard({ machine, assignments, orderMap, activeDragOrderId,
                   <AssignedOrderRow
                     order={order} assignment={asgn} pos={idx + 1}
                     dragging={activeDragOrderId === asgn.orderId}
+                    canEdit={canEdit}
                     onDragStart={e => onDragStartAssigned(e, asgn)}
                     onDragEnd={onDragEnd}
                     onRemove={() => onRemoveAssignment(asgn.id)}
                   />
                   <div
                     className={`h-1.5 rounded transition-all ${dropTarget === asgn.id ? 'bg-primary/50 h-3' : ''}`}
-                    onDragOver={e => { allowDrop(e); setDropTarget(asgn.id) }}
-                    onDragLeave={() => setDropTarget(null)}
-                    onDrop={e => handleCardDrop(e, asgn.id)}
+                    onDragOver={canEdit ? e => { allowDrop(e); setDropTarget(asgn.id) } : undefined}
+                    onDragLeave={canEdit ? () => setDropTarget(null) : undefined}
+                    onDrop={canEdit ? e => handleCardDrop(e, asgn.id) : undefined}
                   />
                 </div>
               )
@@ -365,13 +363,14 @@ function SortIcon({ col, active, dir }: { col: string; active: boolean; dir: 'as
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function ProductionPlanningView({ machines, orders }: Props) {
+  const canEdit = useHasRole('admin')
   const [assignments, setAssignments] = useState<MachinePlanningAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [activeDragOrderId, setActiveDragOrderId] = useState<string | null>(null)
   const dragPayload = useRef<DragPayload | null>(null)
   const [logMachine, setLogMachine] = useState<Machine | null>(null)
   const [search, setSearch] = useState('')
-  const [selectedIds, setSelectedIds] = useState<string[]>(loadSelectedIds)
+  const [selectedIds, setSelectedIds, settingLoaded] = useAppSetting<string[]>('planningSelectedMachines', [])
   const [sortCol, setSortCol] = useState<SortCol>('ownOrderNumber')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -390,13 +389,11 @@ export function ProductionPlanningView({ machines, orders }: Props) {
   useEffect(() => { loadAssignments() }, [loadAssignments])
 
   function toggleMachine(id: string) {
-    setSelectedIds(prev => {
-      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-      saveSelectedIds(next); return next
-    })
+    const next = selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id]
+    void setSelectedIds(next)
   }
   function removeMachine(id: string) {
-    setSelectedIds(prev => { const next = prev.filter(x => x !== id); saveSelectedIds(next); return next })
+    void setSelectedIds(selectedIds.filter(x => x !== id))
   }
 
   // ── Drag ──────────────────────────────────────────────────────────────────
@@ -552,7 +549,7 @@ export function ProductionPlanningView({ machines, orders }: Props) {
       return sortDir === 'asc' ? cmp : -cmp
     })
 
-  if (loading) return <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">Betöltés…</div>
+  if (loading || !settingLoaded) return <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">Betöltés…</div>
 
   const isRemoveDrag = activeDragOrderId !== null && assignments.some(a => a.orderId === activeDragOrderId)
 
@@ -568,6 +565,12 @@ export function ProductionPlanningView({ machines, orders }: Props) {
             <span className="text-xs text-muted-foreground">({visibleMachines.length}/{machines.length})</span>
           </div>
           <MachineSelector allMachines={machines} selectedIds={selectedIds} onToggle={toggleMachine} />
+          {!canEdit && (
+            <div className="flex items-center gap-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-1 text-xs text-amber-700 dark:text-amber-400">
+              <Eye size={12} />
+              <span>Megfigyelő mód — módosítás nem engedélyezett</span>
+            </div>
+          )}
         </div>
 
         {/* Gépkártyák — vízszintes sor */}
@@ -586,6 +589,7 @@ export function ProductionPlanningView({ machines, orders }: Props) {
                 assignments={assignments.filter(a => a.machineId === m.id)}
                 orderMap={orderMap}
                 activeDragOrderId={activeDragOrderId}
+                canEdit={canEdit}
                 onDragStartAssigned={startDragAssigned}
                 onDragEnd={endDrag}
                 onDrop={dropOnMachine}
@@ -647,11 +651,12 @@ export function ProductionPlanningView({ machines, orders }: Props) {
               unassigned.map(order => (
                 <div
                   key={order.id}
-                  draggable
-                  onDragStart={e => startDragUnassigned(e, order.id)}
-                  onDragEnd={endDrag}
-                  className={`grid items-center text-xs border-b last:border-0 px-2 cursor-grab
-                    active:cursor-grabbing select-none transition-colors hover:bg-accent/40
+                  draggable={canEdit}
+                  onDragStart={canEdit ? e => startDragUnassigned(e, order.id) : undefined}
+                  onDragEnd={canEdit ? endDrag : undefined}
+                  className={`grid items-center text-xs border-b last:border-0 px-2 select-none
+                    transition-colors hover:bg-accent/40
+                    ${canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}
                     ${activeDragOrderId === order.id ? 'opacity-40' : ''}`}
                   style={{ gridTemplateColumns: '2fr 2fr 2fr 1fr 1fr 1fr 32px' }}
                 >
