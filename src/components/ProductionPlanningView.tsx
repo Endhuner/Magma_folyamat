@@ -463,7 +463,7 @@ export function ProductionPlanningView({ machines, orders }: Props) {
     })
 
     try {
-      await apiFetch<MachinePlanningAssignment>('/machine-planning', {
+      const created = await apiFetch<MachinePlanningAssignment>('/machine-planning', {
         method: 'POST',
         body: JSON.stringify({
           machineId, orderId, position,
@@ -475,9 +475,11 @@ export function ProductionPlanningView({ machines, orders }: Props) {
           customer: order?.customer || '',
         }),
       })
-      // Szerver-ről töltjük újra → garantáltan valódi UUID-ok az állapotban
-      await loadAssignments()
+      // AZONNAL lecseréljük a temp ID-t a valódi UUID-ra (nem várunk loadAssignments-re)
+      setAssignments(prev => prev.map(a => a.id === tempId ? created : a))
       toast.success(`Hozzárendelve: ${machines.find(m => m.id === machineId)?.name}`)
+      // Háttér-szinkronizáció (nem await — nem blokkolja a UI-t)
+      void loadAssignments()
     } catch (err) {
       // API hiba: visszaállítás
       setAssignments(prev => prev.filter(a => a.id !== tempId))
@@ -501,19 +503,18 @@ export function ProductionPlanningView({ machines, orders }: Props) {
   }
 
   async function removeAssignment(id: string) {
-    // Temp ID-ra ne próbálj törlést küldeni — várjuk meg a szerver választ
-    if (id.startsWith('temp-')) {
-      toast.error('Kérlek várj, a hozzárendelés még mentés alatt van…')
-      return
-    }
+    // Optimista eltávolítás azonnal (temp ID esetén is)
     setAssignments(prev => prev.filter(a => a.id !== id))
+    // Temp ID-t a szerver nem ismeri — csak UI-ból töröljük, nincs API hívás
+    if (id.startsWith('temp-')) return
     try {
       await apiFetch(`/machine-planning/${id}`, { method: 'DELETE' })
       toast.success('Eltávolítva')
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      console.error('[removeAssignment] hiba:', id, msg)
       toast.error(`Törlés sikertelen: ${msg}`, { duration: 8000 })
-      loadAssignments()
+      void loadAssignments()
     }
   }
 
