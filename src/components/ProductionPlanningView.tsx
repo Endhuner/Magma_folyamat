@@ -478,8 +478,6 @@ export function ProductionPlanningView({ machines, orders }: Props) {
       // AZONNAL lecseréljük a temp ID-t a valódi UUID-ra (nem várunk loadAssignments-re)
       setAssignments(prev => prev.map(a => a.id === tempId ? created : a))
       toast.success(`Hozzárendelve: ${machines.find(m => m.id === machineId)?.name}`)
-      // Háttér-szinkronizáció (nem await — nem blokkolja a UI-t)
-      void loadAssignments()
     } catch (err) {
       // API hiba: visszaállítás
       setAssignments(prev => prev.filter(a => a.id !== tempId))
