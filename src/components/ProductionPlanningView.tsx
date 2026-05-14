@@ -122,38 +122,60 @@ function AssignedOrderRow({ order, assignment, pos, dragging, onDragStart, onDra
   order: Order; assignment: MachinePlanningAssignment; pos: number; dragging: boolean
   onDragStart: (e: React.DragEvent) => void; onDragEnd: () => void; onRemove: () => void
 }) {
-  const hrs = fmtHours(assignment.plannedHoursOverride || order.plannedProductionHours)
+  const rawHours = parseFloat(assignment.plannedHoursOverride || order.plannedProductionHours || '0')
+  const hrs = isNaN(rawHours) || rawHours === 0 ? null : `${rawHours} ó`
+  const shifts = (!isNaN(rawHours) && rawHours > 0) ? Math.ceil(rawHours / 8) : null
   const label = [order.productName, order.designation].filter(Boolean).join(' / ')
+  const qty = order.amountPc > 0 ? `${order.amountPc.toLocaleString('hu')} db` : null
+  const deadline = order.requiredDate ? order.requiredDate.slice(0, 10) : null
+
   return (
     <div
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className={`group flex items-center gap-2 rounded-md border bg-card px-2 py-2 text-xs
-        cursor-grab active:cursor-grabbing select-none transition-opacity
+      className={`group flex items-start gap-2 rounded-md border bg-card px-2 py-2 text-xs
+        cursor-grab active:cursor-grabbing select-none transition-all
         ${dragging ? 'opacity-40' : 'hover:border-primary/50 hover:bg-accent/30'}`}
     >
-      {/* Pozíció száma */}
-      <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center shrink-0
+      {/* Sorszám */}
+      <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5
         text-[10px] font-semibold text-muted-foreground">{pos}</span>
-      {/* Grip */}
-      <span className="text-muted-foreground/30 group-hover:text-muted-foreground shrink-0 text-base leading-none">⠿</span>
-      <div className="flex-1 min-w-0">
+      {/* Grip ikon */}
+      <span className="text-muted-foreground/30 group-hover:text-muted-foreground shrink-0 text-base leading-none mt-0.5">⠿</span>
+
+      {/* Fő tartalom */}
+      <div className="flex-1 min-w-0 space-y-0.5">
         {order.customer && <p className="font-medium truncate">{order.customer}</p>}
         {label && <p className="text-muted-foreground truncate">{label}</p>}
+        {/* Mennyiség + határidő */}
+        {(qty || deadline) && (
+          <p className="text-muted-foreground/80 flex gap-2 flex-wrap">
+            {qty && <span>{qty}</span>}
+            {deadline && <span>határidő: {deadline}</span>}
+          </p>
+        )}
+        {/* Műszakszám */}
+        {shifts !== null && (
+          <p className="text-[10px] text-muted-foreground/60">
+            {hrs} → <span className="font-medium">{shifts} műszak</span>
+          </p>
+        )}
       </div>
-      <div className="shrink-0 flex flex-col items-end gap-0.5">
+
+      {/* Rendelésszám + törlés gomb */}
+      <div className="shrink-0 flex flex-col items-end gap-1 ml-1">
         {order.ownOrderNumber && (
           <span className="font-mono text-[10px] text-muted-foreground/70">#{order.ownOrderNumber}</span>
         )}
-        {hrs && <span className="text-primary/70 font-mono text-[10px]">{hrs}</span>}
+        {/* Törlés — mindig látható */}
+        <button
+          onClick={e => { e.stopPropagation(); onRemove() }}
+          className="text-muted-foreground/50 hover:text-destructive transition-colors"
+          title="Eltávolítás a gépről">
+          <X size={13} />
+        </button>
       </div>
-      <button
-        onClick={e => { e.stopPropagation(); onRemove() }}
-        className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity ml-1"
-        title="Eltávolítás">
-        <X size={12} />
-      </button>
     </div>
   )
 }
