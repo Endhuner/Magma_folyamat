@@ -466,7 +466,7 @@ export function ProductionPlanningView({ machines, orders }: Props) {
     })
 
     try {
-      const created = await apiFetch<MachinePlanningAssignment>('/machine-planning', {
+      await apiFetch<MachinePlanningAssignment>('/machine-planning', {
         method: 'POST',
         body: JSON.stringify({
           machineId, orderId, position,
@@ -478,13 +478,13 @@ export function ProductionPlanningView({ machines, orders }: Props) {
           customer: order?.customer || '',
         }),
       })
-      // Valódi ID-ra cseréljük a temp bejegyzést
-      setAssignments(prev => prev.map(a => a.id === tempId ? created : a))
+      // Szerver-ről töltjük újra → garantáltan valódi UUID-ok az állapotban
+      await loadAssignments()
       toast.success(`Hozzárendelve: ${machines.find(m => m.id === machineId)?.name}`)
     } catch (err) {
       // API hiba: visszaállítás
       setAssignments(prev => prev.filter(a => a.id !== tempId))
-      toast.error(`Hiba: ${err instanceof Error ? err.message : err}`)
+      toast.error(`Hozzárendelés sikertelen: ${err instanceof Error ? err.message : err}`)
     }
   }
 
@@ -504,9 +504,20 @@ export function ProductionPlanningView({ machines, orders }: Props) {
   }
 
   async function removeAssignment(id: string) {
+    // Temp ID-ra ne próbálj törlést küldeni — várjuk meg a szerver választ
+    if (id.startsWith('temp-')) {
+      toast.error('Kérlek várj, a hozzárendelés még mentés alatt van…')
+      return
+    }
     setAssignments(prev => prev.filter(a => a.id !== id))
-    try { await apiFetch(`/machine-planning/${id}`, { method: 'DELETE' }); toast.success('Eltávolítva') }
-    catch { toast.error('Eltávolítás sikertelen'); loadAssignments() }
+    try {
+      await apiFetch(`/machine-planning/${id}`, { method: 'DELETE' })
+      toast.success('Eltávolítva')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(`Törlés sikertelen: ${msg}`, { duration: 8000 })
+      loadAssignments()
+    }
   }
 
   function dropOnUnassigned(e: React.DragEvent) {
