@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   GearSix, MagnifyingGlass, ClockCountdown,
   X, List, ArrowLeft, Package, Plus,
+  ArrowUp, ArrowDown, ArrowsDownUp,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { Order, Machine, MachinePlanningAssignment, MachinePlanningLogEntry } from '@/lib/types'
@@ -36,12 +37,13 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 interface Props { machines: Machine[]; orders: Order[] }
 
-// drag adatok átadása dataTransfer-en keresztül (böngésző-kompatibilitás)
 const DT_KEY = 'application/x-pp-order'
 
 type DragPayload =
   | { kind: 'unassigned'; orderId: string }
   | { kind: 'assigned'; assignmentId: string; machineId: string; orderId: string }
+
+type SortCol = 'ownOrderNumber' | 'customer' | 'productName' | 'amountPc' | 'requiredDate' | 'status'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,8 +55,11 @@ function saveSelectedIds(ids: string[]) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(ids)) } catch {}
 }
 
-function getYear(o: Order) { return (o.orderDate || o.createdAt || '').slice(0, 4) || '—' }
-function fmtHours(h: string) { const n = parseFloat(h); return isNaN(n) || n === 0 ? '—' : `${n} ó` }
+function parseDT(e: React.DragEvent): DragPayload | null {
+  try { return JSON.parse(e.dataTransfer.getData(DT_KEY)) as DragPayload } catch { return null }
+}
+
+function fmtHours(h: string) { const n = parseFloat(h); return isNaN(n) || n === 0 ? null : `${n} ó` }
 function totalHours(asgn: MachinePlanningAssignment[], om: Map<string, Order>) {
   return asgn.reduce((s, a) => {
     const h = a.plannedHoursOverride
@@ -110,39 +115,45 @@ function MachineSelector({ allMachines, selectedIds, onToggle }: {
   )
 }
 
-// ─── OrderRow ─────────────────────────────────────────────────────────────────
+// ─── AssignedOrderRow ─────────────────────────────────────────────────────────
+// Kompakt sor a gépkártyán belül
 
-function OrderRow({ order, assignment, dragging, onDragStart, onDragEnd, onRemove }: {
-  order: Order; assignment?: MachinePlanningAssignment; dragging: boolean
-  onDragStart: (e: React.DragEvent) => void; onDragEnd: () => void; onRemove?: () => void
+function AssignedOrderRow({ order, assignment, pos, dragging, onDragStart, onDragEnd, onRemove }: {
+  order: Order; assignment: MachinePlanningAssignment; pos: number; dragging: boolean
+  onDragStart: (e: React.DragEvent) => void; onDragEnd: () => void; onRemove: () => void
 }) {
-  const hoursStr = fmtHours(assignment?.plannedHoursOverride || order.plannedProductionHours)
-  const year = getYear(order)
+  const hrs = fmtHours(assignment.plannedHoursOverride || order.plannedProductionHours)
   const label = [order.productName, order.designation].filter(Boolean).join(' / ')
   return (
     <div
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className={`group flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border bg-card
-        px-2 py-1.5 text-xs cursor-grab active:cursor-grabbing select-none transition-opacity
-        ${dragging ? 'opacity-40' : 'hover:border-primary/50 hover:shadow-sm'}`}
+      className={`group flex items-center gap-2 rounded-md border bg-card px-2 py-2 text-xs
+        cursor-grab active:cursor-grabbing select-none transition-opacity
+        ${dragging ? 'opacity-40' : 'hover:border-primary/50 hover:bg-accent/30'}`}
     >
-      <span className="text-muted-foreground/40 group-hover:text-muted-foreground shrink-0">⠿</span>
-      {year !== '—' && <span className="text-muted-foreground shrink-0">{year}</span>}
-      {order.customer && <span className="font-medium shrink-0 max-w-[110px] truncate" title={order.customer}>{order.customer}</span>}
-      {label && <span className="text-muted-foreground truncate min-w-0 flex-1" title={label}>{label}</span>}
-      {order.ownOrderNumber && <span className="text-muted-foreground/70 shrink-0 font-mono text-[10px]">#{order.ownOrderNumber}</span>}
-      {order.amountPc > 0 && <span className="shrink-0">{order.amountPc.toLocaleString('hu')} db</span>}
-      {order.requiredDate && <span className="shrink-0 text-muted-foreground">{order.requiredDate.slice(0, 10)}</span>}
-      {hoursStr !== '—' && <span className="shrink-0 font-mono text-primary/70">{hoursStr}</span>}
-      {onRemove && (
-        <button onClick={e => { e.stopPropagation(); onRemove() }}
-          className="ml-auto shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
-          title="Eltávolítás">
-          <X size={12} />
-        </button>
-      )}
+      {/* Pozíció száma */}
+      <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center shrink-0
+        text-[10px] font-semibold text-muted-foreground">{pos}</span>
+      {/* Grip */}
+      <span className="text-muted-foreground/30 group-hover:text-muted-foreground shrink-0 text-base leading-none">⠿</span>
+      <div className="flex-1 min-w-0">
+        {order.customer && <p className="font-medium truncate">{order.customer}</p>}
+        {label && <p className="text-muted-foreground truncate">{label}</p>}
+      </div>
+      <div className="shrink-0 flex flex-col items-end gap-0.5">
+        {order.ownOrderNumber && (
+          <span className="font-mono text-[10px] text-muted-foreground/70">#{order.ownOrderNumber}</span>
+        )}
+        {hrs && <span className="text-primary/70 font-mono text-[10px]">{hrs}</span>}
+      </div>
+      <button
+        onClick={e => { e.stopPropagation(); onRemove() }}
+        className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity ml-1"
+        title="Eltávolítás">
+        <X size={12} />
+      </button>
     </div>
   )
 }
@@ -156,7 +167,7 @@ function MachineCard({ machine, assignments, orderMap, activeDragOrderId,
   orderMap: Map<string, Order>; activeDragOrderId: string | null
   onDragStartAssigned: (e: React.DragEvent, a: MachinePlanningAssignment) => void
   onDragEnd: () => void
-  onDrop: (machineId: string, afterAssignmentId?: string) => void
+  onDrop: (machineId: string, afterAssignmentId: string | undefined, raw: string) => void
   onRemoveAssignment: (id: string) => void
   onOpenLog: (m: Machine) => void
   onRemoveFromView: (id: string) => void
@@ -168,27 +179,36 @@ function MachineCard({ machine, assignments, orderMap, activeDragOrderId,
   const isDragging = activeDragOrderId !== null
 
   function allowDrop(e: React.DragEvent) {
-    // Kritikus: e.preventDefault() nélkül a drop nem tüzel
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
   }
 
+  function handleCardDrop(e: React.DragEvent, afterId?: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsOver(false)
+    setDropTarget(null)
+    const raw = e.dataTransfer.getData(DT_KEY) || e.dataTransfer.getData('text/plain') || ''
+    onDrop(machine.id, afterId, raw)
+  }
+
   return (
-    <Card className={`flex flex-col min-w-[280px] flex-1 transition-all
+    <Card className={`flex flex-col min-w-[300px] flex-1 transition-all
       ${isOver && isDragging ? 'ring-2 ring-primary ring-offset-1' : ''}`}
       onDragOver={e => { allowDrop(e); setIsOver(true) }}
       onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) { setIsOver(false); setDropTarget(null) } }}
-      onDrop={e => { e.preventDefault(); setIsOver(false); setDropTarget(null); onDrop(machine.id) }}
+      onDrop={e => handleCardDrop(e)}
     >
-      {/* Fotó — teljes kép, nem vágva */}
+      {/* Fotó — teljes kép, max 160px magas */}
       {machine.photoUrl && (
-        <div className="w-full bg-muted rounded-t-lg overflow-hidden flex items-center justify-center" style={{ minHeight: 160 }}>
-          <img src={machine.photoUrl} alt={machine.name}
-            className="w-full h-auto max-h-64 object-contain" />
+        <div className="w-full bg-muted rounded-t-lg overflow-hidden flex items-center justify-center"
+          style={{ height: 160 }}>
+          <img src={machine.photoUrl} alt={machine.name} className="w-full h-full object-contain" />
         </div>
       )}
 
-      <CardHeader className="pb-2 pt-3 px-3">
+      {/* Fejléc */}
+      <CardHeader className="pb-2 pt-3 px-3 shrink-0">
         <div className="flex items-center gap-2">
           {!machine.photoUrl && (
             <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${colorFor(machine.id)}`}>
@@ -196,67 +216,66 @@ function MachineCard({ machine, assignments, orderMap, activeDragOrderId,
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-sm truncate">{machine.name}</CardTitle>
-            {machine.type && <p className="text-xs text-muted-foreground">{machine.type}</p>}
-            {machine.capacity && <p className="text-xs text-muted-foreground">{machine.capacity}</p>}
+            <CardTitle className="text-sm">{machine.name}</CardTitle>
+            <div className="flex gap-2 flex-wrap mt-0.5">
+              {machine.type && <span className="text-xs text-muted-foreground">{machine.type}</span>}
+              {machine.capacity && <Badge variant="outline" className="text-xs px-1 py-0">{machine.capacity}</Badge>}
+            </div>
           </div>
           <button onClick={() => onOpenLog(machine)}
             className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-            title="Log">
-            <List size={14} />
-          </button>
+            title="Log"><List size={14} /></button>
           <button onClick={() => onRemoveFromView(machine.id)}
             className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
-            title="Eltávolítás a nézetből">
-            <X size={14} />
-          </button>
+            title="Eltávolítás a nézetből"><X size={14} /></button>
         </div>
-        <div className="flex items-center gap-1 mt-1">
+        <div className="flex items-center gap-1.5 mt-1.5">
           <ClockCountdown size={11} className="text-muted-foreground" />
           <span className="text-xs text-muted-foreground">
-            {hrs > 0 ? `${hrs.toFixed(1)} ó` : 'Üres'}
+            {hrs > 0 ? `${hrs.toFixed(1)} óra` : 'Nincs hozzárendelés'}
           </span>
           {assignments.length > 0 && (
-            <Badge variant="secondary" className="ml-auto text-xs px-1 py-0">{assignments.length} db</Badge>
+            <Badge variant="secondary" className="ml-auto text-xs px-1.5 py-0">{assignments.length} rendelés</Badge>
           )}
         </div>
       </CardHeader>
 
-      <CardContent className="px-2 pb-2 flex-1 overflow-y-auto max-h-[320px]">
+      {/* Hozzárendelt rendelések — min. 120px, max. 400px, saját scroll */}
+      <CardContent className="px-2 pb-3 flex-1 min-h-[120px]">
         {/* Top drop zone */}
         <div
-          className={`h-1.5 rounded mb-1 transition-all ${dropTarget === '__top__' ? 'bg-primary/50 h-2.5' : ''}`}
+          className={`h-1.5 rounded mb-1.5 transition-all ${dropTarget === '__top__' ? 'bg-primary/50 h-3' : ''}`}
           onDragOver={e => { allowDrop(e); setDropTarget('__top__') }}
           onDragLeave={() => setDropTarget(null)}
-          onDrop={e => { e.preventDefault(); e.stopPropagation(); setDropTarget(null); onDrop(machine.id, undefined) }}
+          onDrop={e => handleCardDrop(e, '__top__')}
         />
 
         {sorted.length === 0 ? (
           <div className={`flex flex-col items-center justify-center rounded-md border-2 border-dashed
-            py-6 text-xs text-muted-foreground transition-colors
+            min-h-[100px] text-xs text-muted-foreground transition-colors
             ${isDragging ? 'border-primary/50 bg-primary/5' : 'border-muted'}`}>
-            <Package size={18} className="mb-1 opacity-40" />
-            Húzz ide rendelést
+            <Package size={20} className="mb-1.5 opacity-40" />
+            <span>Húzz ide rendelést</span>
           </div>
         ) : (
-          <div className="flex flex-col gap-0.5">
-            {sorted.map(asgn => {
+          <div className="flex flex-col gap-1 overflow-y-auto max-h-[400px]">
+            {sorted.map((asgn, idx) => {
               const order = orderMap.get(asgn.orderId)
               if (!order) return null
               return (
                 <div key={asgn.id}>
-                  <OrderRow
-                    order={order} assignment={asgn}
+                  <AssignedOrderRow
+                    order={order} assignment={asgn} pos={idx + 1}
                     dragging={activeDragOrderId === asgn.orderId}
                     onDragStart={e => onDragStartAssigned(e, asgn)}
                     onDragEnd={onDragEnd}
                     onRemove={() => onRemoveAssignment(asgn.id)}
                   />
                   <div
-                    className={`h-1.5 rounded transition-all ${dropTarget === asgn.id ? 'bg-primary/50 h-2.5' : ''}`}
+                    className={`h-1.5 rounded transition-all ${dropTarget === asgn.id ? 'bg-primary/50 h-3' : ''}`}
                     onDragOver={e => { allowDrop(e); setDropTarget(asgn.id) }}
                     onDragLeave={() => setDropTarget(null)}
-                    onDrop={e => { e.preventDefault(); e.stopPropagation(); setDropTarget(null); onDrop(machine.id, asgn.id) }}
+                    onDrop={e => handleCardDrop(e, asgn.id)}
                   />
                 </div>
               )
@@ -314,17 +333,25 @@ function LogPanel({ machine, onClose }: { machine: Machine; onClose: () => void 
   )
 }
 
+// ─── SortIcon ─────────────────────────────────────────────────────────────────
+
+function SortIcon({ col, active, dir }: { col: string; active: boolean; dir: 'asc' | 'desc' }) {
+  if (!active) return <ArrowsDownUp size={11} className="opacity-30" />
+  return dir === 'asc' ? <ArrowUp size={11} className="text-primary" /> : <ArrowDown size={11} className="text-primary" />
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function ProductionPlanningView({ machines, orders }: Props) {
   const [assignments, setAssignments] = useState<MachinePlanningAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [activeDragOrderId, setActiveDragOrderId] = useState<string | null>(null)
-  // payload ref: azonnal érhető el, nem vár React render-re
   const dragPayload = useRef<DragPayload | null>(null)
   const [logMachine, setLogMachine] = useState<Machine | null>(null)
   const [search, setSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>(loadSelectedIds)
+  const [sortCol, setSortCol] = useState<SortCol>('ownOrderNumber')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const orderMap = new Map(orders.map(o => [o.id, o]))
   const assignedOrderIds = new Set(assignments.map(a => a.orderId))
@@ -355,9 +382,8 @@ export function ProductionPlanningView({ machines, orders }: Props) {
   function startDragUnassigned(e: React.DragEvent, orderId: string) {
     const p: DragPayload = { kind: 'unassigned', orderId }
     dragPayload.current = p
-    // dataTransfer KÖTELEZŐ egyes böngészőkben a drop engedélyezéséhez
     e.dataTransfer.setData(DT_KEY, JSON.stringify(p))
-    e.dataTransfer.setData('text/plain', orderId) // fallback
+    e.dataTransfer.setData('text/plain', orderId)
     e.dataTransfer.effectAllowed = 'move'
     setActiveDragOrderId(orderId)
   }
@@ -376,18 +402,20 @@ export function ProductionPlanningView({ machines, orders }: Props) {
     setActiveDragOrderId(null)
   }
 
-  // ── Drop ──────────────────────────────────────────────────────────────────
+  // ── Drop — payload a dataTransfer-ből jön, nem ref-ből (megbízhatóbb) ──────
 
-  async function dropOnMachine(machineId: string, afterAssignmentId?: string) {
-    // ref-ből olvasunk — mindig friss, nem függünk React state-től
-    const p = dragPayload.current
-    if (!p) return
+  async function dropOnMachine(machineId: string, afterAssignmentId: string | undefined, raw: string) {
+    // Elsőként dataTransfer-ből, fallback a ref-ből
+    let p: DragPayload | null = null
+    try { if (raw) p = JSON.parse(raw) as DragPayload } catch {}
+    if (!p) p = dragPayload.current
     dragPayload.current = null
     setActiveDragOrderId(null)
+    if (!p) return
 
     const orderId = p.orderId
 
-    // Ugyanazon gépen belüli átrendezés
+    // Azonos gépen belüli átrendezés
     if (p.kind === 'assigned' && p.machineId === machineId) {
       await reorder(machineId, p.assignmentId, afterAssignmentId)
       return
@@ -395,14 +423,26 @@ export function ProductionPlanningView({ machines, orders }: Props) {
 
     const machineAsgn = assignments.filter(a => a.machineId === machineId).sort((a, b) => a.position - b.position)
     let position = machineAsgn.length
-    if (afterAssignmentId && afterAssignmentId !== '__top__') {
+    if (afterAssignmentId === '__top__') position = 0
+    else if (afterAssignmentId) {
       const idx = machineAsgn.findIndex(a => a.id === afterAssignmentId)
       if (idx >= 0) position = idx + 1
-    } else if (!afterAssignmentId || afterAssignmentId === '__top__') {
-      position = afterAssignmentId === '__top__' ? 0 : machineAsgn.length
     }
 
     const order = orderMap.get(orderId)
+
+    // Optimista UI frissítés AZONNAL (ne várjunk az API-ra)
+    const tempId = `temp-${Date.now()}`
+    const tempAsgn: MachinePlanningAssignment = {
+      id: tempId, machineId, orderId, position,
+      plannedHoursOverride: '', assignedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    }
+    setAssignments(prev => {
+      const without = prev.filter(a => a.orderId !== orderId)
+      return [...without, tempAsgn]
+    })
+
     try {
       const created = await apiFetch<MachinePlanningAssignment>('/machine-planning', {
         method: 'POST',
@@ -416,20 +456,12 @@ export function ProductionPlanningView({ machines, orders }: Props) {
           customer: order?.customer || '',
         }),
       })
-      setAssignments(prev => {
-        const without = prev.filter(a => a.orderId !== orderId)
-        const same = without.filter(a => a.machineId === machineId).sort((a, b) => a.position - b.position)
-        const inserted: MachinePlanningAssignment[] = []
-        let pos = 0
-        for (const a of same) {
-          if (pos === position) inserted.push({ ...created, position: pos++ })
-          inserted.push({ ...a, position: pos++ })
-        }
-        if (inserted.every(x => x.id !== created.id)) inserted.push({ ...created, position: pos })
-        return [...without.filter(a => a.machineId !== machineId), ...inserted]
-      })
+      // Valódi ID-ra cseréljük a temp bejegyzést
+      setAssignments(prev => prev.map(a => a.id === tempId ? created : a))
       toast.success(`Hozzárendelve: ${machines.find(m => m.id === machineId)?.name}`)
     } catch (err) {
+      // API hiba: visszaállítás
+      setAssignments(prev => prev.filter(a => a.id !== tempId))
       toast.error(`Hiba: ${err instanceof Error ? err.message : err}`)
     }
   }
@@ -457,20 +489,39 @@ export function ProductionPlanningView({ machines, orders }: Props) {
 
   function dropOnUnassigned(e: React.DragEvent) {
     e.preventDefault()
-    const p = dragPayload.current
+    let p: DragPayload | null = null
+    try { p = parseDT(e) } catch {}
+    if (!p) p = dragPayload.current
     if (p?.kind === 'assigned') removeAssignment(p.assignmentId)
     dragPayload.current = null
     setActiveDragOrderId(null)
   }
 
-  const unassigned = orders.filter(o => {
-    if (assignedOrderIds.has(o.id) || o.status === 'Kiszállítva') return false
-    if (!search) return true
-    const q = search.toLowerCase()
-    return [o.customer, o.productName, o.designation, o.ownOrderNumber].some(f => f?.toLowerCase().includes(q))
-  })
+  // ── Rendezés ──────────────────────────────────────────────────────────────
+
+  function toggleSort(col: SortCol) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+
+  const unassigned = orders
+    .filter(o => {
+      if (assignedOrderIds.has(o.id) || o.status === 'Kiszállítva') return false
+      if (!search) return true
+      const q = search.toLowerCase()
+      return [o.customer, o.productName, o.designation, o.ownOrderNumber].some(f => f?.toLowerCase().includes(q))
+    })
+    .sort((a, b) => {
+      let va: string | number = '', vb: string | number = ''
+      if (sortCol === 'amountPc') { va = a.amountPc ?? 0; vb = b.amountPc ?? 0 }
+      else { va = (a[sortCol] ?? '') as string; vb = (b[sortCol] ?? '') as string }
+      const cmp = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb), 'hu')
+      return sortDir === 'asc' ? cmp : -cmp
+    })
 
   if (loading) return <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">Betöltés…</div>
+
+  const isRemoveDrag = activeDragOrderId !== null && assignments.some(a => a.orderId === activeDragOrderId)
 
   return (
     <div className="flex gap-4 items-start">
@@ -486,7 +537,7 @@ export function ProductionPlanningView({ machines, orders }: Props) {
           <MachineSelector allMachines={machines} selectedIds={selectedIds} onToggle={toggleMachine} />
         </div>
 
-        {/* Gépkártyák — vízszintes sor, teljes szélesség */}
+        {/* Gépkártyák — vízszintes sor */}
         {visibleMachines.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed py-16 text-muted-foreground">
             <GearSix size={36} className="mb-3 opacity-30" />
@@ -513,12 +564,13 @@ export function ProductionPlanningView({ machines, orders }: Props) {
           </div>
         )}
 
-        {/* Nem hozzárendelt rendelések */}
+        {/* Nem hozzárendelt rendelések — táblázat */}
         <div
-          className={`rounded-lg border transition-colors ${activeDragOrderId && assignments.some(a => a.orderId === activeDragOrderId) ? 'border-destructive/40 bg-destructive/5' : 'border-border'}`}
+          className={`rounded-lg border transition-colors ${isRemoveDrag ? 'border-destructive/40 bg-destructive/5' : 'border-border'}`}
           onDragOver={e => e.preventDefault()}
           onDrop={dropOnUnassigned}
         >
+          {/* Fejléc */}
           <div className="flex items-center gap-2 px-3 py-2 border-b">
             <Package size={14} className="text-muted-foreground" />
             <h2 className="text-sm font-semibold flex-1">
@@ -528,23 +580,69 @@ export function ProductionPlanningView({ machines, orders }: Props) {
             <div className="relative">
               <MagnifyingGlass size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Szűrés…" className="h-6 pl-6 text-xs w-44" />
+                placeholder="Szűrés…" className="h-7 pl-6 text-xs w-48" />
             </div>
           </div>
+
+          {/* Táblázat fejléc */}
+          <div className="grid text-xs font-medium text-muted-foreground border-b bg-muted/30 px-2"
+            style={{ gridTemplateColumns: '2fr 2fr 2fr 1fr 1fr 1fr 32px' }}>
+            {([
+              ['ownOrderNumber', 'Rendelés#'],
+              ['customer', 'Ügyfél'],
+              ['productName', 'Termék / Megnevezés'],
+              ['amountPc', 'Mennyiség'],
+              ['requiredDate', 'Határidő'],
+              ['status', 'Állapot'],
+            ] as [SortCol, string][]).map(([col, label]) => (
+              <button key={col} onClick={() => toggleSort(col)}
+                className="flex items-center gap-1 py-2 px-1 hover:text-foreground transition-colors text-left">
+                {label}
+                <SortIcon col={col} active={sortCol === col} dir={sortDir} />
+              </button>
+            ))}
+            <div />
+          </div>
+
+          {/* Sorok */}
           <div className="overflow-y-auto max-h-72">
-            <div className="px-2 py-1.5 space-y-0.5">
-              {unassigned.length === 0
-                ? <p className="text-xs text-muted-foreground text-center py-3">{search ? 'Nincs találat' : 'Minden rendelés hozzá van rendelve'}</p>
-                : unassigned.map(o => (
-                  <OrderRow key={o.id} order={o}
-                    dragging={activeDragOrderId === o.id}
-                    onDragStart={e => startDragUnassigned(e, o.id)}
-                    onDragEnd={endDrag} />
-                ))
-              }
-            </div>
+            {unassigned.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">
+                {search ? 'Nincs találat' : 'Minden rendelés hozzá van rendelve'}
+              </p>
+            ) : (
+              unassigned.map(order => (
+                <div
+                  key={order.id}
+                  draggable
+                  onDragStart={e => startDragUnassigned(e, order.id)}
+                  onDragEnd={endDrag}
+                  className={`grid items-center text-xs border-b last:border-0 px-2 cursor-grab
+                    active:cursor-grabbing select-none transition-colors hover:bg-accent/40
+                    ${activeDragOrderId === order.id ? 'opacity-40' : ''}`}
+                  style={{ gridTemplateColumns: '2fr 2fr 2fr 1fr 1fr 1fr 32px' }}
+                >
+                  <span className="py-2 px-1 font-mono truncate">{order.ownOrderNumber || '—'}</span>
+                  <span className="py-2 px-1 font-medium truncate">{order.customer || '—'}</span>
+                  <span className="py-2 px-1 text-muted-foreground truncate">
+                    {[order.productName, order.designation].filter(Boolean).join(' / ') || '—'}
+                  </span>
+                  <span className="py-2 px-1 text-right">
+                    {order.amountPc > 0 ? `${order.amountPc.toLocaleString('hu')} db` : '—'}
+                  </span>
+                  <span className="py-2 px-1 text-muted-foreground">
+                    {order.requiredDate ? order.requiredDate.slice(0, 10) : '—'}
+                  </span>
+                  <span className="py-2 px-1">
+                    <Badge variant="outline" className="text-[10px] px-1 py-0">{order.status}</Badge>
+                  </span>
+                  <span className="py-2 text-muted-foreground/30 text-base leading-none text-center">⠿</span>
+                </div>
+              ))
+            )}
           </div>
-          {activeDragOrderId && assignments.some(a => a.orderId === activeDragOrderId) && (
+
+          {isRemoveDrag && (
             <div className="px-3 py-1.5 text-xs text-destructive/70 border-t text-center">
               Ide húzva eltávolítod a gépről
             </div>
