@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useState } from 'react'
 import { Order, OrderStatus, Product } from '@/lib/types'
+import { getPlannedHoursForOrder } from '@/lib/orderService'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -150,7 +151,7 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
     
     const totalGrossWeight = ordersToSummarize.reduce((sum, o) => sum + parseKg(o.grossWeightKg), 0)
     const totalRequiredMaterial = ordersToSummarize.reduce((sum, o) => sum + parseKg(o.requiredMaterialKg), 0)
-    const totalPlannedHours = ordersToSummarize.reduce((sum, o) => sum + parseHours(o.plannedProductionHours), 0)
+    const totalPlannedHours = ordersToSummarize.reduce((sum, o) => sum + parseHours(getPlannedHoursForOrder(o, products ?? [])), 0)
     
     return {
       count: ordersToSummarize.length,
@@ -249,7 +250,7 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
                   {isColumnVisible('palletsCount') && <TableCell>{order.palletsCount}</TableCell>}
                   {isColumnVisible('grossWeightKg') && <TableCell>{order.grossWeightKg}</TableCell>}
                   {isColumnVisible('requiredMaterialKg') && <TableCell>{order.requiredMaterialKg}</TableCell>}
-                  {isColumnVisible('plannedProductionHours') && <TableCell>{order.plannedProductionHours}</TableCell>}
+                  {isColumnVisible('plannedProductionHours') && <TableCell>{getPlannedHoursForOrder(order, products ?? [])}</TableCell>}
                   {isColumnVisible('deliveryNote') && <TableCell>{order.deliveryNote}</TableCell>}
                   {isColumnVisible('cmr') && <TableCell>{order.cmr}</TableCell>}
                   {isColumnVisible('status') && <TableCell>

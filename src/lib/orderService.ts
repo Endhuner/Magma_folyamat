@@ -1,4 +1,4 @@
-import { Product } from './types'
+import { Order, Product } from './types'
 
 function parseNumberLoose(x: string | number | null | undefined): number | null {
   if (x == null) return null
@@ -158,4 +158,21 @@ export function computeAutoFieldsForOrder(
     grossWeightKg,
     plannedProductionHours,
   }
+}
+
+/**
+ * Dinamikusan számolja a tervezett gyártási időt egy rendeléshez
+ * a termék aktuális adatai (ciklusidő, fészekszám) alapján.
+ * Ha a termék nem található, a rendelésen tárolt értéket adja vissza tartalékként.
+ */
+export function getPlannedHoursForOrder(order: Order, products: Product[]): string {
+  const product = products.find(
+    p => p.customer.trim() === order.customer.trim() &&
+      (p.drawingNumber.trim() === order.productName.trim() ||
+       p.productName.trim() === order.productName.trim() ||
+       p.drawingNumber.trim() === order.designation.trim() ||
+       p.productName.trim() === order.designation.trim())
+  )
+  if (!product) return order.plannedProductionHours || ''
+  return computePlannedProductionHours(order.amountPc, undefined, product.cycleTime, product.nestCount)
 }

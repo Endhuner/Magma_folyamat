@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Order, OrderStatus, Product, ProductionShift, ProductionDefect } from '@/lib/types'
+import { getPlannedHoursForOrder } from '@/lib/orderService'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -275,12 +276,12 @@ export function ProductionView({
                   : '-'}
               </span>
             </div>
-            {order.plannedProductionHours && (
+            {(() => { const ph = getPlannedHoursForOrder(order, products); return ph ? (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Tervezett óra:</span>
-                <span className="font-mono">{order.plannedProductionHours}h</span>
+                <span className="font-mono">{ph}h</span>
               </div>
-            )}
+            ) : null })()}
           </div>
 
           <div className="flex items-center gap-1 pt-2">
@@ -374,16 +375,9 @@ export function ProductionView({
       const existing = map.get(key)
       const product = findProduct(order)
 
-      // Idő kalkuláció: ha van ciklusidő és fészekszám, számítjuk; különben plannedProductionHours
-      let hours = 0
-      const cycleTimeSec = product?.cycleTime ? parseFloat(product.cycleTime) : 0
-      const nestCount = product?.nestCount ? parseInt(product.nestCount, 10) : 0
-      if (cycleTimeSec > 0 && nestCount > 0) {
-        const pcsPerHour = (3600 / cycleTimeSec) * nestCount
-        hours = order.amountPc / pcsPerHour
-      } else if (order.plannedProductionHours) {
-        hours = parseFloat(order.plannedProductionHours) || 0
-      }
+      // Idő kalkuláció: dinamikusan a termék aktuális adataiból
+      const plannedHoursStr = getPlannedHoursForOrder(order, products)
+      const hours = parseFloat(plannedHoursStr) || 0
 
       const materialKg = parseFloat(order.requiredMaterialKg) || 0
 
