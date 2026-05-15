@@ -38,11 +38,16 @@ function atMidnight(d: Date): Date {
   return x
 }
 
-/** Megpróbál egy rendelés "kezdetét" kinyerni — ez az a nap, amikor már várható műszakadat. */
-function orderStartDate(order: Order): Date | null {
-  const candidate = order.orderDate || order.createdAt || null
-  if (!candidate) return null
-  const d = new Date(candidate)
+/**
+ * Visszaadja azt a dátumot, amikortól már hiányzó műszakot kell jelezni.
+ * Ez az első rögzített műszak dátuma — ha még nincs egyetlen műszak sem,
+ * null-t ad vissza (ilyenkor nem jelzünk hiányt: a gyártás még nem indult el).
+ */
+function orderProductionStartDate(orderId: string, shifts: ProductionShift[]): Date | null {
+  const orderShifts = shifts.filter(s => s.orderId === orderId)
+  if (orderShifts.length === 0) return null
+  const earliest = orderShifts.reduce((min, s) => s.date < min ? s.date : min, orderShifts[0].date)
+  const d = new Date(earliest)
   if (Number.isNaN(d.getTime())) return null
   return atMidnight(d)
 }
@@ -72,9 +77,11 @@ export function detectMissingShifts(
 
   const missing: MissingShift[] = []
   for (const order of trackedOrders) {
-    const startDate = orderStartDate(order)
+    const startDate = orderProductionStartDate(order.id, shifts)
+    // Ha még egyetlen műszak sincs rögzítve, a gyártás nem kezdődött el → nincs hiány
+    if (!startDate) continue
     for (const day of lookback) {
-      if (startDate && day.getTime() < startDate.getTime()) continue
+      if (day.getTime() < startDate.getTime()) continue
       const iso = toISODate(day)
       for (const shift of ['de', 'du'] as const) {
         const key = `${order.id}|${iso}|${shift}`

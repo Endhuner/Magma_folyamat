@@ -173,6 +173,7 @@ export const productionShiftCreateSchema = z.object({
   producedQuantity: z.number().int().min(0),
   notes: z.string().default(''),
   userId: z.string().optional(),
+  endShotsAbsolute: z.number().int().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 })

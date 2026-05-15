@@ -127,17 +127,6 @@ export function ProductionDetailDialog({
     return n > 0 ? n : 1
   }, [product])
 
-  // Reset form whenever the dialog opens or prefills change.
-  useEffect(() => {
-    if (!open) return
-    setDate(prefillDate || toISODate(new Date()))
-    setShift(prefillShift || 'de')
-    setStartShots('')
-    setEndShots('')
-    setNotes('')
-    setEditingId(null)
-  }, [open, prefillDate, prefillShift, order?.id])
-
   const orderShifts = useMemo(() => {
     if (!order) return [] as ProductionShift[]
     return [...shifts]
@@ -147,6 +136,22 @@ export function ProductionDetailDialog({
         return a.shift === 'de' ? -1 : 1
       })
   }, [order, shifts])
+
+  // Reset form whenever the dialog opens or prefills change.
+  useEffect(() => {
+    if (!open) return
+    setDate(prefillDate || toISODate(new Date()))
+    setShift(prefillShift || 'de')
+    // Kezdő lövésszám: az előző műszak vég lövésszámából auto-kitöltés (szerkeszthető)
+    const lastShift = orderShifts[0]
+    const autoStart = lastShift?.endShotsAbsolute != null
+      ? String(lastShift.endShotsAbsolute)
+      : ''
+    setStartShots(autoStart)
+    setEndShots('')
+    setNotes('')
+    setEditingId(null)
+  }, [open, prefillDate, prefillShift, order?.id])
 
   const totalShots = useMemo(
     () => orderShifts.reduce((sum, s) => sum + (s.shotsCount || 0), 0),
@@ -204,6 +209,8 @@ export function ProductionDetailDialog({
     const id = editingId ?? generateId()
     const now = new Date().toISOString()
 
+    const endShotsNum = endShots !== '' ? parseInt(endShots, 10) : undefined
+
     const newShift: ProductionShift = {
       id,
       orderId: order.id,
@@ -213,6 +220,7 @@ export function ProductionDetailDialog({
       producedQuantity: producedPreview,
       notes: notes.trim(),
       userId,
+      endShotsAbsolute: !isNaN(endShotsNum ?? NaN) ? endShotsNum : undefined,
       createdAt: editingId
         ? orderShifts.find((s) => s.id === editingId)?.createdAt || now
         : now,

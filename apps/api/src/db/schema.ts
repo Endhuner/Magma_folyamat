@@ -230,6 +230,7 @@ export const productionShifts = sqliteTable('production_shifts', {
   producedQuantity: integer('produced_quantity').notNull().default(0),
   notes: text('notes').notNull().default(''),
   userId: text('user_id'),
+  endShotsAbsolute: integer('end_shots_absolute'),
   createdAt: text('created_at').notNull().default(nowDefault),
   updatedAt: text('updated_at').default(nowDefault),
 }, (t) => ({

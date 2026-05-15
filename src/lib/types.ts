@@ -170,6 +170,8 @@ export interface ProductionShift {
   producedQuantity: number
   notes: string
   userId?: string
+  /** Abszolút vég lövésszám (a számlálón lévő érték a műszak végén). A következő műszak kezdő értékének auto-kitöltéséhez. */
+  endShotsAbsolute?: number
   createdAt: string
   updatedAt?: string
 }
