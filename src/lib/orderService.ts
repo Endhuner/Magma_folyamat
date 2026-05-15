@@ -87,19 +87,21 @@ export function computeGrossWeightKg(
 export function computePlannedProductionHours(
   rendeltDb: number,
   beallitasIdoPerc: number | undefined,
-  ciklusidoMpDb?: string
+  ciklusidoMpDb?: string,
+  feszekszam?: string
 ): string {
   const rendelt = parseNumberLoose(rendeltDb)
   const beallitas = beallitasIdoPerc || 0
   const ciklus = parseNumberLoose(ciklusidoMpDb)
-  
+  const feszek = parseNumberLoose(feszekszam) || 1
+
   if (rendelt == null) return ''
   if (ciklus == null) return ''
-  
-  const futasIdoPerc = (rendelt * ciklus) / 60
-  const tervezettIdoPerc = beallitas + futasIdoPerc
-  const tervezettIdoOra = tervezettIdoPerc / 60
-  
+
+  // ((rendelt × ciklus) / fészekszám) / 3600
+  const futasIdoMp = (rendelt * ciklus) / feszek
+  const tervezettIdoOra = (beallitas * 60 + futasIdoMp) / 3600
+
   return fmtHours0(tervezettIdoOra)
 }
 
@@ -145,7 +147,7 @@ export function computeAutoFieldsForOrder(
     palletsCount
   )
   
-  const plannedProductionHours = computePlannedProductionHours(amountPc, undefined, product.cycleTime)
+  const plannedProductionHours = computePlannedProductionHours(amountPc, undefined, product.cycleTime, product.nestCount)
 
   return {
     surfaceTreatment: product.surfaceTreatment || '',

@@ -52,9 +52,13 @@ describe('computeGrossWeightKg', () => {
 })
 
 describe('computePlannedProductionHours', () => {
-  it('uses cycle-time × amount + setup time, returns whole hours', () => {
-    // 60 db × 60s = 3600s = 60 perc + 60 perc setup = 120 perc = 2 óra
-    expect(computePlannedProductionHours(60, 60, '60')).toBe('2 óra')
+  it('uses cycle-time × amount / fészekszám, returns whole hours', () => {
+    // 120 db × 60s / 2 fészek = 3600s = 1 óra
+    expect(computePlannedProductionHours(120, 0, '60', '2')).toBe('1 óra')
+  })
+  it('fészekszám=1 esetén ugyanaz mint korábban', () => {
+    // 3600 db × 1s / 1 fészek = 3600s = 1 óra
+    expect(computePlannedProductionHours(3600, 0, '1', '1')).toBe('1 óra')
   })
   it('returns empty when cycle time missing', () => {
     expect(computePlannedProductionHours(60, 0, '')).toBe('')
