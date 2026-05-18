@@ -1,5 +1,5 @@
-import { Order, DashboardMetrics } from './types'
-import { format, formatDistanceToNow, isPast } from 'date-fns'
+import { Order, DashboardMetrics, ProductionShift, ProductionDefect, ProductionKPIs, DailyProductionData } from './types'
+import { format, formatDistanceToNow, isPast, subDays, startOfDay } from 'date-fns'
 
 /**
  * Egységes, ékezet-érzéketlen szöveg-normalizáló keresés/összehasonlítás
@@ -44,6 +44,42 @@ export function calculateDashboardMetrics(
     deliveredOrders,
     invoicedOrders,
   }
+}
+
+export function calculateProductionKPIs(
+  shifts: ProductionShift[],
+  defects: ProductionDefect[]
+): ProductionKPIs {
+  const today = startOfDay(new Date())
+  const todayStr = format(today, 'yyyy-MM-dd')
+
+  const days: DailyProductionData[] = Array.from({ length: 7 }, (_, i) => {
+    const d = subDays(today, 6 - i)
+    return {
+      date: format(d, 'yyyy-MM-dd'),
+      label: format(d, 'MM.dd'),
+      produced: 0,
+      defects: 0,
+    }
+  })
+
+  const dayMap = new Map(days.map(d => [d.date, d]))
+
+  for (const s of shifts) {
+    const d = dayMap.get(s.date)
+    if (d) d.produced += s.producedQuantity ?? 0
+  }
+  for (const def of defects) {
+    const d = dayMap.get(def.date)
+    if (d) d.defects += def.quantity ?? 0
+  }
+
+  const weekProduced = days.reduce((sum, d) => sum + d.produced, 0)
+  const weekDefects = days.reduce((sum, d) => sum + d.defects, 0)
+  const todayProduced = dayMap.get(todayStr)?.produced ?? 0
+  const defectRate = weekProduced > 0 ? Math.round((weekDefects / weekProduced) * 100 * 10) / 10 : 0
+
+  return { todayProduced, weekProduced, weekDefects, defectRate, dailyData: days }
 }
 
 export function formatDate(date: string): string {

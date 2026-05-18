@@ -15,6 +15,13 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
 import type { CrudApi } from './createCrudHook'
 import { subscribeSSE } from './sseClient'
+import { enqueue } from '@/lib/offlineQueue'
+
+function isNetworkError(err: unknown): boolean {
+  if (err instanceof TypeError && (err.message === 'Failed to fetch' || err.message.includes('NetworkError'))) return true
+  if (!navigator.onLine) return true
+  return false
+}
 
 const API_BASE: string =
   (typeof import.meta !== 'undefined' &&
@@ -136,10 +143,16 @@ export function useServerCrud<T extends { id: string }>(
     }).catch((err: Error) => {
       pendingIds.current.delete(item.id)
       inFlightCount.current--
-      console.error(`[API] POST /${resource} SIKERTELEN:`, err, '\nKüldött adat:', item)
-      setItems(cur => cur.filter(it => it.id !== item.id))
-      const msg = err?.message ?? 'Ismeretlen hiba'
-      toast.error(`Mentés sikertelen (${resource}): ${msg}`, { duration: 8000 })
+      if (isNetworkError(err)) {
+        enqueue({ resource, entityId: item.id, method: 'POST', body: JSON.stringify(item) })
+          .catch(e => console.error('[OfflineQueue] enqueue hiba:', e))
+        toast.warning(`Offline — a rögzítés szinkronizálásra vár (${resource})`, { duration: 6000 })
+      } else {
+        console.error(`[API] POST /${resource} SIKERTELEN:`, err, '\nKüldött adat:', item)
+        setItems(cur => cur.filter(it => it.id !== item.id))
+        const msg = err?.message ?? 'Ismeretlen hiba'
+        toast.error(`Mentés sikertelen (${resource}): ${msg}`, { duration: 8000 })
+      }
     })
   }, [resource])
 
@@ -173,12 +186,21 @@ export function useServerCrud<T extends { id: string }>(
     if (pendingIds.current.has(id)) return
     inFlightCount.current++
     setItems(cur => cur.map(it => it.id === id ? { ...it, ...patch } : it))
+    const patchBody = JSON.stringify(patch)
     apiFetch<T>(apiUrl(resource, id), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
+      body: patchBody,
     }).then(() => { inFlightCount.current-- })
-      .catch(() => { inFlightCount.current--; reloadRef.current() })
+      .catch((err: unknown) => {
+        inFlightCount.current--
+        if (isNetworkError(err)) {
+          enqueue({ resource, entityId: id, method: 'PATCH', body: patchBody })
+            .catch(e => console.error('[OfflineQueue] enqueue hiba:', e))
+        } else {
+          reloadRef.current()
+        }
+      })
   }, [resource])
 
   const replace = useCallback((item: T) => {
@@ -199,7 +221,15 @@ export function useServerCrud<T extends { id: string }>(
     setItems(cur => cur.filter(it => it.id !== id))
     apiFetch<void>(apiUrl(resource, id), { method: 'DELETE' })
       .then(() => { inFlightCount.current-- })
-      .catch(() => { inFlightCount.current--; reloadRef.current() })
+      .catch((err: unknown) => {
+        inFlightCount.current--
+        if (isNetworkError(err)) {
+          enqueue({ resource, entityId: id, method: 'DELETE' })
+            .catch(e => console.error('[OfflineQueue] enqueue hiba:', e))
+        } else {
+          reloadRef.current()
+        }
+      })
   }, [resource])
 
   const removeMany = useCallback((ids: string[]) => {

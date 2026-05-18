@@ -54,6 +54,21 @@ export interface DashboardMetrics {
   invoicedOrders: number
 }
 
+export interface DailyProductionData {
+  date: string
+  label: string
+  produced: number
+  defects: number
+}
+
+export interface ProductionKPIs {
+  todayProduced: number
+  weekProduced: number
+  weekDefects: number
+  defectRate: number
+  dailyData: DailyProductionData[]
+}
+
 export interface Customer {
   id: string
   name: string
