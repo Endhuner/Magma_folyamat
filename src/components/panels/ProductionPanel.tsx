@@ -20,6 +20,7 @@ import type {
   Product,
   ProductionShift,
   ProductionDefect,
+  Machine,
 } from '@/lib/types'
 
 export interface ProductionPanelProps {
@@ -28,6 +29,7 @@ export interface ProductionPanelProps {
   products: Product[] | null | undefined
   productionShifts: ProductionShift[] | null | undefined
   productionDefects: ProductionDefect[] | null | undefined
+  machines?: Machine[]
 
   handleStatusChange: (id: string, status: OrderStatus) => void
   handleEditOrder: (id: string) => void
@@ -44,6 +46,7 @@ export function ProductionPanel({
   products,
   productionShifts,
   productionDefects,
+  machines,
   handleStatusChange,
   handleEditOrder,
   handleSaveShift,
@@ -80,6 +83,7 @@ export function ProductionPanel({
           defects={productionDefects || []}
           onSaveDefect={handleSaveDefect}
           onDeleteDefect={handleDeleteDefect}
+          machines={machines}
         />
       )}
     </TabsContent>

@@ -29,9 +29,11 @@ import { BackupRestore } from '@/components/BackupRestore'
 import { GithubStyleTemplateEditor, TemplateBackupRestore } from '@/components/lazy'
 import { ProductionPlanningView } from '@/components/ProductionPlanningView'
 import { useIsMobile } from '@/hooks/useMediaQuery'
+import { useOfflineSync } from '@/hooks/useOfflineSync'
+import { OfflineBanner } from '@/components/OfflineBanner'
 import { Order, OrderStatus, Customer, Product, DeliveryNote, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
 import { diffObjects, buildAuditEntry, pruneAuditLog, AUDIT_LOG_MAX_ENTRIES } from '@/lib/auditLog'
-import { calculateDashboardMetrics, parseYear, stripDiacritics, isDelivered } from '@/lib/helpers'
+import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered } from '@/lib/helpers'
 import { computeAutoFieldsForOrder } from '@/lib/orderService'
 import { CmrLayoutSettings } from '@/lib/cmrTemplateBuilder'
 import { useAuth } from '@/lib/auth'
@@ -141,6 +143,13 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const setProducts = useCallback(makeSyncSetter(productsApi), [productsApi.items, productsApi.add, productsApi.remove, productsApi.replace])
 
+
+  const { isOnline, pendingCount, isSyncing } = useOfflineSync(() => {
+    ordersApi.reload()
+    productsApi.reload()
+    customersApi.reload()
+    inventoryApi.reload()
+  })
 
   // Változásnapló — minden lényeges adatmódosítás itt is rögzül (Dokumentumok → Változások).
   const [auditLog, setAuditLog] = useEntityKV<AuditLogEntry>(auditLogRepo)
@@ -496,6 +505,16 @@ function App() {
           : o
       )
     )
+
+    // 'Elkészült' státusznál automatikusan eltávolítjuk a gyártástervező hozzárendelést
+    if (status === 'Elkészült') {
+      orderIds.forEach(id => {
+        fetch(`/api/v1/machine-planning/order/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        }).catch(err => console.warn('[planning] auto-remove sikertelen:', err))
+      })
+    }
   }
 
   const handleConfirmInventoryDeduction = async () => {
@@ -1598,6 +1617,21 @@ function App() {
     [dashboardFilteredOrders]
   )
 
+  const productionKPIs = useMemo(
+    () => calculateProductionKPIs(productionShifts || [], productionDefects || []),
+    [productionShifts, productionDefects]
+  )
+
+  const lowStockItems = useMemo(() => {
+    if (!inventory || !products) return []
+    const productMap = new Map((products || []).map(p => [p.id, p]))
+    return (inventory || []).filter(item => {
+      const product = productMap.get(item.productId)
+      if (!product?.lowStockThreshold) return false
+      return item.quantity < product.lowStockThreshold
+    })
+  }, [inventory, products])
+
   const toggleYear = (year: number) => {
     if (selectedYears.includes(year)) {
       setSelectedYears(selectedYears.filter(y => y !== year))
@@ -1659,13 +1693,22 @@ function App() {
 
       <div className="flex-1 container mx-auto px-6 py-8">
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
+          <OfflineBanner isOnline={isOnline} pendingCount={pendingCount} isSyncing={isSyncing} />
+
           <div className="flex items-center gap-3 flex-wrap">
             <TabsList className={`grid w-full md:w-auto md:inline-grid ${auth.user?.role === 'operator' ? 'grid-cols-3 md:grid-cols-3' : 'grid-cols-5 md:grid-cols-5'}`}>
               {auth.user?.role !== 'operator' && <TabsTrigger value="dashboard">Áttekintés</TabsTrigger>}
               <TabsTrigger value="production">Gyártás</TabsTrigger>
               <TabsTrigger value="planning">Gy. tervezés</TabsTrigger>
               {auth.user?.role !== 'operator' && <TabsTrigger value="orders">Rendelések</TabsTrigger>}
-              <TabsTrigger value="inventory">Készlet</TabsTrigger>
+              <TabsTrigger value="inventory" className="relative">
+                Készlet
+                {lowStockItems.length > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                    {lowStockItems.length > 9 ? '9+' : lowStockItems.length}
+                  </span>
+                )}
+              </TabsTrigger>
             </TabsList>
 
             <div className="flex items-center gap-2 ml-auto">
@@ -1744,7 +1787,13 @@ function App() {
               />
             </div>
 
-            <Dashboard metrics={metrics} onFilterByStatus={handleFilterByStatus} />
+            <Dashboard
+              metrics={metrics}
+              productionKPIs={productionKPIs}
+              lowStockItems={lowStockItems}
+              onFilterByStatus={handleFilterByStatus}
+              onNavigateToInventory={() => setCurrentTab('inventory')}
+            />
 
             {(orders || []).length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -1767,6 +1816,7 @@ function App() {
             products={products}
             productionShifts={productionShifts}
             productionDefects={productionDefects}
+            machines={machinesApi.items || []}
             handleStatusChange={handleStatusChange}
             handleEditOrder={handleEditOrder}
             handleSaveShift={handleSaveShift}
@@ -1939,6 +1989,7 @@ function App() {
             setInventory={setInventory}
             products={products}
             orders={orders}
+            lowStockItems={lowStockItems}
             inventorySearchQuery={inventorySearchQuery}
             setInventorySearchQuery={setInventorySearchQuery}
             setSelectedInventoryItem={setSelectedInventoryItem}

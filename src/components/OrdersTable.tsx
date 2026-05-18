@@ -29,6 +29,7 @@ const STATUS_OPTIONS: OrderStatus[] = [
   'Folyamatban',
   'Előkészítve',
   'Javítás alatt',
+  'Elkészült',
 ]
 
 const STATUS_COLORS: Record<OrderStatus, string> = {

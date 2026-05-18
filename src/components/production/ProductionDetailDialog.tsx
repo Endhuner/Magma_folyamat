@@ -6,6 +6,8 @@ import type {
   Product,
   ProductionShift,
   ProductionDefect,
+  Machine,
+  MachinePlanningAssignment,
 } from '@/lib/types'
 import { DefectEntryDialog } from '@/components/production/DefectEntryDialog'
 import { parseFloatSafe } from '@/lib/helpers'
@@ -43,6 +45,7 @@ import {
   CheckFat,
   Warning,
   ArrowRight,
+  GearSix,
 } from '@phosphor-icons/react'
 import {
   AlertDialog,
@@ -79,6 +82,8 @@ interface ProductionDetailDialogProps {
   /** Selejt törlése. */
   onDeleteDefect?: (defectId: string) => void
   userId?: string
+  /** Gépek listája — a gyártásindítás gép-kiválasztó dialógushoz. */
+  machines?: Machine[]
 }
 
 function toISODate(d: Date): string {
@@ -107,6 +112,7 @@ export function ProductionDetailDialog({
   defects,
   onSaveDefect,
   onDeleteDefect,
+  machines = [],
   userId,
 }: ProductionDetailDialogProps) {
   const [date, setDate] = useState<string>(toISODate(new Date()))
@@ -121,6 +127,10 @@ export function ProductionDetailDialog({
   // Elkészült megerősítő popup
   const [completionConfirmOpen, setCompletionConfirmOpen] = useState(false)
   const [pendingNewTotalProduced, setPendingNewTotalProduced] = useState(0)
+  // Gyártás indítása — gép kiválasztó dialog
+  const [startMachineOpen, setStartMachineOpen] = useState(false)
+  const [startAssignment, setStartAssignment] = useState<MachinePlanningAssignment | null | undefined>(undefined) // undefined=loading, null=nincs hozzárendelés
+  const [startMachineLoading, setStartMachineLoading] = useState(false)
 
   const nestCountNum = useMemo(() => {
     const n = parseFloatSafe(product?.nestCount, 1, { allowNegative: false })
@@ -297,6 +307,57 @@ export function ProductionDetailDialog({
   const isInProgress = order?.status === 'Folyamatban'
   const isPaused = order?.status === 'Szünetel'
   const isStopped = order?.status === 'Előkészítve'
+
+  const handleStartProductionClick = async () => {
+    if (!order) return
+    if (isInProgress) {
+      toast.info('A rendelés már "Folyamatban" állapotban van')
+      return
+    }
+    setStartMachineOpen(true)
+    setStartMachineLoading(true)
+    setStartAssignment(undefined)
+    try {
+      const all = await fetch('/api/v1/machine-planning', { credentials: 'include' })
+        .then(r => r.json()) as MachinePlanningAssignment[]
+      const mine = all.find(a => a.orderId === order.id)
+      setStartAssignment(mine ?? null)
+    } catch {
+      setStartAssignment(null)
+    } finally {
+      setStartMachineLoading(false)
+    }
+  }
+
+  const confirmStartProduction = async (moveToFront: boolean) => {
+    if (!order || !onStatusChange) return
+    if (moveToFront && startAssignment) {
+      try {
+        // Az adott gép összes assignmentjét lekérjük, majd az aktuálisat az elejére rakjuk
+        const all = await fetch('/api/v1/machine-planning', { credentials: 'include' })
+          .then(r => r.json()) as MachinePlanningAssignment[]
+        const machineAsgns = all
+          .filter(a => a.machineId === startAssignment.machineId)
+          .sort((a, b) => a.position - b.position)
+        const reordered = [
+          startAssignment,
+          ...machineAsgns.filter(a => a.id !== startAssignment.id),
+        ]
+        await fetch('/api/v1/machine-planning/reorder', {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderedIds: reordered.map(a => a.id) }),
+        })
+        toast.success('Sorrend frissítve — az aktuális munka az élre került')
+      } catch {
+        toast.error('Sorrend frissítése sikertelen')
+      }
+    }
+    setStartMachineOpen(false)
+    onStatusChange(order.id, 'Folyamatban')
+    toast.success('Rendelés státusz: Folyamatban')
+  }
 
   if (!order) return null
 
@@ -678,7 +739,7 @@ export function ProductionDetailDialog({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Button
                   size="lg"
-                  onClick={() => handleStatusButton('Folyamatban', 'Folyamatban')}
+                  onClick={handleStartProductionClick}
                   className={`h-14 font-semibold text-base text-white shadow-sm ${
                     isInProgress
                       ? 'bg-green-600 hover:bg-green-700 ring-2 ring-green-400 ring-offset-2'
@@ -782,6 +843,88 @@ export function ProductionDetailDialog({
             <CheckFat className="w-4 h-4 mr-2" />
             Igen, Elkészült
           </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    {/* Gyártás indítása — gép kiválasztó dialog */}
+    <AlertDialog open={startMachineOpen} onOpenChange={setStartMachineOpen}>
+      <AlertDialogContent className="max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <GearSix className="w-5 h-5 text-green-600" weight="duotone" />
+            Gyártás indítása
+          </AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-3 text-sm">
+              {startMachineLoading || startAssignment === undefined ? (
+                <p className="text-muted-foreground">Hozzárendelés ellenőrzése…</p>
+              ) : startAssignment === null ? (
+                <div className="space-y-2">
+                  <p>Ez a rendelés nincs tervezett munkának hozzárendelve egyetlen géphez sem.</p>
+                  {machines.length > 0 && (
+                    <p className="text-muted-foreground text-xs">
+                      Rendeld hozzá a Gyártástervező nézetben, majd indítsd el a gyártást.
+                    </p>
+                  )}
+                </div>
+              ) : (() => {
+                const machine = machines.find(m => m.id === startAssignment.machineId)
+                const machineName = machine?.name ?? startAssignment.machineId
+                const position = startAssignment.position + 1
+                const isFirst = position === 1
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
+                      <GearSix className="w-4 h-4 text-primary shrink-0" weight="duotone" />
+                      <div>
+                        <p className="font-medium">{machineName}</p>
+                        <p className="text-xs text-muted-foreground">{position}. a sorban ezen a gépen</p>
+                      </div>
+                    </div>
+                    {!isFirst && (
+                      <div className="flex items-start gap-2 rounded-lg border border-warning/50 bg-warning/10 px-3 py-2">
+                        <Warning className="w-4 h-4 text-warning shrink-0 mt-0.5" weight="fill" />
+                        <p className="text-warning-foreground text-xs">
+                          Ez a rendelés nem az első a sorban a gépen. Az előtte lévő {position - 1} munkát kihagynád.
+                          Elfogadással az élre kerül a gépen.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+          <AlertDialogCancel>Mégse</AlertDialogCancel>
+          {startAssignment && startAssignment.position > 0 ? (
+            <>
+              <AlertDialogAction
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+                onClick={() => confirmStartProduction(false)}
+              >
+                Indítás (sorrend marad)
+              </AlertDialogAction>
+              <AlertDialogAction
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => confirmStartProduction(true)}
+              >
+                <ArrowRight className="w-4 h-4 mr-1" />
+                Élre + Indítás
+              </AlertDialogAction>
+            </>
+          ) : (
+            <AlertDialogAction
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => confirmStartProduction(false)}
+              disabled={startMachineLoading}
+            >
+              <PlayCircle className="w-4 h-4 mr-1" weight="fill" />
+              Indítás
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
