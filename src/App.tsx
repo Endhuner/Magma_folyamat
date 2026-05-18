@@ -1164,6 +1164,16 @@ body {
           : o
       )
     )
+
+    // 'Elkészült' státusznál automatikusan eltávolítjuk a gyártástervező hozzárendelést
+    if (status === 'Elkészült') {
+      orderIds.forEach(id => {
+        fetch(`/api/v1/machine-planning/order/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        }).catch(err => console.warn('[planning] auto-remove sikertelen:', err))
+      })
+    }
   }
 
   const handleConfirmInventoryDeduction = async () => {
@@ -2549,6 +2559,7 @@ body {
             products={products}
             productionShifts={productionShifts}
             productionDefects={productionDefects}
+            machines={machinesApi.items || []}
             handleStatusChange={handleStatusChange}
             handleEditOrder={handleEditOrder}
             handleSaveShift={handleSaveShift}

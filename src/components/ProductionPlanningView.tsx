@@ -1,7 +1,7 @@
 /**
  * Gyártástervező nézet — gépek és rendelések drag & drop tervezése.
  */
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner'
 import { useHasRole } from '@/lib/auth'
 import { useAppSetting } from '@/hooks/useAppSetting'
+import { subscribeSSE } from '@/lib/providers/sseClient'
 import type { Order, Machine, MachinePlanningAssignment, MachinePlanningLogEntry } from '@/lib/types'
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -377,8 +378,16 @@ export function ProductionPlanningView({ machines, orders }: Props) {
   const [sortCol, setSortCol] = useState<SortCol>('ownOrderNumber')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
-  const orderMap = new Map(orders.map(o => [o.id, o]))
-  const assignedOrderIds = new Set(assignments.map(a => a.orderId))
+  const orderMap = useMemo(() => new Map(orders.map(o => [o.id, o])), [orders])
+  // 'Elkészült' és 'Kiszállítva' rendeléseket nem jelenítjük meg a tervező nézetben
+  const activeAssignments = useMemo(
+    () => assignments.filter(a => {
+      const s = orderMap.get(a.orderId)?.status
+      return s !== 'Elkészült' && s !== 'Kiszállítva'
+    }),
+    [assignments, orderMap]
+  )
+  const assignedOrderIds = new Set(activeAssignments.map(a => a.orderId))
   const visibleMachines = machines.filter(m => selectedIds.includes(m.id))
 
   const loadAssignments = useCallback(async () => {
@@ -390,6 +399,11 @@ export function ProductionPlanningView({ machines, orders }: Props) {
   }, [])
 
   useEffect(() => { loadAssignments() }, [loadAssignments])
+
+  // SSE: ha egy rendelés státusza változik (pl. Elkészült), frissítjük a hozzárendeléseket
+  const loadRef = useRef(loadAssignments)
+  loadRef.current = loadAssignments
+  useEffect(() => subscribeSSE(['order'], () => loadRef.current()), [])
 
   function toggleMachine(id: string) {
     const next = selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id]
@@ -538,7 +552,7 @@ export function ProductionPlanningView({ machines, orders }: Props) {
 
   const unassigned = orders
     .filter(o => {
-      if (assignedOrderIds.has(o.id) || o.status === 'Kiszállítva') return false
+      if (assignedOrderIds.has(o.id) || o.status === 'Kiszállítva' || o.status === 'Elkészült') return false
       if (!search) return true
       const q = search.toLowerCase()
       return [o.customer, o.productName, o.designation, o.ownOrderNumber].some(f => f?.toLowerCase().includes(q))
@@ -588,7 +602,7 @@ export function ProductionPlanningView({ machines, orders }: Props) {
               <MachineCard
                 key={m.id}
                 machine={m}
-                assignments={assignments.filter(a => a.machineId === m.id)}
+                assignments={activeAssignments.filter(a => a.machineId === m.id)}
                 orderMap={orderMap}
                 activeDragOrderId={activeDragOrderId}
                 canEdit={canEdit}

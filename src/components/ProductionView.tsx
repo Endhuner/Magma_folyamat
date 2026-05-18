@@ -66,6 +66,7 @@ interface ProductionViewProps {
   onSaveDefect?: (defect: ProductionDefect) => void
   onDeleteDefect?: (defectId: string) => void
   userId?: string
+  machines?: import('@/lib/types').Machine[]
 }
 
 export function ProductionView({
@@ -80,6 +81,7 @@ export function ProductionView({
   onSaveDefect,
   onDeleteDefect,
   userId,
+  machines,
 }: ProductionViewProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
@@ -592,6 +594,7 @@ export function ProductionView({
         onSaveDefect={onSaveDefect}
         onDeleteDefect={onDeleteDefect}
         userId={userId}
+        machines={machines}
       />
 
       <QuickShiftEntryDialog
