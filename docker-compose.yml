@@ -39,15 +39,24 @@ services:
       - appdata:/data
     environment:
       # Admin PIN — csak az első indításkor használja (ha nincs admin a DB-ben)
-      DEFAULT_ADMIN_PIN: "1234"
-      DEFAULT_ADMIN_NAME: "Admin"
-      # Ha saját JWT_SECRET-et akarsz (különben automatikusan generál egyet):
-      # JWT_SECRET: "minimum-32-karakteres-titkos-kulcs-ide"
+      # FONTOS: az első bejelentkezés után változtasd meg a PIN-t!
+      DEFAULT_ADMIN_PIN: "${DEFAULT_ADMIN_PIN:-1234}"
+      DEFAULT_ADMIN_NAME: "${DEFAULT_ADMIN_NAME:-Admin}"
+      # JWT Secret — KÖTELEZŐ production-ban (min. 32 karakter).
+      # Generálás: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+      JWT_SECRET: "${JWT_SECRET}"
       NODE_ENV: production
-      LOG_LEVEL: info
-      CORS_ORIGIN: "*"
-      SESSION_TTL_SECONDS: "28800"
-      COOKIE_SECURE: "false"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      # CORS — BIZTONSÁGI BEÁLLÍTÁS!
+      # LAN-only (nincs internet): "*" elfogadható
+      # Internet-elérés (Cloudflare Tunnel): állítsd be a saját domainre!
+      # Pl. CORS_ORIGIN=https://produktivpro.pelda.hu
+      CORS_ORIGIN: "${CORS_ORIGIN:-*}"
+      SESSION_TTL_SECONDS: "${SESSION_TTL_SECONDS:-28800}"
+      # COOKIE_SECURE — BIZTONSÁGI BEÁLLÍTÁS!
+      # false: HTTP is elfogadható (LAN / Cloudflare Tunnel — ő kezeli az SSL-t)
+      # true: HTTPS kötelező (ha saját SSL tanúsítványod van)
+      COOKIE_SECURE: "${COOKIE_SECURE:-false}"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5050/health"]
       interval: 30s

@@ -213,6 +213,32 @@ docker image prune -f
 
 ---
 
+## Biztonsági beállítások
+
+### Kötelező telepítés előtt
+
+| Beállítás | Fájl | Teendő |
+|---|---|---|
+| `JWT_SECRET` | `.env` | Generálj erős véletlenszerű stringet (min. 32 kar.) |
+| `DEFAULT_ADMIN_PIN` | `.env` | Adj meg egyedi PIN-t; az első belépés után azonnal cseréld! |
+| `CORS_ORIGIN` | `.env` | Ha internet-elérés van, állítsd be a saját domain-re |
+| `COOKIE_SECURE` | `.env` | Ha közvetlen HTTPS-en fut (nem Cloudflare Tunnel mögött), állítsd `true`-ra |
+
+**JWT_SECRET generálása:**
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+### LAN vs. internet-elérés
+
+| Eset | CORS_ORIGIN | COOKIE_SECURE |
+|---|---|---|
+| Csak LAN (nincs domain) | `*` | `false` |
+| Cloudflare Tunnel mögött | `https://sajatdomain.hu` | `false` (Cloudflare kezeli az SSL-t) |
+| Közvetlen HTTPS (saját cert) | `https://sajatdomain.hu` | `true` |
+
+---
+
 ## Hibaelhárítás
 
 | Probléma | Megoldás |

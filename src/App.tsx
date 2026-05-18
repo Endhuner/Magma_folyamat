@@ -2,14 +2,12 @@ import { generateId } from '@/lib/generateId'
 import { useState, useMemo, useEffect, useRef, Suspense, useCallback } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { useEntityKV } from '@/hooks/useEntityKV'
-import {
-  auditLogRepo,
-} from '@/lib/db/repos'
+import { auditLogRepo } from '@/lib/db/repos'
 import { useServerCrud } from '@/lib/providers/useServerCrud'
 import { useAppSetting } from '@/hooks/useAppSetting'
 import { useCustomerSequences } from '@/hooks/useCustomerSequences'
-import { runMigrationIfNeeded } from '@/lib/db/migrate'
-import { isMigrationDone, markMigrationDone, migrateLocalDataToServer } from '@/lib/db/migrateToServer'
+import { useMigrations } from '@/hooks/useMigrations'
+import { useDefaultTemplates } from '@/hooks/useDefaultTemplates'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,55 +22,27 @@ import {
   DropdownMenuPortal,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
-import { OrderDialog } from '@/components/OrderDialog'
 import { Dashboard } from '@/components/Dashboard'
-import { CustomerDialog } from '@/components/CustomerDialog'
-import { ProductDialog } from '@/components/ProductDialog'
 import { DeliveryNotesTable } from '@/components/DeliveryNotesTable'
-
 import { BackupRestore } from '@/components/BackupRestore'
-import { ValidationDialog } from '@/components/ValidationDialog'
-// Code-split heavy editors / dialogs — lásd `src/components/lazy.ts`.
-import {
-  GithubStyleTemplateEditor,
-  TemplateBackupRestore,
-  CmrSettingsDialog,
-  DeliverySettingsDialog,
-  LabelTemplateDialog,
-} from '@/components/lazy'
-import { OrderBulkImportDialog } from '@/components/OrderBulkImportDialog'
-import { ProductBulkImportDialog } from '@/components/ProductBulkImportDialog'
-import { BulkImportDialog } from '@/components/BulkImportDialog'
-import { DocumentFilterDialog } from '@/components/DocumentFilterDialog'
-import { OrderColumnFilterDialog } from '@/components/OrderColumnFilterDialog'
-import { ProductionView } from '@/components/ProductionView'
-import { MobileProductionView } from '@/components/MobileProductionView'
+// Code-split heavy editors — lásd `src/components/lazy.ts`.
+import { GithubStyleTemplateEditor, TemplateBackupRestore } from '@/components/lazy'
 import { ProductionPlanningView } from '@/components/ProductionPlanningView'
-import { MachinePlanningListView } from '@/components/MachinePlanningListView'
 import { useIsMobile } from '@/hooks/useMediaQuery'
 import { Order, OrderStatus, Customer, Product, DeliveryNote, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
 import { diffObjects, buildAuditEntry, pruneAuditLog, AUDIT_LOG_MAX_ENTRIES } from '@/lib/auditLog'
-import { SimpleListView, SimpleColumnDef } from '@/components/SimpleListView'
-import { MachineDetailDialog } from '@/components/MachineDetailDialog'
-import { InventoryHistoryDialog } from '@/components/InventoryHistoryDialog'
-import { WarehouseAddDialog } from '@/components/WarehouseAddDialog'
 import { calculateDashboardMetrics, parseYear, stripDiacritics, isDelivered } from '@/lib/helpers'
 import { computeAutoFieldsForOrder } from '@/lib/orderService'
 import { CmrLayoutSettings } from '@/lib/cmrTemplateBuilder'
 import { useAuth } from '@/lib/auth'
 import { listUsers, createUser, updateUser, deleteUser } from '@/lib/api/usersApi'
 import type { UserRole } from '@produktivpro/shared'
-import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database, Package, Wrench, Camera } from '@phosphor-icons/react'
+import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { exportCmrAsHtml } from '@/lib/cmrHtmlTemplate'
 import { exportDeliveryAsHtml, TemplateStyles } from '@/lib/deliveryHtmlTemplate'
 import { validateCmrExport, validateDeliveryExport, ValidationResult } from '@/lib/exportValidation'
-import { DEFAULT_DELIVERY_TEMPLATE_HTML, DEFAULT_DELIVERY_TEMPLATE_CSS } from '@/lib/defaultDeliveryTemplate'
-import { previewLabels, LabelTemplate, generateLabelsWithPrintSettings } from '@/lib/labelTemplate'
-import { LabelPrintSettingsDialog } from '@/components/LabelPrintSettingsDialog'
-import { InventoryDialog } from '@/components/InventoryDialog'
-import { InventoryAdjustDialog } from '@/components/InventoryAdjustDialog'
-import { InventoryDeductionDialog } from '@/components/InventoryDeductionDialog'
+import { LabelTemplate } from '@/lib/labelTemplate'
 import { deductInventoryForOrders, commitInventoryDeduction, InventoryDeductionResult } from '@/lib/inventoryService'
 import { LabelTemplatesPanel } from '@/components/panels/LabelTemplatesPanel'
 import { InventoryPanel } from '@/components/panels/InventoryPanel'
@@ -81,6 +51,10 @@ import { CustomersPanel } from '@/components/panels/CustomersPanel'
 import { ProductsPanel } from '@/components/panels/ProductsPanel'
 import { OrdersPanel } from '@/components/panels/OrdersPanel'
 import { ProductionPanel } from '@/components/panels/ProductionPanel'
+import { MachinesPanel } from '@/components/panels/MachinesPanel'
+import { UsersPanel } from '@/components/panels/UsersPanel'
+import { MaterialsPanel } from '@/components/panels/MaterialsPanel'
+import { AppDialogs } from '@/components/AppDialogs'
 
 type LastAction =
   | { type: 'delete', orders: Order[] }
@@ -171,8 +145,6 @@ function App() {
   // Változásnapló — minden lényeges adatmódosítás itt is rögzül (Dokumentumok → Változások).
   const [auditLog, setAuditLog] = useEntityKV<AuditLogEntry>(auditLogRepo)
   const machinesApi = useServerCrud<Machine>('machines', ['machine'])
-  const [detailMachineId, setDetailMachineId] = useState<string | null>(null)
-  const [detailMachineTab, setDetailMachineTab] = useState<'photo' | 'oils' | 'accessories' | 'repairs'>('photo')
   // Felhasználók: a backend a forrás (auth + bcrypt PIN miatt nem lehet
   // local-only). A "Felhasználók" tab onSave/onDelete a `usersApi`-n
   // keresztül a `/api/v1/users` endpointtal beszél, mentés után
@@ -323,655 +295,24 @@ function App() {
     }
   }, [yearOptions, selectedYears.length, currentYear])
 
-  // Egyszeri localStorage → IndexedDB migráció bootstrap.
-  // Idempotens: ha már lefutott, azonnal visszatér (flag a localStorage-ban).
-  // Hibára csak naplózunk — a régi useKV állapotot is meghagyjuk fallbacknek
-  // egy verzió erejéig (rollback-stratégia).
-  useEffect(() => {
-    let cancelled = false
-    runMigrationIfNeeded()
-      .then((result) => {
-        if (cancelled) return
-        if (result.alreadyDone) return
-        const total = Object.values(result.migrated).reduce((a, b) => a + (b ?? 0), 0)
-        if (total > 0) {
-          toast.success(
-            `Adatbázis migráció kész — ${total} rekord IndexedDB-be mozgatva.`,
-            { duration: 6000 }
-          )
-        }
-        if (result.errors.length > 0) {
-          console.error('[migrate] hibák:', result.errors)
-          toast.warning(
-            `Migráció figyelmeztetések: ${result.errors.length} kulcs nem költözött át. Részletek a konzolon.`,
-            { duration: 8000 }
-          )
-        }
-      })
-      .catch((err) => {
-        console.error('[migrate] kritikus hiba:', err)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  useMigrations({
+    orders,
+    products,
+    setOrders,
+    reloadAll: () => {
+      ordersApi.reload()
+      customersApi.reload()
+      productsApi.reload()
+      inventoryApi.reload()
+      transactionsApi.reload()
+      shiftsApi.reload()
+      defectsApi.reload()
+      logsApi.reload()
+    },
+  })
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Egyszeri migráció: IndexedDB (régi localStorage-alapú) → szerver SQLite.
-  // Csak akkor fut, ha a szerver üres ÉS van helyi adat (első indítás után).
-  // ──────────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (isMigrationDone()) return
-    // Várunk 2 másodpercet, hogy a szerver-CRUD hook-ok töltsék be az adatot.
-    const timer = setTimeout(async () => {
-      try {
-        const result = await migrateLocalDataToServer()
-        markMigrationDone()
-        if (result.migrated > 0) {
-          toast.success(
-            `Helyi adatok szerverre migrálva: ${result.migrated} tétel.`,
-            { duration: 8000 }
-          )
-          // Frissítjük a szerver-CRUD hookokat, hogy az új adatot lássák.
-          ordersApi.reload()
-          customersApi.reload()
-          productsApi.reload()
-          inventoryApi.reload()
-          transactionsApi.reload()
-          shiftsApi.reload()
-          defectsApi.reload()
-          logsApi.reload()
-        } else {
-          markMigrationDone()
-        }
-        if (result.errors > 0) {
-          console.warn(`[migration] ${result.errors} tétel migrálása sikertelen`)
-        }
-      } catch (err) {
-        console.error('[migration] kritikus hiba:', err)
-      }
-    }, 2000)
-    return () => clearTimeout(timer)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  useDefaultTemplates(savedTemplatesApi)
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Egyszeri productId-backfill: a régi rendelések még csak név-alapon
-  // kapcsolódtak a termékekhez. Most, hogy az `Order.productId` mező létezik,
-  // megpróbáljuk a meglévő rendeléseket az eredeti heurisztikával (customer +
-  // productName/designation) párosítani egy létező Producthez, és bevezetni
-  // a `productId`-t. Idempotens: csak azokat a rendeléseket frissíti, ahol
-  // még nincs `productId`. Egy localStorage-flag akadályozza meg, hogy minden
-  // app-induláskor újra végigfusson.
-  // ──────────────────────────────────────────────────────────────────────────
-  const productIdBackfillDone = useRef(false)
-  useEffect(() => {
-    if (productIdBackfillDone.current) return
-    if (!Array.isArray(orders) || !Array.isArray(products)) return
-    if (orders.length === 0 || products.length === 0) return
-    if (typeof window !== 'undefined') {
-      try {
-        if (window.localStorage.getItem('orders-productid-backfill-v1') === 'done') {
-          productIdBackfillDone.current = true
-          return
-        }
-      } catch {
-        /* private browsing — semmi baj, akkor minden induláskor lefuthat. */
-      }
-    }
-    const candidates = orders.filter((o) => !o.productId)
-    if (candidates.length === 0) {
-      productIdBackfillDone.current = true
-      try {
-        window.localStorage.setItem('orders-productid-backfill-v1', 'done')
-      } catch {
-        /* ignore */
-      }
-      return
-    }
-
-    // Mégegyszer a régi heurisztika — szándékosan duplikálva, hogy a
-    // `productionHelpers.findProductForOrder` új implementációja már a
-    // productId-t várja és így ne hivatkozzunk vissza a régi ágra.
-    const matchByLegacy = (order: Order): Product | undefined => {
-      // Csak helyes mezőpárosítás — cross-field false positive-ot okozna:
-      //   order.productName = rajzszám, order.designation = terméknév
-      //   product.drawingNumber = rajzszám, product.productName = terméknév
-      return products.find(
-        (p) =>
-          p.customer === order.customer &&
-          (
-            (order.productName && p.drawingNumber === order.productName) ||
-            (order.designation && p.productName === order.designation)
-          )
-      )
-    }
-
-    let updatedCount = 0
-    const updatedOrders = orders.map((o) => {
-      if (o.productId) return o
-      const matched = matchByLegacy(o)
-      if (!matched) return o
-      updatedCount += 1
-      return { ...o, productId: matched.id, updatedAt: new Date().toISOString() }
-    })
-
-    productIdBackfillDone.current = true
-    try {
-      window.localStorage.setItem('orders-productid-backfill-v1', 'done')
-    } catch {
-      /* ignore */
-    }
-    if (updatedCount > 0) {
-      setOrders(() => updatedOrders)
-      // eslint-disable-next-line no-console
-      console.log(`[backfill] ${updatedCount} rendelésnél kitöltöttük a productId-t.`)
-    }
-  }, [orders, products, setOrders])
-
-  // localStorage kvóta figyelmeztetések — ha a tár ≥ 80%-ban tele van, vagy
-  // ha QuotaExceededError történik, a felhasználó kap egy érthető toast-ot,
-  // mielőtt valami "csendes" mentési hiba miatt adatot veszítene.
-  useEffect(() => {
-    const onWarning = (e: Event) => {
-      const detail = (e as CustomEvent).detail as
-        | { ratio?: number; bytes?: number; entries?: number }
-        | undefined
-      const pct = Math.round(((detail?.ratio ?? 0) * 100))
-      toast.warning(
-        `A helyi tárhely ~${pct}%-ban megtelt. Készíts biztonsági mentést és ürítsd a régi adatokat.`,
-        { duration: 8000 }
-      )
-    }
-    const onExceeded = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { key?: string } | undefined
-      toast.error(
-        `Nem sikerült menteni: a böngésző helyi tárhelye megtelt${
-          detail?.key ? ` (kulcs: ${detail.key})` : ''
-        }. Készíts biztonsági mentést, majd töröld a régi adatokat.`,
-        { duration: 12000 }
-      )
-    }
-    window.addEventListener('kv:quota-warning', onWarning as EventListener)
-    window.addEventListener('kv:quota-exceeded', onExceeded as EventListener)
-    return () => {
-      window.removeEventListener('kv:quota-warning', onWarning as EventListener)
-      window.removeEventListener('kv:quota-exceeded', onExceeded as EventListener)
-    }
-  }, [])
-
-  useEffect(() => {
-    const initializeDefaultTemplates = () => {
-      const deliveryTemplateName = 'Szállítólevél Sablon - 2026.03.13 12:32'
-      const deliveryTemplateExists = (savedTemplates || []).some(t => t.name === deliveryTemplateName)
-      
-      if (!deliveryTemplateExists) {
-        const newTemplateId = `template-delivery-${Date.now()}`
-        const newTemplate = {
-          id: newTemplateId,
-          name: deliveryTemplateName,
-          timestamp: new Date('2026-03-13T12:32:00').toISOString(),
-          size: JSON.stringify({ html: DEFAULT_DELIVERY_TEMPLATE_HTML, css: DEFAULT_DELIVERY_TEMPLATE_CSS }).length,
-          data: {
-            id: newTemplateId,
-            name: deliveryTemplateName,
-            type: 'delivery' as const,
-            html: DEFAULT_DELIVERY_TEMPLATE_HTML,
-            css: DEFAULT_DELIVERY_TEMPLATE_CSS,
-            timestamp: new Date('2026-03-13T12:32:00').toISOString(),
-            description: 'Alapértelmezett szállítólevél sablon',
-            margins: {
-              top: '10',
-              right: '10',
-              bottom: '10',
-              left: '10'
-            }
-          }
-        }
-        
-        savedTemplatesApi.add(newTemplate)
-        console.log('✅ Szállítólevél sablon inicializálva:', deliveryTemplateName)
-      }
-
-      const cmrTemplateName = 'CMR Sablon - 2026.03.13 12:42'
-      const cmrTemplateExists = (savedTemplates || []).some(t => t.name === cmrTemplateName)
-      
-      if (!cmrTemplateExists) {
-        const DEFAULT_CMR_TEMPLATE_HTML = `<!DOCTYPE html>
-<html lang="hu">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CMR - {{sequenceNumber}}</title>
-</head>
-<body>
-  <div class="cmr-document">
-    <div class="sequence-number">Saját rendelési szám: {{sequenceNumber}}</div>
-    
-    <div class="header">
-      <h1>NEMZETKÖZI FUVARLEVÉL</h1>
-      <h2>INTERNATIONAL CONSIGNMENT NOTE</h2>
-    </div>
-    
-    <div class="notice-box">
-      This carriage is subject, notwithstanding any clause to the contrary to the Convention on the Contract for the international Carriage of goods by road (CMR).<br>
-      A fuvarozásra elétrő megállapodás esetén is a nemzetközi árufuvarozási egyezmény CMR rendelkezései az irányadók
-    </div>
-    
-    <div class="cmr-grid">
-      <div class="section">
-        <div class="section-title">1. Feladó (Név, cím, ország)<br>Sender (Name, Address, Country)</div>
-        <div class="section-content">
-          <strong>{{senderName}}</strong><br>
-          {{senderAddress}}<br>
-          {{senderCity}}, {{senderCountry}}<br>
-          Adószám: {{senderTaxNumber}}
-        </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">2. Átvevő (Név, cím, ország)<br>Consignee (Name, Address, Country)</div>
-        <div class="section-content">
-          <strong>{{customerName}}</strong><br>
-          {{customerAddress}}<br>
-          {{customerCity}}, {{customerCountry}}<br>
-          {{customerTaxNumber}}
-        </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">3. Az áru átvételének helye és időpontja<br>Place and date of delivery of the goods</div>
-        <div class="section-content">
-          Helység / Place: <strong>{{pickupLocation}}</strong><br>
-          Ország / Country: <strong>{{senderCountry}}</strong>
-        </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">4. Az áru leadásának helye és időpontja<br>Place and date of taking over of the goods</div>
-        <div class="section-content">
-          Helység / Place: <strong>{{customerCity}}</strong><br>
-          Ország / Country: <strong>{{customerCountry}}</strong>
-        </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">16. Carrier (Name, Address, Country)<br>Fuvarozó (Név, cím, ország)</div>
-        <div class="section-content">
-          {{carrierName}}<br>
-          {{carrierAddress}}
-        </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">17. Successive carriers<br>További fuvarozó</div>
-        <div class="section-content">
-          &nbsp;
-        </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">5. Mellékelt okmányok<br>Documents attached</div>
-        <div class="section-content">
-          Szállítólevél
-        </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">18. Carrier's reservations and observations<br>A fuvarozó fenntartásai és bejegyzése</div>
-        <div class="section-content">
-          &nbsp;
-        </div>
-      </div>
-    </div>
-    
-    <table class="goods-table">
-      <thead>
-        <tr>
-          <th>Jel és szám<br>Marks and Nos</th>
-          <th>Vevő rendelési száma<br>Customer Order No</th>
-          <th>Darabszám<br>Number of packages</th>
-          <th>Csomagolás<br>Method of packing</th>
-          <th>Áru megnevezése<br>Nature of the goods</th>
-          <th>Bruttósúly kg<br>Gross weight kg</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{#items}}
-        <tr>
-          <td class="center">{{index}}</td>
-          <td class="center">{{ownOrderNumber}}</td>
-          <td class="center">{{quantity}}</td>
-          <td>{{packaging}}</td>
-          <td>{{productName}}<br><small>{{designation}}</small></td>
-          <td class="right">{{weight}}</td>
-        </tr>
-        {{/items}}
-      </tbody>
-    </table>
-    
-    <div class="section full-width">
-      <div class="section-title">13. Sender's instructions (Customs and other formalities)<br>Feladó rendelkezései (Vám és egyéb hivatalos kezelés)</div>
-      <div class="section-content">
-        &nbsp;
-      </div>
-    </div>
-    
-    <div class="cmr-grid">
-      <div class="section">
-        <div class="section-title">14. Cash on delivery<br>Visszatérítés</div>
-        <div class="section-content">
-          -
-        </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">19. To be paid by / Fizetendő</div>
-        <div class="section-content">
-          Sender / Feladó: ☐<br>
-          Consignee / Átvevő: ☐<br>
-          Currency / Pénznem: EUR
-        </div>
-      </div>
-    </div>
-    
-    <div class="section full-width">
-      <div class="section-title">15. Directions as to payment for carriage<br>Fuvardíjfizetési meghagyások</div>
-      <div class="section-content">
-        &nbsp;
-      </div>
-    </div>
-    
-    <div class="section full-width">
-      <div class="section-title">20. Special agreements<br>Egyedi megállapodások</div>
-      <div class="section-content">
-        &nbsp;
-      </div>
-    </div>
-    
-    <div class="signature-section">
-      <div class="signature-box">
-        <div class="signature-label">
-          21. Kiállítás helye<br>
-          <span class="signature-label-sub">Place issued</span>
-        </div>
-        <div class="section-content">
-          <strong>{{pickupLocation}}</strong><br>
-          Dátum: {{issueDate}}
-        </div>
-      </div>
-      
-      <div class="signature-box">
-        <div class="signature-label">
-          22. A feladó aláírása és bélyegzője<br>
-          <span class="signature-label-sub">Signature and stamp of the sender</span>
-        </div>
-        <div class="signature-space">
-          (aláírás / signature)
-        </div>
-      </div>
-      
-      <div class="signature-box">
-        <div class="signature-label">
-          23. Fuvarozó aláírása és bélyegzője<br>
-          <span class="signature-label-sub">Signature and stamp of the carrier</span>
-        </div>
-        <div class="signature-space">
-          (aláírás / signature)
-        </div>
-      </div>
-    </div>
-    
-    <div class="signature-section">
-      <div class="signature-box">
-        <div class="signature-label">
-          24. Goods received / Áru átvétele<br>
-          <span class="signature-label-sub">Date / Dátum</span>
-        </div>
-        <div class="signature-space">
-          (dátum / date)
-        </div>
-      </div>
-      
-      <div class="signature-box" style="grid-column: 2 / -1;">
-        <div class="signature-label">
-          Signature and stamp of the consignee<br>
-          <span class="signature-label-sub">Az átvevő aláírása és bélyegzője</span>
-        </div>
-        <div class="signature-space">
-          (aláírás / signature)
-        </div>
-      </div>
-    </div>
-    
-    <div class="signature-section">
-      <div class="signature-box" style="grid-column: 1 / -1;">
-        <div class="signature-label">
-          25. Vehicle / Jármű
-        </div>
-        <div class="section-content">
-          Rendszám / Registration number: <strong>{{vehiclePlate}}</strong>
-        </div>
-      </div>
-    </div>
-    
-  </div>
-  
-  <div class="no-print" style="text-align: center; padding: 20px;">
-    <button onclick="window.print()" style="padding: 10px 20px; font-size: 14pt; cursor: pointer;">
-      🖨️ Nyomtatás / Mentés PDF-ként
-    </button>
-  </div>
-</body>
-</html>`
-
-        const DEFAULT_CMR_TEMPLATE_CSS = `@page {
-  size: A4;
-  margin: 10mm;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: Arial, sans-serif;
-  font-size: 10pt;
-  line-height: 1.3;
-  color: #000;
-}
-
-.cmr-document {
-  width: 210mm;
-  min-height: 297mm;
-  margin: 0 auto;
-  background: white;
-  padding: 5mm;
-  position: relative;
-}
-
-.header {
-  text-align: center;
-  margin-bottom: 10px;
-  border-bottom: 2px solid #000;
-  padding-bottom: 5px;
-}
-
-.header h1 {
-  font-size: 14pt;
-  font-weight: bold;
-  margin-bottom: 2px;
-}
-
-.header h2 {
-  font-size: 11pt;
-  font-weight: normal;
-  font-style: italic;
-}
-
-.sequence-number {
-  position: absolute;
-  top: 5mm;
-  right: 5mm;
-  font-size: 12pt;
-  font-weight: bold;
-}
-
-.cmr-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.section {
-  border: 1px solid #000;
-  padding: 8px;
-  background: #fff;
-}
-
-.section-title {
-  font-size: 9pt;
-  font-weight: bold;
-  margin-bottom: 5px;
-  text-decoration: underline;
-}
-
-.section-content {
-  font-size: 10pt;
-  line-height: 1.4;
-}
-
-.section-content strong {
-  font-weight: bold;
-}
-
-.full-width {
-  grid-column: 1 / -1;
-}
-
-.goods-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 10px 0;
-  font-size: 9pt;
-}
-
-.goods-table th,
-.goods-table td {
-  border: 1px solid #000;
-  padding: 4px 6px;
-  text-align: left;
-}
-
-.goods-table th {
-  background: #e0e0e0;
-  font-weight: bold;
-  text-align: center;
-}
-
-.goods-table td.center {
-  text-align: center;
-}
-
-.goods-table td.right {
-  text-align: right;
-}
-
-.signature-section {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px;
-  margin-top: 20px;
-  page-break-inside: avoid;
-}
-
-.signature-box {
-  border: 1px solid #000;
-  padding: 8px;
-  min-height: 80px;
-}
-
-.signature-label {
-  font-size: 8pt;
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-
-.signature-label-sub {
-  font-size: 7pt;
-  font-style: italic;
-  color: #666;
-}
-
-.signature-space {
-  margin-top: 40px;
-  border-top: 1px solid #666;
-  padding-top: 3px;
-  text-align: center;
-  font-size: 7pt;
-}
-
-.notice-box {
-  border: 1px solid #000;
-  padding: 5px;
-  font-size: 7pt;
-  text-align: center;
-  margin-bottom: 10px;
-  background: #f9f9f9;
-}
-
-@media print {
-  body {
-    margin: 0;
-    padding: 0;
-  }
-  
-  .cmr-document {
-    margin: 0;
-    padding: 5mm;
-  }
-  
-  .no-print {
-    display: none;
-  }
-}`
-
-        const newCmrTemplateId = `template-cmr-${Date.now()}`
-        const newCmrTemplate = {
-          id: newCmrTemplateId,
-          name: cmrTemplateName,
-          timestamp: new Date('2026-03-13T12:42:00').toISOString(),
-          size: JSON.stringify({ html: DEFAULT_CMR_TEMPLATE_HTML, css: DEFAULT_CMR_TEMPLATE_CSS }).length,
-          data: {
-            id: newCmrTemplateId,
-            name: cmrTemplateName,
-            type: 'cmr' as const,
-            html: DEFAULT_CMR_TEMPLATE_HTML,
-            css: DEFAULT_CMR_TEMPLATE_CSS,
-            timestamp: new Date('2026-03-13T12:42:00').toISOString(),
-            description: 'Alapértelmezett CMR sablon',
-            margins: {
-              top: '10',
-              right: '10',
-              bottom: '10',
-              left: '10'
-            }
-          }
-        }
-        
-        savedTemplatesApi.add(newCmrTemplate)
-        console.log('✅ CMR sablon inicializálva:', cmrTemplateName)
-      }
-    }
-    
-    if (savedTemplatesApi.items !== undefined) {
-      initializeDefaultTemplates()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedTemplatesApi.items.length])
 
   const handleSaveOrder = (orderData: Partial<Order>) => {
     if (selectedOrder) {
@@ -1968,90 +1309,6 @@ body {
     }
   }
 
-  const machineColumns: SimpleColumnDef[] = [
-    { key: 'name', label: 'Név', required: true, minWidth: 200, placeholder: 'Pl. Engel Victory 120' },
-    { key: 'serialNumber', label: 'Gyári szám', minWidth: 160, placeholder: 'Pl. SN-123456' },
-    { key: 'type', label: 'Típus', minWidth: 160, placeholder: 'Pl. fröccsöntő' },
-    { key: 'capacity', label: 'Befogókapacitás', minWidth: 160, placeholder: 'Pl. 120 t' },
-    { key: 'notes', label: 'Megjegyzés', type: 'textarea', minWidth: 240, truncate: true },
-  ]
-
-  /**
-   * A backend `'admin' | 'operator' | 'viewer'` enum-ot vár (English),
-   * a UI viszont magyar feliratokat mutat. A SimpleListView `options`
-   * objektum-formátuma ezt natívan megoldja: `value` az API-érték,
-   * `label` a felhasználónak megjelenő szöveg.
-   */
-  const ROLE_LABEL_MAP: Record<string, string> = {
-    admin: 'Adminisztrátor',
-    operator: 'Operátor',
-    viewer: 'Megfigyelő',
-  }
-  const userColumns: SimpleColumnDef[] = [
-    { key: 'name', label: 'Név', required: true, minWidth: 200, placeholder: 'Pl. Kovács János' },
-    { key: 'email', label: 'Email', type: 'email', minWidth: 220, placeholder: 'pl. nev@cegnev.hu' },
-    {
-      key: 'role',
-      label: 'Szerepkör',
-      type: 'select',
-      options: [
-        { value: 'admin', label: 'Adminisztrátor' },
-        { value: 'operator', label: 'Operátor' },
-        { value: 'viewer', label: 'Megfigyelő' },
-      ],
-      minWidth: 160,
-      placeholder: 'Válasszon...',
-      formatCell: (v) => ROLE_LABEL_MAP[v] ?? v,
-      defaultValue: 'operator',
-    },
-    {
-      key: 'pin',
-      label: 'PIN-kód',
-      type: 'password',
-      digitOnly: true,
-      maxLength: 8,
-      placeholder: '4–8 számjegy',
-      requiredOnCreateOnly: true,
-      hideInTable: true,
-      helpText:
-        'Új felhasználónál kötelező (4–8 számjegy). Szerkesztéskor csak akkor töltsd ki, ha cserélni szeretnéd a PIN-t.',
-    },
-    {
-      key: 'active',
-      label: 'Aktív',
-      type: 'select',
-      options: [
-        { value: 'Igen', label: 'Igen' },
-        { value: 'Nem', label: 'Nem (zárolt)' },
-      ],
-      minWidth: 110,
-      // A tábla cellájában a User.active boolean; getCell `String(v)`-vel
-      // alakítja → 'true' / 'false' / ''. Ezt fordítjuk vissza emberinek.
-      formatCell: (v) =>
-        v === 'true' || v === 'Igen' ? 'Igen' : v === 'false' || v === 'Nem' ? 'Nem' : 'Igen',
-      // Szerkesztéskor a Select értékének az options.value-jéből kell lennie.
-      parseValue: (raw) =>
-        raw === 'false' || raw === 'Nem' ? 'Nem' : 'Igen',
-      // Új user létrehozásakor alapból aktív.
-      defaultValue: 'Igen',
-    },
-    { key: 'notes', label: 'Megjegyzés', type: 'textarea', minWidth: 240, truncate: true },
-  ]
-
-  const materialColumns: SimpleColumnDef[] = [
-    { key: 'name', label: 'Anyag neve', required: true, minWidth: 200, placeholder: 'Pl. PA66 GF30' },
-    { key: 'type', label: 'Típus', minWidth: 160, placeholder: 'Pl. granulátum' },
-    { key: 'supplier', label: 'Beszállító', minWidth: 200, placeholder: 'Pl. BASF' },
-    { key: 'unitPrice', label: 'Egységár', type: 'number', minWidth: 140, placeholder: 'Pl. 1250' },
-    {
-      key: 'unit',
-      label: 'Egység',
-      type: 'select',
-      options: ['kg', 'g', 'db', 'l', 'm'],
-      minWidth: 120,
-    },
-    { key: 'notes', label: 'Megjegyzés', type: 'textarea', minWidth: 240, truncate: true },
-  ]
 
   const handleNewProduct = () => {
     setSelectedProduct(null)
@@ -2590,123 +1847,29 @@ body {
             handleBulkDeleteProducts={handleBulkDeleteProducts}
           />
 
-          <TabsContent value="machines">
-            <Tabs defaultValue="machine-list" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="machine-list">Gépek listája</TabsTrigger>
-                <TabsTrigger value="machine-planning-list">Tervezett munkák</TabsTrigger>
-              </TabsList>
 
-              <TabsContent value="machine-list" className="space-y-6">
-                <SimpleListView<Machine>
-                  title="Gépek"
-                  description="Termelőgépek és berendezések adatai"
-                  icon={<Factory className="w-16 h-16 text-muted-foreground mb-4" weight="duotone" />}
-                  items={machinesApi.items}
-                  columns={machineColumns}
-                  onSave={handleSaveMachine}
-                  onDelete={handleDeleteMachine}
-                  addLabel="Új gép"
-                  addDialogTitle="Új gép hozzáadása"
-                  editDialogTitle="Gép szerkesztése"
-                  emptyHint='Vegyen fel új gépet az "Új gép" gombbal.'
-                  canDelete={(m) =>
-                    auth.user?.role === 'admin' ||
-                    !m.createdBy ||
-                    m.createdBy === auth.user?.id
-                  }
-                  extraActions={(machine) => (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Fotó feltöltése"
-                        onClick={() => { setDetailMachineTab('photo'); setDetailMachineId(machine.id) }}
-                      >
-                        <Camera className="w-4 h-4 text-accent" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Olajok / Kiegészítések / Javítások"
-                        onClick={() => { setDetailMachineTab('oils'); setDetailMachineId(machine.id) }}
-                      >
-                        <Wrench className="w-4 h-4 text-accent" />
-                      </Button>
-                    </>
-                  )}
-                />
-                <MachineDetailDialog
-                  open={detailMachineId !== null}
-                  onClose={() => setDetailMachineId(null)}
-                  machine={machinesApi.items.find((m) => m.id === detailMachineId) ?? null}
-                  initialTab={detailMachineTab}
-                  onSave={(updated) => {
-                    handleSaveMachine(updated)
-                  }}
-                />
-              </TabsContent>
+          <MachinesPanel
+            machines={machinesApi.items}
+            orders={orders}
+            auth={auth}
+            onSave={handleSaveMachine}
+            onDelete={handleDeleteMachine}
+          />
 
-              <TabsContent value="machine-planning-list">
-                <MachinePlanningListView
-                  machines={machinesApi.items}
-                  orders={orders}
-                />
-              </TabsContent>
-            </Tabs>
-          </TabsContent>
+          <UsersPanel
+            users={users}
+            usersLoading={usersLoading}
+            auth={auth}
+            onSave={handleSaveUser}
+            onDelete={handleDeleteUser}
+          />
 
-          <TabsContent value="users" className="space-y-6">
-            <SimpleListView<User>
-              title="Felhasználók"
-              description={
-                auth.user?.role === 'admin'
-                  ? 'Rendszerfelhasználók és szerepkörök. Új felhasználónál állíts be PIN-t — azzal tud belépni a login képernyőn.'
-                  : usersLoading
-                    ? 'Felhasználók betöltése…'
-                    : 'Csak adminisztrátor tud felhasználókat létrehozni vagy módosítani.'
-              }
-              icon={<Database className="w-16 h-16 text-muted-foreground mb-4" weight="duotone" />}
-              items={users}
-              columns={userColumns}
-              onSave={handleSaveUser}
-              onDelete={handleDeleteUser}
-              addLabel="Új felhasználó"
-              addDialogTitle="Új felhasználó hozzáadása"
-              editDialogTitle="Felhasználó szerkesztése"
-              emptyHint={
-                auth.user?.role === 'admin'
-                  ? 'Vegyen fel új felhasználót az "Új felhasználó" gombbal. PIN-t a felhasználó-űrlapon adhatsz meg.'
-                  : 'Nincs felhasználó. Adminisztrátor jogosultság szükséges a létrehozáshoz.'
-              }
-              successMessages={{
-                create: 'Felhasználó létrehozva',
-                update: 'Felhasználó módosítva',
-                delete: 'Felhasználó törölve',
-              }}
-            />
-          </TabsContent>
-
-          <TabsContent value="materials" className="space-y-6">
-            <SimpleListView<Material>
-              title="Anyaglista"
-              description="Alapanyagok és granulátumok nyilvántartása"
-              icon={<Package className="w-16 h-16 text-muted-foreground mb-4" weight="duotone" />}
-              items={materialsApi.items}
-              columns={materialColumns}
-              onSave={handleSaveMaterial}
-              onDelete={handleDeleteMaterial}
-              addLabel="Új anyag"
-              addDialogTitle="Új anyag hozzáadása"
-              editDialogTitle="Anyag szerkesztése"
-              emptyHint='Vegyen fel új anyagot az "Új anyag" gombbal.'
-              canDelete={(m) =>
-                auth.user?.role === 'admin' ||
-                !m.createdBy ||
-                m.createdBy === auth.user?.id
-              }
-            />
-          </TabsContent>
+          <MaterialsPanel
+            materials={materialsApi.items}
+            auth={auth}
+            onSave={handleSaveMaterial}
+            onDelete={handleDeleteMaterial}
+          />
 
           <TabsContent value="github-editor" className="space-y-6">
             <Suspense fallback={<div className="text-muted-foreground p-4">Sablonszerkesztő betöltése…</div>}>
@@ -2790,393 +1953,94 @@ body {
         </Tabs>
       </div>
 
-      <InventoryDialog
-        open={inventoryDialogOpen}
-        onClose={() => {
-          setInventoryDialogOpen(false)
-          setSelectedInventoryItem(null)
-        }}
-        onSave={(itemData) => {
-          if (selectedInventoryItem) {
-            const before = inventory?.find((i) => i.id === selectedInventoryItem.id)
-            const after = before ? { ...before, ...itemData } : null
-            setInventory((current) =>
-              (current || []).map((item) =>
-                item.id === selectedInventoryItem.id ? { ...item, ...itemData } : item
-              )
-            )
-            if (before && after) {
-              const changes = diffObjects(
-                before as unknown as Record<string, unknown>,
-                after as unknown as Record<string, unknown>,
-                ['updatedAt', 'lastUpdated']
-              )
-              if (changes.length > 0) {
-                appendAudit(
-                  'inventory',
-                  'Készlet',
-                  selectedInventoryItem.id,
-                  before.productName || before.drawingNumber || selectedInventoryItem.id,
-                  'update',
-                  { changes, notes: before.customer }
-                )
-              }
-            }
-            toast.success('Készlet tétel frissítve')
-          } else {
-            const newItem: InventoryItem = {
-              id: generateId(),
-              ...itemData,
-              createdAt: new Date().toISOString(),
-            } as InventoryItem
-            setInventory((current) => [...(current || []), newItem])
-            appendAudit(
-              'inventory',
-              'Készlet',
-              newItem.id,
-              newItem.productName || newItem.drawingNumber || newItem.id,
-              'create',
-              { notes: `${newItem.customer || ''} · ${newItem.quantity} db` }
-            )
-            toast.success('Készlet tétel létrehozva')
-          }
-        }}
-        item={selectedInventoryItem}
-        products={products || []}
-      />
-
-      <InventoryAdjustDialog
-        open={inventoryAdjustDialogOpen}
-        onClose={() => {
-          setInventoryAdjustDialogOpen(false)
-          setSelectedInventoryItem(null)
-        }}
-        onSave={(adjustment) => {
-          if (!selectedInventoryItem) return
-
-          const transaction: InventoryTransaction = {
-            id: generateId(),
-            inventoryItemId: selectedInventoryItem.id,
-            type: adjustment.type,
-            quantity: adjustment.quantity,
-            notes: adjustment.notes,
-            createdAt: new Date().toISOString(),
-          }
-
-          setInventoryTransactions((current) => [...(current || []), transaction])
-
-          let beforeQty = selectedInventoryItem.quantity
-          let afterQty = beforeQty
-          setInventory((current) =>
-            (current || []).map((item) => {
-              if (item.id !== selectedInventoryItem.id) return item
-
-              let newQuantity = item.quantity
-              if (adjustment.type === 'in') {
-                newQuantity += adjustment.quantity
-              } else if (adjustment.type === 'out') {
-                newQuantity = Math.max(0, newQuantity - adjustment.quantity)
-              } else if (adjustment.type === 'adjustment') {
-                newQuantity = adjustment.quantity
-              }
-              afterQty = newQuantity
-              beforeQty = item.quantity
-
-              return {
-                ...item,
-                quantity: newQuantity,
-                lastUpdated: new Date().toISOString(),
-              }
-            })
-          )
-
-          // Audit-log: készletmozgás
-          appendAudit(
-            'inventory',
-            'Készlet',
-            selectedInventoryItem.id,
-            selectedInventoryItem.productName || selectedInventoryItem.drawingNumber || selectedInventoryItem.id,
-            adjustment.type,
-            {
-              changes: [
-                {
-                  field: 'quantity',
-                  label: 'Mennyiség (db)',
-                  before: beforeQty,
-                  after: afterQty,
-                },
-              ],
-              notes: adjustment.notes || `${adjustment.quantity} db`,
-            }
-          )
-
-          toast.success('Készlet módosítva')
-        }}
-        item={selectedInventoryItem}
-      />
-
-      <OrderDialog
-        open={orderDialogOpen}
-        onClose={() => {
-          setOrderDialogOpen(false)
-          setSelectedOrder(null)
-        }}
-        onSave={handleSaveOrder}
-        order={selectedOrder}
-        customers={customers || []}
-        products={products || []}
-        orders={orders || []}
-      />
-
-      <OrderBulkImportDialog
-        open={orderBulkImportDialogOpen}
-        onClose={() => setOrderBulkImportDialogOpen(false)}
-        onImport={handleOrderBulkImport}
-      />
-
-      <CustomerDialog
-        open={customerDialogOpen}
-        onClose={() => {
-          setCustomerDialogOpen(false)
-          setSelectedCustomer(null)
-        }}
-        onSave={handleSaveCustomer}
-        customer={selectedCustomer}
-        savedTemplates={savedTemplates?.map(t => t.data).filter(Boolean) || []}
-        labelTemplates={labelTemplates || []}
-      />
-
-      <BulkImportDialog
-        open={bulkImportDialogOpen}
-        onClose={() => setBulkImportDialogOpen(false)}
-        onImport={handleBulkImport}
-      />
-
-      <ProductDialog
-        open={productDialogOpen}
-        onClose={() => {
-          setProductDialogOpen(false)
-          setSelectedProduct(null)
-        }}
-        onSave={handleSaveProduct}
-        product={selectedProduct}
-      />
-
-      <ProductBulkImportDialog
-        open={productBulkImportDialogOpen}
-        onClose={() => setProductBulkImportDialogOpen(false)}
-        onImport={handleProductBulkImport}
-      />
-
-      {cmrSettingsDialogOpen && (
-        <Suspense fallback={null}>
-          <CmrSettingsDialog
-            open={cmrSettingsDialogOpen}
-            onClose={() => setCmrSettingsDialogOpen(false)}
-          />
-        </Suspense>
-      )}
-
-      {deliverySettingsDialogOpen && (
-        <Suspense fallback={null}>
-          <DeliverySettingsDialog
-            open={deliverySettingsDialogOpen}
-            onClose={() => setDeliverySettingsDialogOpen(false)}
-          />
-        </Suspense>
-      )}
-
-      <ValidationDialog
-        open={validationDialogOpen}
-        onClose={() => {
-          setValidationDialogOpen(false)
-          setPendingExportType(null)
-          setValidationResult(null)
-        }}
-        onContinue={handleValidationContinue}
-        validation={validationResult || { isValid: true, errors: [], warnings: [] }}
-        title={pendingExportType === 'cmr' ? 'CMR Export Ellenőrzés' : 'Szállítólevél Export Ellenőrzés'}
-        orders={(orders || []).filter(o => selectedOrderIds.includes(o.id))}
-        onEditOrder={handleEditOrder}
-        onEditSettings={() => {
-          if (pendingExportType === 'cmr') {
-            setCmrSettingsDialogOpen(true)
-          } else if (pendingExportType === 'delivery') {
-            setDeliverySettingsDialogOpen(true)
-          }
-        }}
-        exportType={pendingExportType || undefined}
-      />
-
-      <DocumentFilterDialog
-        open={newFilterDialogOpen}
-        onClose={() => setNewFilterDialogOpen(false)}
-        onSave={(filter) => {
-          const newFilter = {
-            id: Date.now().toString(),
-            ...filter,
-          }
-          setDocumentFilters((current) => [...(current || []), newFilter])
-          toast.success(`Szűrő "${filter.name}" létrehozva`)
-        }}
-      />
-
-      <OrderColumnFilterDialog
-        open={newOrderFilterDialogOpen}
-        onClose={() => setNewOrderFilterDialogOpen(false)}
-        onSave={(filter) => {
-          const newFilter = {
-            id: Date.now().toString(),
-            ...filter,
-          }
-          setOrderColumnFilters((current) => [...(current || []), newFilter])
-          setActiveOrderFilterId(newFilter.id)
-          toast.success(`Oszlop szűrő "${filter.name}" létrehozva és aktiválva`)
-        }}
-      />
-
-      {labelTemplateDialogOpen && (
-        <Suspense fallback={null}>
-          <LabelTemplateDialog
-            open={labelTemplateDialogOpen}
-            onClose={() => {
-              setLabelTemplateDialogOpen(false)
-              setSelectedLabelTemplate(null)
-            }}
-            onSave={(template) => {
-              if (selectedLabelTemplate) {
-                labelTemplatesApi.replace(template)
-                toast.success('Sablon frissítve')
-              } else {
-                labelTemplatesApi.add(template)
-                toast.success('Sablon létrehozva')
-              }
-              setLabelTemplateDialogOpen(false)
-              setSelectedLabelTemplate(null)
-            }}
-            template={selectedLabelTemplate || undefined}
-            onPreview={async (template) => {
-              if (selectedOrderIds.length === 0) {
-                const demoOrders = orders?.slice(0, 3) || []
-                if (demoOrders.length === 0) {
-                  toast.info('Nincs rendelés az előnézethez')
-                  return
-                }
-                const html = await previewLabels(demoOrders, customers || [], products || [], template, labelTemplates)
-                const win = window.open('', '_blank')
-                if (win) {
-                  win.document.write(html)
-                  win.document.close()
-                }
-              } else {
-                const selectedOrders = (orders || []).filter(o => selectedOrderIds.includes(o.id))
-                const html = await previewLabels(selectedOrders, customers || [], products || [], template, labelTemplates)
-                const win = window.open('', '_blank')
-                if (win) {
-                  win.document.write(html)
-                  win.document.close()
-                }
-              }
-            }}
-          />
-        </Suspense>
-      )}
-
-      <InventoryDeductionDialog
-        open={inventoryDeductionDialogOpen}
-        onClose={() => {
-          setInventoryDeductionDialogOpen(false)
-          setPendingDeductionResult(null)
-          setPendingStatusChange(null)
-          setPendingPostDeduction(null)
-          setDeductionContext('státuszváltás')
-        }}
-        onConfirm={handleConfirmInventoryDeduction}
-        deductionResult={pendingDeductionResult}
-        context={deductionContext}
-      />
-
-      <InventoryHistoryDialog
-        open={inventoryHistoryDialogOpen}
-        onClose={() => {
-          setInventoryHistoryDialogOpen(false)
-          setHistoryInventoryItem(null)
-        }}
-        item={historyInventoryItem}
-        transactions={inventoryTransactions || []}
-        orders={orders || []}
-      />
-
-      <WarehouseAddDialog
-        open={warehouseAddDialogOpen}
-        onClose={() => {
-          setWarehouseAddDialogOpen(false)
-          setWarehouseAddPrefillProductId(undefined)
-        }}
-        products={products || []}
-        inventory={inventory || []}
-        prefillProductId={warehouseAddPrefillProductId}
-        onSubmit={({ item, transaction, createdNew }) => {
-          if (createdNew) {
-            setInventory((current) => [...(current || []), item])
-            appendAudit(
-              'inventory',
-              'Készlet',
-              item.id,
-              item.productName || item.drawingNumber || item.id,
-              'create',
-              { notes: `${item.customer || ''} · ${item.quantity} db` }
-            )
-          } else {
-            const before = (inventory || []).find((i) => i.id === item.id)
-            setInventory((current) =>
-              (current || []).map((i) => (i.id === item.id ? item : i))
-            )
-            if (before) {
-              appendAudit(
-                'inventory',
-                'Készlet',
-                item.id,
-                item.productName || item.drawingNumber || item.id,
-                transaction.type,
-                {
-                  changes: [
-                    {
-                      field: 'quantity',
-                      label: 'Mennyiség (db)',
-                      before: before.quantity,
-                      after: item.quantity,
-                    },
-                  ],
-                  notes: transaction.notes,
-                }
-              )
-            }
-          }
-          setInventoryTransactions((current) => [...(current || []), transaction])
-        }}
-      />
-
-      <LabelPrintSettingsDialog
-        open={labelPrintSettingsDialogOpen}
-        onClose={() => setLabelPrintSettingsDialogOpen(false)}
-        onPrint={async (printSettings) => {
-          if (selectedOrderIds.length === 0) {
-            toast.error('Nincsenek kiválasztott rendelések')
-            return
-          }
-          const selectedOrders = (orders || []).filter(o => selectedOrderIds.includes(o.id))
-          const activeTemplate = labelTemplates?.find(t => t.id === activeLabelTemplateId)
-          await generateLabelsWithPrintSettings(
-            selectedOrders,
-            customers || [],
-            products || [],
-            activeTemplate,
-            printSettings,
-            labelTemplates
-          )
-        }}
-        defaultCopies={1}
+      <AppDialogs
+        inventoryDialogOpen={inventoryDialogOpen}
+        setInventoryDialogOpen={setInventoryDialogOpen}
+        selectedInventoryItem={selectedInventoryItem}
+        setSelectedInventoryItem={setSelectedInventoryItem}
+        inventory={inventory}
+        setInventory={setInventory}
+        products={products}
+        appendAudit={appendAudit}
+        inventoryAdjustDialogOpen={inventoryAdjustDialogOpen}
+        setInventoryAdjustDialogOpen={setInventoryAdjustDialogOpen}
+        inventoryTransactions={inventoryTransactions}
+        setInventoryTransactions={setInventoryTransactions}
+        inventoryDeductionDialogOpen={inventoryDeductionDialogOpen}
+        setInventoryDeductionDialogOpen={setInventoryDeductionDialogOpen}
+        pendingDeductionResult={pendingDeductionResult}
+        setPendingDeductionResult={setPendingDeductionResult}
+        pendingStatusChange={pendingStatusChange}
+        setPendingStatusChange={setPendingStatusChange}
+        setPendingPostDeduction={setPendingPostDeduction}
+        deductionContext={deductionContext}
+        setDeductionContext={setDeductionContext}
+        handleConfirmInventoryDeduction={handleConfirmInventoryDeduction}
+        inventoryHistoryDialogOpen={inventoryHistoryDialogOpen}
+        setInventoryHistoryDialogOpen={setInventoryHistoryDialogOpen}
+        historyInventoryItem={historyInventoryItem}
+        setHistoryInventoryItem={setHistoryInventoryItem}
+        orders={orders}
+        warehouseAddDialogOpen={warehouseAddDialogOpen}
+        setWarehouseAddDialogOpen={setWarehouseAddDialogOpen}
+        warehouseAddPrefillProductId={warehouseAddPrefillProductId}
+        setWarehouseAddPrefillProductId={setWarehouseAddPrefillProductId}
+        orderDialogOpen={orderDialogOpen}
+        setOrderDialogOpen={setOrderDialogOpen}
+        selectedOrder={selectedOrder}
+        setSelectedOrder={setSelectedOrder}
+        handleSaveOrder={handleSaveOrder}
+        customers={customers}
+        orderBulkImportDialogOpen={orderBulkImportDialogOpen}
+        setOrderBulkImportDialogOpen={setOrderBulkImportDialogOpen}
+        handleOrderBulkImport={handleOrderBulkImport}
+        validationDialogOpen={validationDialogOpen}
+        setValidationDialogOpen={setValidationDialogOpen}
+        validationResult={validationResult}
+        setValidationResult={setValidationResult}
+        pendingExportType={pendingExportType}
+        setPendingExportType={setPendingExportType}
+        handleValidationContinue={handleValidationContinue}
+        selectedOrderIds={selectedOrderIds}
+        handleEditOrder={handleEditOrder}
+        cmrSettingsDialogOpen={cmrSettingsDialogOpen}
+        setCmrSettingsDialogOpen={setCmrSettingsDialogOpen}
+        deliverySettingsDialogOpen={deliverySettingsDialogOpen}
+        setDeliverySettingsDialogOpen={setDeliverySettingsDialogOpen}
+        customerDialogOpen={customerDialogOpen}
+        setCustomerDialogOpen={setCustomerDialogOpen}
+        selectedCustomer={selectedCustomer}
+        setSelectedCustomer={setSelectedCustomer}
+        handleSaveCustomer={handleSaveCustomer}
+        savedTemplates={savedTemplates}
+        labelTemplates={labelTemplates}
+        bulkImportDialogOpen={bulkImportDialogOpen}
+        setBulkImportDialogOpen={setBulkImportDialogOpen}
+        handleBulkImport={handleBulkImport}
+        productDialogOpen={productDialogOpen}
+        setProductDialogOpen={setProductDialogOpen}
+        selectedProduct={selectedProduct}
+        setSelectedProduct={setSelectedProduct}
+        handleSaveProduct={handleSaveProduct}
+        productBulkImportDialogOpen={productBulkImportDialogOpen}
+        setProductBulkImportDialogOpen={setProductBulkImportDialogOpen}
+        handleProductBulkImport={handleProductBulkImport}
+        newFilterDialogOpen={newFilterDialogOpen}
+        setNewFilterDialogOpen={setNewFilterDialogOpen}
+        setDocumentFilters={setDocumentFilters}
+        newOrderFilterDialogOpen={newOrderFilterDialogOpen}
+        setNewOrderFilterDialogOpen={setNewOrderFilterDialogOpen}
+        setOrderColumnFilters={setOrderColumnFilters}
+        setActiveOrderFilterId={setActiveOrderFilterId}
+        labelTemplateDialogOpen={labelTemplateDialogOpen}
+        setLabelTemplateDialogOpen={setLabelTemplateDialogOpen}
+        selectedLabelTemplate={selectedLabelTemplate}
+        setSelectedLabelTemplate={setSelectedLabelTemplate}
+        labelTemplatesApiAdd={labelTemplatesApi.add}
+        labelTemplatesApiReplace={labelTemplatesApi.replace}
+        activeLabelTemplateId={activeLabelTemplateId}
+        labelPrintSettingsDialogOpen={labelPrintSettingsDialogOpen}
+        setLabelPrintSettingsDialogOpen={setLabelPrintSettingsDialogOpen}
       />
     </div>
   )

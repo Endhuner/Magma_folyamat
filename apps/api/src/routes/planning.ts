@@ -143,6 +143,42 @@ export async function planningRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ ok: true })
   })
 
+  // DELETE /machine-planning/order/:orderId — egy rendelés összes hozzárendelésének törlése (Elkészült státusz esetén)
+  app.delete<{ Params: { orderId: string } }>('/machine-planning/order/:orderId', { preHandler: [tryAuth] }, async (req, reply) => {
+    const db = getDb()
+    const { orderId } = req.params
+
+    const existing = db.select().from(machinePlanningAssignments)
+      .where(eq(machinePlanningAssignments.orderId, orderId))
+      .get()
+
+    if (!existing) return reply.code(204).send()
+
+    db.delete(machinePlanningAssignments)
+      .where(eq(machinePlanningAssignments.orderId, orderId))
+      .run()
+
+    const { userId, userName } = userOf(req)
+    db.insert(machinePlanningLog).values({
+      id: uuidv4(),
+      machineId: existing.machineId,
+      orderId,
+      action: 'removed' as const,
+      productName: '',
+      designation: '',
+      ownOrderNumber: '',
+      customer: '',
+      fromMachineId: '',
+      userId,
+      userName,
+      timestamp: nowIso(),
+      createdAt: nowIso(),
+    }).run()
+
+    broadcast({ type: 'order', action: 'update', id: orderId })
+    return reply.code(204).send()
+  })
+
   // DELETE /machine-planning/:id — hozzárendelés törlése
   app.delete<{ Params: { id: string } }>('/machine-planning/:id', { preHandler: [tryAuth] }, async (req, reply) => {
     const db = getDb()

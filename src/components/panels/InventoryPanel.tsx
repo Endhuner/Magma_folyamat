@@ -14,7 +14,7 @@
 import { Button } from '@/components/ui/button'
 import { TabsContent } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
-import { Plus, MagnifyingGlass } from '@phosphor-icons/react'
+import { Plus, MagnifyingGlass, Warning } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { InventoryTable } from '@/components/InventoryTable'
 import type {
@@ -28,6 +28,7 @@ import type {
 
 export interface InventoryPanelProps {
   inventory: InventoryItem[] | null | undefined
+  lowStockItems?: InventoryItem[]
   setInventory: (
     updater: (current: InventoryItem[] | null | undefined) => InventoryItem[]
   ) => void
@@ -61,6 +62,7 @@ export function InventoryPanel({
   setInventory,
   products,
   orders,
+  lowStockItems = [],
   inventorySearchQuery,
   setInventorySearchQuery,
   setSelectedInventoryItem,
@@ -101,6 +103,29 @@ export function InventoryPanel({
           </Button>
         </div>
       </div>
+
+      {lowStockItems.length > 0 && (
+        <div className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+          <Warning className="w-5 h-5 text-destructive mt-0.5 shrink-0" weight="fill" />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-destructive text-sm">
+              {lowStockItems.length} termék készlete a küszöb alatt van
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {lowStockItems.slice(0, 5).map(item => (
+                <li key={item.id} className="text-sm text-muted-foreground truncate">
+                  {item.productName} ({item.drawingNumber}) — {item.quantity} db
+                </li>
+              ))}
+              {lowStockItems.length > 5 && (
+                <li className="text-sm text-muted-foreground">
+                  … és még {lowStockItems.length - 5} tétel
+                </li>
+              )}
+            </ul>
+          </div>
+        </div>
+      )}
 
       <div className="relative">
         <MagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
