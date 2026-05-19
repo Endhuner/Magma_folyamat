@@ -16,7 +16,7 @@ import { hu } from 'date-fns/locale'
 interface TemplateData {
   id: string
   name: string
-  type: 'cmr' | 'delivery'
+  type: 'cmr' | 'delivery' | 'pallet'
   html: string
   css: string
   timestamp: string
@@ -32,8 +32,8 @@ interface SavedTemplate {
 }
 
 interface TemplateBackupRestoreProps {
-  activeTemplates: { cmr?: string; delivery?: string }
-  setActiveTemplates: (v: { cmr?: string; delivery?: string }) => Promise<void>
+  activeTemplates: { cmr?: string; delivery?: string; pallet?: string }
+  setActiveTemplates: (v: { cmr?: string; delivery?: string; pallet?: string }) => Promise<void>
 }
 
 export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: TemplateBackupRestoreProps) {
@@ -54,20 +54,23 @@ export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: T
   
   const [saveName, setSaveName] = useState('')
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
-  const [templateTypeToSave, setTemplateTypeToSave] = useState<'cmr' | 'delivery' | null>(null)
+  const [templateTypeToSave, setTemplateTypeToSave] = useState<'cmr' | 'delivery' | 'pallet' | null>(null)
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false)
   const [templateToRestore, setTemplateToRestore] = useState<SavedTemplate | null>(null)
 
-  const handleSaveTemplate = (type: 'cmr' | 'delivery') => {
+  const typeLabel = (type: 'cmr' | 'delivery' | 'pallet') =>
+    type === 'cmr' ? 'CMR' : type === 'pallet' ? 'Raklap cimke' : 'Szállítólevél'
+
+  const handleSaveTemplate = (type: 'cmr' | 'delivery' | 'pallet') => {
     const templateToSave = (templates || []).find(t => t.type === type)
-    
+
     if (!templateToSave) {
-      toast.error(`Nincs ${type === 'cmr' ? 'CMR' : 'szállítólevél'} sablon`)
+      toast.error(`Nincs ${typeLabel(type)} sablon`)
       return
     }
-    
+
     setTemplateTypeToSave(type)
-    setSaveName(`${type === 'cmr' ? 'CMR' : 'Szállítólevél'} Sablon - ${format(new Date(), 'yyyy.MM.dd HH:mm', { locale: hu })}`)
+    setSaveName(`${typeLabel(type)} Sablon - ${format(new Date(), 'yyyy.MM.dd HH:mm', { locale: hu })}`)
     setSaveDialogOpen(true)
   }
 
@@ -119,6 +122,9 @@ export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: T
     if (templateData.type === 'cmr') {
       void setActiveTemplates({ ...activeTemplates, cmr: templateToRestore.id })
       toast.success('CMR sablon aktiválva')
+    } else if (templateData.type === 'pallet') {
+      void setActiveTemplates({ ...activeTemplates, pallet: templateToRestore.id })
+      toast.success('Raklap cimke sablon aktiválva')
     } else {
       void setActiveTemplates({ ...activeTemplates, delivery: templateToRestore.id })
       toast.success('Szállítólevél sablon aktiválva')
@@ -195,9 +201,11 @@ export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: T
 
   const cmrTemplate = (templates || []).find(t => t.type === 'cmr')
   const deliveryTemplate = (templates || []).find(t => t.type === 'delivery')
-  
+  const palletTemplate = (templates || []).find(t => t.type === 'pallet')
+
   const cmrTemplateExists = cmrTemplate && cmrTemplate.html && cmrTemplate.html.length > 0
   const deliveryTemplateExists = deliveryTemplate && deliveryTemplate.html && deliveryTemplate.html.length > 0
+  const palletTemplateExists = palletTemplate && palletTemplate.html && palletTemplate.html.length > 0
 
   return (
     <div className="space-y-6">
@@ -206,7 +214,7 @@ export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: T
         <p className="text-muted-foreground">Sablonok mentése és visszatöltése</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -280,6 +288,43 @@ export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: T
             )}
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Raklap Cimke Sablon</span>
+              {activeTemplates?.pallet && (
+                <Badge variant="default" className="gap-1">
+                  <Check className="w-3 h-3" />
+                  Aktív
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {palletTemplateExists ? (
+              <>
+                <div className="text-sm text-muted-foreground">
+                  <p>Méret: {formatFileSize(JSON.stringify(palletTemplate).length)}</p>
+                  {palletTemplate.timestamp && (
+                    <p>Utolsó módosítás: {format(new Date(palletTemplate.timestamp), 'yyyy.MM.dd HH:mm', { locale: hu })}</p>
+                  )}
+                </div>
+                <Button onClick={() => handleSaveTemplate('pallet')} className="w-full">
+                  <FloppyDisk className="w-4 h-4 mr-2" />
+                  Sablon mentése
+                </Button>
+              </>
+            ) : (
+              <Alert>
+                <Info className="w-4 h-4" />
+                <AlertDescription>
+                  Nincs raklap cimke sablon. Hozz létre egyet a Sablon Szerkesztőben.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -308,7 +353,7 @@ export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: T
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-semibold truncate">{template.name}</h3>
                           <Badge variant="outline">
-                            {template.data.type === 'cmr' ? 'CMR' : 'Szállítólevél'}
+                            {template.data.type === 'cmr' ? 'CMR' : template.data.type === 'pallet' ? 'Raklap cimke' : 'Szállítólevél'}
                           </Badge>
                           {activeTemplates?.[template.data.type] === template.id && (
                             <Badge variant="default" className="gap-1">
@@ -403,7 +448,7 @@ export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: T
                 <AlertDescription>
                   <p className="font-semibold mb-1">{templateToRestore.name}</p>
                   <p className="text-sm">
-                    Ez a sablon lesz használva a {templateToRestore.data.type === 'cmr' ? 'CMR' : 'szállítólevél'} dokumentumok generálásakor.
+                    Ez a sablon lesz használva a {templateToRestore.data.type === 'cmr' ? 'CMR' : templateToRestore.data.type === 'pallet' ? 'raklap cimke' : 'szállítólevél'} dokumentumok generálásakor.
                   </p>
                 </AlertDescription>
               </Alert>

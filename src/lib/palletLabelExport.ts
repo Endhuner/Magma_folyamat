@@ -330,7 +330,8 @@ export function generatePalletLabels(
   orders: Order[],
   customers: Customer[],
   products: Product[],
-  savedTemplatesOverride?: Array<{ id: string; data: { type: string; html: string; css: string } }>
+  savedTemplatesOverride?: Array<{ id: string; data: { type: string; html: string; css: string } }>,
+  activeTemplatesOverride?: { pallet?: string }
 ): void {
   const allLabels: PalletLabelData[] = []
 
@@ -349,8 +350,10 @@ export function generatePalletLabels(
     return
   }
 
-  // Mentett raklap sablon keresése
-  const savedPalletTemplate = savedTemplatesOverride?.find(t => t.data?.type === 'pallet')
+  // Mentett raklap sablon keresése — aktív sablon ID szerint, fallback: első pallet típusú
+  const savedPalletTemplate = activeTemplatesOverride?.pallet
+    ? savedTemplatesOverride?.find(t => t.id === activeTemplatesOverride.pallet)
+    : savedTemplatesOverride?.find(t => t.data?.type === 'pallet')
 
   const html = savedPalletTemplate
     ? buildHTMLFromTemplate(allLabels, savedPalletTemplate.data.html, savedPalletTemplate.data.css)

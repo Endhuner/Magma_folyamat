@@ -90,6 +90,7 @@ export interface OrdersPanelProps {
   labelTemplates: LabelTemplate[] | null | undefined
   activeLabelTemplateId: string | null | undefined
   savedDeliveryTemplates?: Array<{ id: string; data: { type: string; html: string; css: string } }> | null
+  activeTemplates?: { cmr?: string; delivery?: string; pallet?: string }
 
   // UI state
   hideDelivered: boolean
@@ -142,6 +143,7 @@ export function OrdersPanel({
   labelTemplates,
   activeLabelTemplateId,
   savedDeliveryTemplates,
+  activeTemplates,
   hideDelivered,
   setHideDelivered,
   yearFilterEnabled,
@@ -490,7 +492,8 @@ export function OrdersPanel({
                         selectedOrders,
                         customers || [],
                         products || [],
-                        savedDeliveryTemplates || undefined
+                        savedDeliveryTemplates || undefined,
+                        activeTemplates
                       )
                     }}
                     className="pl-6 gap-2 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:bg-blue-100 dark:text-blue-300 dark:bg-blue-950/30 dark:hover:bg-blue-950/50"
