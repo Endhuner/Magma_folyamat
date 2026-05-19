@@ -774,14 +774,6 @@ export async function exportCmrAsHtml(
     console.log('Margók alkalmazva: NINCS (alapértelmezett 10mm használata)')
   }
   
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = fileName
-  link.click()
-  URL.revokeObjectURL(url)
-
   const newWindow = window.open('', '_blank')
   if (newWindow) {
     newWindow.document.write(html)

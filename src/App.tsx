@@ -1839,6 +1839,7 @@ function App() {
             customers={customers}
             products={products}
             labelTemplates={labelTemplates}
+            savedDeliveryTemplates={savedTemplates}
             activeLabelTemplateId={activeLabelTemplateId}
             hideDelivered={hideDelivered}
             setHideDelivered={setHideDelivered}

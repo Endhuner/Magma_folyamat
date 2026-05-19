@@ -23,7 +23,8 @@ function buildPalletLabels(order: Order, customer: Customer, product: Product): 
   const totalBoxes = order.boxesCount || 1
   const boxesPerPallet = parseInt(product.boxesPerPallet || '1') || 1
   const piecesPerBox = parseInt(product.piecesPerBox || '1') || 1
-  const weightPerPiece = parseFloat(product.weightPerPiece || '0') || 0
+  // weightPerPiece gramm-ban van tárolva → kg-ba konvertálás
+  const weightPerPieceG = parseFloat(product.weightPerPiece || '0') || 0
   const grossWeightKg = parseFloat(order.grossWeightKg || '0') || 0
 
   const labels: PalletLabelData[] = []
@@ -34,8 +35,8 @@ function buildPalletLabels(order: Order, customer: Customer, product: Product): 
     const remainingBoxes = totalBoxes - boxesAlreadyAssigned
     const boxesOnPallet = isLast ? remainingBoxes : boxesPerPallet
     const totalPieces = boxesOnPallet * piecesPerBox
-    const nettoKg = parseFloat((weightPerPiece * totalPieces).toFixed(3))
-    const bruttoKg = parseFloat((grossWeightKg * (boxesOnPallet / totalBoxes)).toFixed(3))
+    const nettoKg = Math.round((weightPerPieceG / 1000) * totalPieces)
+    const bruttoKg = Math.round(grossWeightKg * (boxesOnPallet / totalBoxes))
 
     labels.push({
       palletIndex: i + 1,
@@ -81,7 +82,7 @@ function renderLabel(d: PalletLabelData): string {
       <!-- Rendelési azonosítók -->
       <div class="info-row">
         <div class="info-label">Order No.:</div>
-        <div class="info-value bold">${d.orderNo}</div>
+        <div class="info-value order-no">${d.orderNo}</div>
       </div>
       <div class="info-row">
         <div class="info-label">Cikkszám / Artikelnummer:</div>
@@ -204,6 +205,11 @@ function buildHTML(labels: PalletLabelData[]): string {
     .info-value.bold {
       font-weight: bold;
     }
+    .info-value.order-no {
+      font-size: 24pt;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+    }
 
     /* ── mennyiség ── */
     .qty-row {
@@ -276,7 +282,56 @@ ${rendered}
 </html>`
 }
 
-export function generatePalletLabels(orders: Order[], customers: Customer[], products: Product[]): void {
+function applyPalletTemplate(templateHtml: string, templateCss: string, d: PalletLabelData): string {
+  const vars: Record<string, string> = {
+    customerName: d.customerName,
+    customerCity: d.customerCity,
+    customerStreet: d.customerStreet,
+    customerPostalCode: d.customerPostalCode,
+    orderNo: d.orderNo,
+    drawingNumber: d.drawingNumber,
+    boxesOnPallet: String(d.boxesOnPallet),
+    piecesPerBox: String(d.piecesPerBox),
+    totalPieces: String(d.totalPieces),
+    nettoKg: String(d.nettoKg),
+    bruttoKg: String(d.bruttoKg),
+    palletIndex: String(d.palletIndex),
+    totalPallets: String(d.totalPallets),
+  }
+  let html = templateHtml
+  for (const [key, val] of Object.entries(vars)) {
+    html = html.replace(new RegExp(`{{${key}}}`, 'g'), val)
+  }
+  return html
+}
+
+function buildHTMLFromTemplate(labels: PalletLabelData[], templateHtml: string, templateCss: string): string {
+  const rendered = labels.map(d => applyPalletTemplate(templateHtml, templateCss, d)).join('\n')
+  return `<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <title>Raklap cimke</title>
+  <style>
+    @page { size: A4; margin: 10mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #000; }
+    ${templateCss}
+    @media print { body { margin: 0; } }
+  </style>
+</head>
+<body>
+${rendered}
+</body>
+</html>`
+}
+
+export function generatePalletLabels(
+  orders: Order[],
+  customers: Customer[],
+  products: Product[],
+  savedTemplatesOverride?: Array<{ id: string; data: { type: string; html: string; css: string } }>
+): void {
   const allLabels: PalletLabelData[] = []
 
   for (const order of orders) {
@@ -294,7 +349,13 @@ export function generatePalletLabels(orders: Order[], customers: Customer[], pro
     return
   }
 
-  const html = buildHTML(allLabels)
+  // Mentett raklap sablon keresése
+  const savedPalletTemplate = savedTemplatesOverride?.find(t => t.data?.type === 'pallet')
+
+  const html = savedPalletTemplate
+    ? buildHTMLFromTemplate(allLabels, savedPalletTemplate.data.html, savedPalletTemplate.data.css)
+    : buildHTML(allLabels)
+
   const win = window.open('', '_blank')
   if (!win) return
   win.document.write(html)
