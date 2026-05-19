@@ -18,7 +18,7 @@ import { hu } from 'date-fns/locale'
 interface TemplateData {
   id: string
   name: string
-  type: 'cmr' | 'delivery'
+  type: 'cmr' | 'delivery' | 'pallet'
   html: string
   css: string
   timestamp: string
@@ -43,6 +43,84 @@ const DEFAULT_CMR_HTML = ``
 const DEFAULT_CMR_CSS = ``
 const DEFAULT_DELIVERY_HTML = ``
 const DEFAULT_DELIVERY_CSS = ``
+
+const DEFAULT_PALLET_HTML = `<div class="pallet-label">
+  <div class="header-row">
+    <div class="header-cell">
+      <div class="header-title">Vevő / Kaufer</div>
+      <div class="address-name">{{customerName}}</div>
+      <div class="address-line">{{customerCity}}</div>
+      <div class="address-line">{{customerStreet}}</div>
+      <div class="address-line">{{customerPostalCode}}</div>
+    </div>
+    <div class="header-cell right-cell">
+      <div class="header-title">Feladó / Absender</div>
+      <div class="address-name">MAGMA KFT</div>
+      <div class="address-line">Budapest</div>
+      <div class="address-line">Déli u. 13.</div>
+      <div class="address-line">H-1211</div>
+    </div>
+  </div>
+  <div class="info-row">
+    <div class="info-label">Order No.:</div>
+    <div class="info-value order-no">{{orderNo}}</div>
+  </div>
+  <div class="info-row">
+    <div class="info-label">Cikkszám / Artikelnummer:</div>
+    <div class="info-value bold">{{drawingNumber}}</div>
+  </div>
+  <div class="qty-row">
+    <div class="qty-cell">
+      <div class="qty-number">{{boxesOnPallet}}</div>
+      <div class="qty-unit">karton / Karton</div>
+    </div>
+    <div class="qty-cell">
+      <div class="qty-number">{{piecesPerBox}}</div>
+      <div class="qty-unit">db/karton / Stk/Karton</div>
+    </div>
+    <div class="qty-cell highlight">
+      <div class="qty-number">{{totalPieces}}</div>
+      <div class="qty-unit">db / Stück</div>
+    </div>
+  </div>
+  <div class="weight-row">
+    <div class="weight-cell">
+      <span class="weight-label">Nettó:</span>
+      <span class="weight-value">{{nettoKg}} kg</span>
+    </div>
+    <div class="weight-cell">
+      <span class="weight-label">Bruttó:</span>
+      <span class="weight-value">{{bruttoKg}} kg</span>
+    </div>
+  </div>
+  <div class="pallet-counter">Raklap / Palette: {{palletIndex}} / {{totalPallets}}</div>
+</div>`
+
+const DEFAULT_PALLET_CSS = `* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #000; }
+.pallet-label { width: 190mm; min-height: 130mm; border: 2px solid #000; padding: 6mm; margin-bottom: 10mm; page-break-inside: avoid; display: flex; flex-direction: column; gap: 4mm; }
+.header-row { display: flex; gap: 4mm; border-bottom: 1.5px solid #000; padding-bottom: 4mm; }
+.header-cell { flex: 1; }
+.right-cell { border-left: 1.5px solid #000; padding-left: 4mm; }
+.header-title { font-size: 8pt; font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2mm; }
+.address-name { font-size: 13pt; font-weight: bold; line-height: 1.3; }
+.address-line { font-size: 11pt; line-height: 1.4; }
+.info-row { display: flex; gap: 3mm; align-items: baseline; }
+.info-label { font-size: 9pt; color: #444; min-width: 42mm; }
+.info-value { font-size: 14pt; }
+.info-value.bold { font-weight: bold; }
+.info-value.order-no { font-size: 24pt; font-weight: bold; letter-spacing: 0.5px; }
+.qty-row { display: flex; gap: 3mm; border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; padding: 3mm 0; }
+.qty-cell { flex: 1; text-align: center; border-right: 1px solid #ccc; padding: 1mm 2mm; }
+.qty-cell:last-child { border-right: none; }
+.qty-cell.highlight { background: #f0f0f0; }
+.qty-number { font-size: 22pt; font-weight: bold; line-height: 1.1; }
+.qty-unit { font-size: 8pt; color: #555; margin-top: 1mm; }
+.weight-row { display: flex; gap: 8mm; }
+.weight-cell { display: flex; gap: 2mm; align-items: baseline; }
+.weight-label { font-size: 9pt; color: #444; }
+.weight-value { font-size: 13pt; font-weight: bold; }
+.pallet-counter { margin-top: auto; text-align: right; font-size: 9pt; color: #666; border-top: 1px solid #ccc; padding-top: 2mm; }`
 
 // --- Változó lista definíció ---
 const TEMPLATE_VARIABLES = [
@@ -120,6 +198,24 @@ const TEMPLATE_VARIABLES = [
       { token: '{{volume}}',         label: 'Térfogat (m³)' },
     ],
   },
+  {
+    group: '📦 Raklap cimke változók',
+    vars: [
+      { token: '{{customerName}}',      label: 'Vevő neve' },
+      { token: '{{customerCity}}',      label: 'Vevő városa' },
+      { token: '{{customerStreet}}',    label: 'Vevő utcája' },
+      { token: '{{customerPostalCode}}',label: 'Vevő irányítószáma' },
+      { token: '{{orderNo}}',           label: 'Vevő rendelési száma' },
+      { token: '{{drawingNumber}}',     label: 'Cikkszám / Rajzszám' },
+      { token: '{{boxesOnPallet}}',     label: 'Karton ezen a raklapon' },
+      { token: '{{piecesPerBox}}',      label: 'Db/karton' },
+      { token: '{{totalPieces}}',       label: 'Összes db (raklapon)' },
+      { token: '{{nettoKg}}',           label: 'Nettó súly (kg)' },
+      { token: '{{bruttoKg}}',          label: 'Bruttó súly (kg)' },
+      { token: '{{palletIndex}}',       label: 'Raklap sorszáma' },
+      { token: '{{totalPallets}}',      label: 'Összes raklap' },
+    ],
+  },
 ]
 
 export function GithubStyleTemplateEditor() {
@@ -165,7 +261,7 @@ export function GithubStyleTemplateEditor() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [templateDescription, setTemplateDescription] = useState('')
-  const [templateType, setTemplateType] = useState<'cmr' | 'delivery'>('delivery')
+  const [templateType, setTemplateType] = useState<'cmr' | 'delivery' | 'pallet'>('delivery')
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importFileContent, setImportFileContent] = useState('')
 
@@ -376,6 +472,17 @@ export function GithubStyleTemplateEditor() {
         orderNumber: o.orderNumber || 'N/A', ownOrderNumber: o.ownOrderNumber || 'N/A',
       })),
       totalQuantity: String(totalQuantity), totalBoxes: String(totalBoxes), totalPallets: String(totalPallets), totalWeight: totalWeight.toFixed(2),
+      // Raklap cimke előnézet adatok
+      customerStreet: (sampleCustomer as any).street || 'Minta utca 1.',
+      customerPostalCode: (sampleCustomer as any).postalCode || '1234',
+      orderNo: sampleOrders[0].orderNumber || '4500104784',
+      drawingNumber: 'MA51',
+      boxesOnPallet: 45,
+      piecesPerBox: 350,
+      totalPieces: 15750,
+      nettoKg: 449,
+      bruttoKg: 479,
+      palletIndex: 1,
     }
   }
 
@@ -429,7 +536,9 @@ export function GithubStyleTemplateEditor() {
   const handleCreateNewTemplate = () => {
     if (!templateName.trim()) { toast.error('Add meg a sablon nevét'); return }
     const newId = `template-${Date.now()}`
-    const newData: TemplateData = { id: newId, name: templateName, type: templateType, html: templateType === 'cmr' ? DEFAULT_CMR_HTML : DEFAULT_DELIVERY_HTML, css: templateType === 'cmr' ? DEFAULT_CMR_CSS : DEFAULT_DELIVERY_CSS, timestamp: new Date().toISOString(), description: templateDescription }
+    const defaultHtml = templateType === 'cmr' ? DEFAULT_CMR_HTML : templateType === 'pallet' ? DEFAULT_PALLET_HTML : DEFAULT_DELIVERY_HTML
+    const defaultCss  = templateType === 'cmr' ? DEFAULT_CMR_CSS  : templateType === 'pallet' ? DEFAULT_PALLET_CSS  : DEFAULT_DELIVERY_CSS
+    const newData: TemplateData = { id: newId, name: templateName, type: templateType, html: defaultHtml, css: defaultCss, timestamp: new Date().toISOString(), description: templateDescription }
     const saveName = `${templateName} - ${format(new Date(), 'yyyy.MM.dd HH:mm', { locale: hu })}`
     setSavedTemplates(cur => [{ id: newId, name: saveName, timestamp: new Date().toISOString(), size: JSON.stringify(newData).length, data: newData }, ...(cur || [])])
     setSelectedTemplate(newData); setSelectedTemplateId(newId); setHtmlContent(newData.html); setCssContent(newData.css)
@@ -511,8 +620,9 @@ export function GithubStyleTemplateEditor() {
 
   const handleResetToDefault = () => {
     if (!confirm('Biztosan visszaállítod az alapértelmezett sablont?')) return
-    setHtmlContent(selectedTemplate?.type === 'cmr' ? DEFAULT_CMR_HTML : DEFAULT_DELIVERY_HTML)
-    setCssContent(selectedTemplate?.type === 'cmr' ? DEFAULT_CMR_CSS : DEFAULT_DELIVERY_CSS)
+    const t = selectedTemplate?.type
+    setHtmlContent(t === 'cmr' ? DEFAULT_CMR_HTML : t === 'pallet' ? DEFAULT_PALLET_HTML : DEFAULT_DELIVERY_HTML)
+    setCssContent(t === 'cmr' ? DEFAULT_CMR_CSS : t === 'pallet' ? DEFAULT_PALLET_CSS : DEFAULT_DELIVERY_CSS)
     toast.success('Alapértelmezett sablon visszaállítva')
   }
 
@@ -579,7 +689,7 @@ export function GithubStyleTemplateEditor() {
                             <div className="font-medium text-xs truncate leading-tight">{saved.name}</div>
                             <div className="flex items-center gap-1 mt-1">
                               <Badge variant="outline" className="text-[10px] py-0 px-1">
-                                {saved.data.type === 'cmr' ? 'CMR' : 'Szállítólevél'}
+                                {saved.data.type === 'cmr' ? 'CMR' : saved.data.type === 'pallet' ? 'Raklap cimke' : 'Szállítólevél'}
                               </Badge>
                               {hasUnsavedChanges && selectedTemplate?.id === saved.id && (
                                 <span className="text-[10px] text-amber-500 font-semibold">● módosítva</span>
@@ -810,11 +920,12 @@ export function GithubStyleTemplateEditor() {
             </div>
             <div>
               <Label>Típus</Label>
-              <Select value={templateType} onValueChange={v => setTemplateType(v as 'cmr' | 'delivery')}>
+              <Select value={templateType} onValueChange={v => setTemplateType(v as 'cmr' | 'delivery' | 'pallet')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="delivery">Szállítólevél</SelectItem>
                   <SelectItem value="cmr">CMR</SelectItem>
+                  <SelectItem value="pallet">Raklap cimke</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -89,6 +89,7 @@ export interface OrdersPanelProps {
   products: Product[] | null | undefined
   labelTemplates: LabelTemplate[] | null | undefined
   activeLabelTemplateId: string | null | undefined
+  savedDeliveryTemplates?: Array<{ id: string; data: { type: string; html: string; css: string } }> | null
 
   // UI state
   hideDelivered: boolean
@@ -140,6 +141,7 @@ export function OrdersPanel({
   products,
   labelTemplates,
   activeLabelTemplateId,
+  savedDeliveryTemplates,
   hideDelivered,
   setHideDelivered,
   yearFilterEnabled,
@@ -487,7 +489,8 @@ export function OrdersPanel({
                       generatePalletLabels(
                         selectedOrders,
                         customers || [],
-                        products || []
+                        products || [],
+                        savedDeliveryTemplates || undefined
                       )
                     }}
                     className="pl-6 gap-2 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:bg-blue-100 dark:text-blue-300 dark:bg-blue-950/30 dark:hover:bg-blue-950/50"
@@ -621,7 +624,9 @@ export function OrdersPanel({
       />
 
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Törlés megerősítése</AlertDialogTitle>
             <AlertDialogDescription>
