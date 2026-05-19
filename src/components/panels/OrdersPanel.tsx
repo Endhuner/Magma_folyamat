@@ -56,6 +56,7 @@ import {
   CopySimple,
   DownloadSimple,
   Export,
+  Package,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { OrdersTable } from '@/components/OrdersTable'
@@ -67,6 +68,7 @@ import {
 } from '@/lib/labelTemplate'
 import type { Order, OrderStatus, Customer, Product } from '@/lib/types'
 import { downloadOrderImportTemplate, exportOrdersToExcel } from '@/lib/orderExcelExport'
+import { generatePalletLabels } from '@/lib/palletLabelExport'
 
 export interface OrderColumnFilter {
   id: string
@@ -473,6 +475,25 @@ export function OrdersPanel({
                     className="pl-6"
                   >
                     Címkék vevőnként (külön fájlok)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled
+                    className="font-semibold text-foreground opacity-100 mt-1"
+                  >
+                    Raklap cimke
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      generatePalletLabels(
+                        selectedOrders,
+                        customers || [],
+                        products || []
+                      )
+                    }}
+                    className="pl-6 gap-2 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:bg-blue-100 dark:text-blue-300 dark:bg-blue-950/30 dark:hover:bg-blue-950/50"
+                  >
+                    <Package className="w-4 h-4" />
+                    Raklap cimke nyomtatás
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
