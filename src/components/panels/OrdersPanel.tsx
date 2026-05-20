@@ -90,7 +90,8 @@ export interface OrdersPanelProps {
   products: Product[] | null | undefined
   labelTemplates: LabelTemplate[] | null | undefined
   activeLabelTemplateId: string | null | undefined
-  savedDeliveryTemplates?: Array<{ id: string; data: { type: string; html: string; css: string } }> | null
+  savedDeliveryTemplates?: Array<{ id: string; data: { type: string; html: string; css: string; active?: boolean } }> | null
+  activeTemplates?: { cmr?: string; delivery?: string; pallet?: string; 'box-label'?: string }
 
   // UI state
   hideDelivered: boolean
@@ -143,6 +144,7 @@ export function OrdersPanel({
   labelTemplates,
   activeLabelTemplateId,
   savedDeliveryTemplates,
+  activeTemplates,
   hideDelivered,
   setHideDelivered,
   yearFilterEnabled,
@@ -487,12 +489,12 @@ export function OrdersPanel({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => {
-                      generatePalletLabels(
-                        selectedOrders,
-                        customers || [],
-                        products || [],
-                        savedDeliveryTemplates || undefined
-                      )
+                      const templates = savedDeliveryTemplates
+                        ? activeTemplates?.pallet
+                          ? [...savedDeliveryTemplates].sort((a, b) => a.id === activeTemplates.pallet ? -1 : b.id === activeTemplates.pallet ? 1 : 0)
+                          : savedDeliveryTemplates
+                        : undefined
+                      generatePalletLabels(selectedOrders, customers || [], products || [], templates || undefined)
                     }}
                     className="pl-6 gap-2 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:bg-blue-100 dark:text-blue-300 dark:bg-blue-950/30 dark:hover:bg-blue-950/50"
                   >
@@ -507,12 +509,12 @@ export function OrdersPanel({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => {
-                      generateBoxLabels(
-                        selectedOrders,
-                        customers || [],
-                        products || [],
-                        savedDeliveryTemplates || undefined
-                      )
+                      const templates = savedDeliveryTemplates
+                        ? activeTemplates?.['box-label']
+                          ? [...savedDeliveryTemplates].sort((a, b) => a.id === activeTemplates['box-label'] ? -1 : b.id === activeTemplates['box-label'] ? 1 : 0)
+                          : savedDeliveryTemplates
+                        : undefined
+                      generateBoxLabels(selectedOrders, customers || [], products || [], templates || undefined)
                     }}
                     className="pl-6 gap-2 text-purple-700 bg-purple-50 hover:bg-purple-100 focus:bg-purple-100 dark:text-purple-300 dark:bg-purple-950/30 dark:hover:bg-purple-950/50"
                   >

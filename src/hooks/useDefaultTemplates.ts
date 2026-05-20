@@ -7,6 +7,7 @@ const CMR_DEFAULT_ID = 'template-cmr-default'
 
 interface SavedTemplateApi {
   items: Array<{ id?: string; name?: string; [key: string]: unknown }>
+  loading?: boolean
   add: (item: unknown) => void
 }
 
@@ -14,8 +15,8 @@ export function useDefaultTemplates(savedTemplatesApi: SavedTemplateApi) {
   const initialized = useRef(false)
 
   useEffect(() => {
-    // Csak egyszer fut, miután az adatok megérkeztek a szerverről
-    if (savedTemplatesApi.items === undefined) return
+    // Várjuk meg amíg a szerver válasza megérkezik — loading=true vagy üres tömb loading közben
+    if (savedTemplatesApi.loading) return
     if (initialized.current) return
     initialized.current = true
 
@@ -58,5 +59,5 @@ export function useDefaultTemplates(savedTemplatesApi: SavedTemplateApi) {
         },
       })
     }
-  }, [savedTemplatesApi.items])
+  }, [savedTemplatesApi.items, savedTemplatesApi.loading])
 }
