@@ -1,9 +1,5 @@
 import { Order, Customer, Product } from './types'
 
-const LABELS_PER_PAGE = 40
-const COLS = 4
-const ROWS = 10
-
 interface BoxLabelData {
   designation: string
   drawingNumber: string
@@ -13,6 +9,13 @@ interface BoxLabelData {
   requiredDate: string
   customer: string
   productNotes: string
+}
+
+interface BoxLabelMargins {
+  top: string
+  right: string
+  bottom: string
+  left: string
 }
 
 function formatDate(iso: string): string {
@@ -51,24 +54,35 @@ function renderGrid(labels: BoxLabelData[], cellHtml: string): string {
   return `<div class="label-grid">${cells}</div>`
 }
 
-function buildHTMLFull(allPages: BoxLabelData[][], templateCss: string, cellHtml: string): string {
+function buildHTMLFull(
+  allPages: BoxLabelData[][],
+  templateCss: string,
+  cellHtml: string,
+  cols: number,
+  rows: number,
+  margins: BoxLabelMargins,
+): string {
   const pages = allPages.map(page => renderGrid(page, cellHtml)).join('\n')
+  const pageMargin = `${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm`
+  const gridH = 297 - parseFloat(margins.top) - parseFloat(margins.bottom)
+  const gridW = 210 - parseFloat(margins.left) - parseFloat(margins.right)
+
   return `<!DOCTYPE html>
 <html lang="hu">
 <head>
   <meta charset="UTF-8">
   <title>Etiketta</title>
   <style>
-    @page { size: A4; margin: 5mm; }
+    @page { size: A4; margin: ${pageMargin}; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; }
 
     .label-grid {
       display: grid;
-      grid-template-columns: repeat(${COLS}, 1fr);
-      grid-template-rows: repeat(${ROWS}, 1fr);
-      width: 200mm;
-      height: 287mm;
+      grid-template-columns: repeat(${cols}, 1fr);
+      grid-template-rows: repeat(${rows}, 1fr);
+      width: ${gridW}mm;
+      height: ${gridH}mm;
       page-break-after: always;
     }
     .label-grid:last-child { page-break-after: avoid; }
@@ -118,16 +132,35 @@ export const DEFAULT_BOX_LABEL_CSS = `.label-designation {
   color: #333;
 }`
 
+const DEFAULT_MARGINS: BoxLabelMargins = { top: '5', right: '5', bottom: '5', left: '5' }
+const DEFAULT_COLS = 4
+const DEFAULT_ROWS = 10
+
 export function generateBoxLabels(
   orders: Order[],
   customers: Customer[],
   products: Product[],
-  savedTemplatesOverride?: Array<{ id: string; data: { type: string; html: string; css: string; active?: boolean } }>
+  savedTemplatesOverride?: Array<{
+    id: string
+    data: {
+      type: string
+      html: string
+      css: string
+      active?: boolean
+      gridCols?: number
+      gridRows?: number
+      margins?: { top: string; right: string; bottom: string; left: string }
+    }
+  }>
 ): void {
   const boxTemplate = savedTemplatesOverride?.find(t => t.data?.type === 'box-label' && t.data?.active)
     ?? savedTemplatesOverride?.find(t => t.data?.type === 'box-label')
   const cellHtml = boxTemplate?.data.html || DEFAULT_BOX_LABEL_CELL_HTML
   const templateCss = boxTemplate?.data.css || DEFAULT_BOX_LABEL_CSS
+  const cols = boxTemplate?.data.gridCols ?? DEFAULT_COLS
+  const rows = boxTemplate?.data.gridRows ?? DEFAULT_ROWS
+  const margins = boxTemplate?.data.margins ?? DEFAULT_MARGINS
+  const labelsPerPage = cols * rows
 
   const allPages: BoxLabelData[][] = []
 
@@ -137,7 +170,7 @@ export function generateBoxLabels(
       : products.find(p => p.customer.trim().toLowerCase() === order.customer.trim().toLowerCase())
 
     const labelData = buildLabelData(order, product)
-    const page: BoxLabelData[] = Array(LABELS_PER_PAGE).fill(labelData)
+    const page: BoxLabelData[] = Array(labelsPerPage).fill(labelData)
     allPages.push(page)
   }
 
@@ -146,7 +179,7 @@ export function generateBoxLabels(
     return
   }
 
-  const html = buildHTMLFull(allPages, templateCss, cellHtml)
+  const html = buildHTMLFull(allPages, templateCss, cellHtml, cols, rows, margins)
   const win = window.open('', '_blank')
   if (!win) return
   win.document.write(html)

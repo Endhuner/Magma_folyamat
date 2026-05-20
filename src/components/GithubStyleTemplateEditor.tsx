@@ -823,7 +823,7 @@ export function GithubStyleTemplateEditor() {
                       ))}
                       <span className="text-xs text-muted-foreground">· Kék szaggatott vonal jelzi az előnézetben</span>
                     </div>
-                    {templateType === 'box-label' && (
+                    {(selectedTemplate?.type === 'box-label' || templateType === 'box-label') && (
                       <div className="flex items-center gap-3 flex-wrap border-t pt-2">
                         <span className="text-sm font-medium shrink-0">Rács (cimkék/oldal):</span>
                         <div className="flex items-center gap-1">
