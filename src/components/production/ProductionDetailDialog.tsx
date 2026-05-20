@@ -444,6 +444,7 @@ export function ProductionDetailDialog({
               <Input
                 id="shift-date"
                 type="date"
+                lang="hu"
                 className="text-lg h-12"
                 value={date}
                 max={toISODate(new Date())}
@@ -474,7 +475,7 @@ export function ProductionDetailDialog({
                 id="start-shots"
                 type="number"
                 min={0}
-                className="text-2xl font-mono h-16 text-center"
+                className="text-4xl font-mono h-24 text-center"
                 value={startShots}
                 placeholder="pl. 12 500"
                 onChange={(e) => setStartShots(e.target.value)}
@@ -491,7 +492,7 @@ export function ProductionDetailDialog({
                 id="end-shots"
                 type="number"
                 min={0}
-                className="text-2xl font-mono h-16 text-center"
+                className="text-4xl font-mono h-24 text-center"
                 value={endShots}
                 placeholder="pl. 12 620"
                 onChange={(e) => setEndShots(e.target.value)}
@@ -746,19 +747,27 @@ export function ProductionDetailDialog({
                 </Badge>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Button
-                  size="lg"
-                  onClick={handleStartProductionClick}
-                  className={`h-14 font-semibold text-base text-white shadow-sm ${
-                    isInProgress
-                      ? 'bg-green-600 hover:bg-green-700 ring-2 ring-green-400 ring-offset-2'
-                      : 'bg-green-600 hover:bg-green-700'
-                  }`}
-                  title="Gyártás indítása — a rendelés a Folyamatban csoportba kerül"
-                >
-                  <PlayCircle className="w-6 h-6 mr-2" weight="fill" />
-                  Gyártás indítása
-                </Button>
+                {isInProgress ? (
+                  <Button
+                    size="lg"
+                    onClick={() => handleStatusButton('Elkészült', 'Elkészült')}
+                    className="h-14 font-semibold text-base text-white shadow-sm bg-blue-600 hover:bg-blue-700"
+                    title="Gyártás befejezése — a rendelés az Elkészült csoportba kerül"
+                  >
+                    <CheckCircle className="w-6 h-6 mr-2" weight="fill" />
+                    Gyártás Elkészült
+                  </Button>
+                ) : (
+                  <Button
+                    size="lg"
+                    onClick={handleStartProductionClick}
+                    className="h-14 font-semibold text-base text-white shadow-sm bg-green-600 hover:bg-green-700"
+                    title="Gyártás indítása — a rendelés a Folyamatban csoportba kerül"
+                  >
+                    <PlayCircle className="w-6 h-6 mr-2" weight="fill" />
+                    Gyártás indítása
+                  </Button>
+                )}
                 <Button
                   size="lg"
                   onClick={() => handleStatusButton('Szünetel', 'Szünetel')}
