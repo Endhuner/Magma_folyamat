@@ -152,16 +152,21 @@ export function ProductionDetailDialog({
     if (!open) return
     setDate(prefillDate || toISODate(new Date()))
     setShift(prefillShift || 'de')
-    // Kezdő lövésszám: az előző műszak vég lövésszámából auto-kitöltés (szerkeszthető)
-    const lastShift = orderShifts[0]
-    const autoStart = lastShift?.endShotsAbsolute != null
-      ? String(lastShift.endShotsAbsolute)
-      : ''
-    setStartShots(autoStart)
+    setStartShots('')
     setEndShots('')
     setNotes('')
     setEditingId(null)
   }, [open, prefillDate, prefillShift, order?.id])
+
+  // Új rögzítésnél: ha dátum vagy műszak változik, a kezdő lövésszámot
+  // az előző műszak endShotsAbsolute-jából töltjük ki (átírható).
+  useEffect(() => {
+    if (!open || editingId) return
+    const shiftOrder = (s: ProductionShift) =>
+      s.date < date ? true : s.date === date && s.shift === 'de' && shift === 'du'
+    const prevShift = orderShifts.find(shiftOrder)
+    setStartShots(prevShift?.endShotsAbsolute != null ? String(prevShift.endShotsAbsolute) : '')
+  }, [open, date, shift, editingId, orderShifts])
 
   const totalShots = useMemo(
     () => orderShifts.reduce((sum, s) => sum + (s.shotsCount || 0), 0),
@@ -261,9 +266,13 @@ export function ProductionDetailDialog({
   const handleEdit = (s: ProductionShift) => {
     setDate(s.date)
     setShift(s.shift)
-    // Szerkesztéskor: kezdő = 0, vég = shotsCount (az eredeti start/end nem tárolt)
-    setStartShots('0')
-    setEndShots(String(s.shotsCount))
+    if (s.endShotsAbsolute != null) {
+      setStartShots(String(s.endShotsAbsolute - s.shotsCount))
+      setEndShots(String(s.endShotsAbsolute))
+    } else {
+      setStartShots('0')
+      setEndShots(String(s.shotsCount))
+    }
     setNotes(s.notes)
     setEditingId(s.id)
   }
