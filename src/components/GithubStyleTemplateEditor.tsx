@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Code, Eye, FloppyDisk, Upload, Download, ArrowCounterClockwise, FileHtml, SplitVertical, FolderOpen, CaretDown, CaretUp, Copy, Check, PencilSimple, Trash, CopySimple, Star } from '@phosphor-icons/react'
+import { Code, Eye, FloppyDisk, Upload, Download, ArrowCounterClockwise, FileHtml, SplitVertical, FolderOpen, CaretDown, CaretUp, Copy, Check, PencilSimple, Trash, CopySimple, Star, MagnifyingGlass, X } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Order, Customer, Product } from '@/lib/types'
 import { format } from 'date-fns'
@@ -279,6 +279,8 @@ export function GithubStyleTemplateEditor() {
   const [gridRows, setGridRows] = useState(10)
   const [cellPaddingH, setCellPaddingH] = useState(3)
   const [cellPaddingV, setCellPaddingV] = useState(2)
+  const [filterName, setFilterName] = useState('')
+  const [filterType, setFilterType] = useState<'all' | 'cmr' | 'delivery' | 'pallet' | 'box-label'>('all')
 
   // ------------------------------------------------------------------ Dialógusok
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
@@ -843,15 +845,54 @@ export function GithubStyleTemplateEditor() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Mentett sablonok</CardTitle>
           </CardHeader>
-          <CardContent className="p-2">
+          <CardContent className="p-2 space-y-2">
+            {/* Szűrő sor */}
+            <div className="space-y-1">
+              <div className="relative">
+                <MagnifyingGlass className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Keresés névben..."
+                  value={filterName}
+                  onChange={e => setFilterName(e.target.value)}
+                  className="h-7 text-xs pl-7 pr-6"
+                />
+                {filterName && (
+                  <button onClick={() => setFilterName('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+              <Select value={filterType} onValueChange={v => setFilterType(v as typeof filterType)}>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="Minden típus" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Minden típus</SelectItem>
+                  <SelectItem value="cmr">CMR</SelectItem>
+                  <SelectItem value="delivery">Szállítólevél</SelectItem>
+                  <SelectItem value="pallet">Raklap cimke</SelectItem>
+                  <SelectItem value="box-label">Etiketta</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {(savedTemplates || []).length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 <FolderOpen className="w-10 h-10 mx-auto mb-2 opacity-40" />
                 <p>Nincs mentett sablon</p>
               </div>
-            ) : (
+            ) : (() => {
+              const filtered = (savedTemplates || []).filter(s =>
+                (filterType === 'all' || s.data.type === filterType) &&
+                (!filterName || s.name.toLowerCase().includes(filterName.toLowerCase()))
+              )
+              return filtered.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground text-sm">
+                  <MagnifyingGlass className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p>Nincs találat</p>
+                </div>
+              ) : (
               <div className="space-y-1">
-                {(savedTemplates || []).map(saved => (
+                {filtered.map(saved => (
                   <div key={saved.id} className={`rounded-lg border transition-colors ${selectedTemplate?.id === saved.id ? 'bg-primary/10 border-primary' : 'hover:bg-accent border-transparent'}`}>
                     {renameId === saved.id ? (
                       /* Inline átnevezés */
@@ -914,7 +955,8 @@ export function GithubStyleTemplateEditor() {
                   </div>
                 ))}
               </div>
-            )}
+              )})()
+            }
           </CardContent>
         </Card>
 
