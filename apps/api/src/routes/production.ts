@@ -29,7 +29,7 @@ export async function productionRoutes(app: FastifyInstance): Promise<void> {
     permissions: {
       read:   ['admin', 'operator'],
       create: ['admin', 'operator'],
-      update: ['admin'],
+      update: ['admin', 'operator'],
       delete: ['admin'],
     },
   })

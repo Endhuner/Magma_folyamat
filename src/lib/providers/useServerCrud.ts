@@ -213,7 +213,12 @@ export function useServerCrud<T extends { id: string }>(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
     }).then(() => { inFlightCount.current-- })
-      .catch(() => { inFlightCount.current--; reloadRef.current() })
+      .catch((err: Error) => {
+        inFlightCount.current--
+        reloadRef.current()
+        const msg = err?.message ?? 'Ismeretlen hiba'
+        toast.error(`Mentés sikertelen (${resource}): ${msg}`, { duration: 8000 })
+      })
   }, [resource])
 
   const remove = useCallback((id: string) => {

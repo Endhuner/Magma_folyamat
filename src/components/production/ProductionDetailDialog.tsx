@@ -226,7 +226,7 @@ export function ProductionDetailDialog({
       orderId: order.id,
       date,
       shift,
-      shotsCount: shotsNum,
+      shotsCount: Math.round(shotsNum),
       producedQuantity: producedPreview,
       notes: notes.trim(),
       userId,
