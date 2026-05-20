@@ -330,7 +330,7 @@ export function generatePalletLabels(
   orders: Order[],
   customers: Customer[],
   products: Product[],
-  savedTemplatesOverride?: Array<{ id: string; data: { type: string; html: string; css: string } }>
+  savedTemplatesOverride?: Array<{ id: string; data: { type: string; html: string; css: string; active?: boolean } }>
 ): void {
   const allLabels: PalletLabelData[] = []
 
@@ -350,7 +350,8 @@ export function generatePalletLabels(
   }
 
   // Mentett raklap sablon keresése
-  const savedPalletTemplate = savedTemplatesOverride?.find(t => t.data?.type === 'pallet')
+  const savedPalletTemplate = savedTemplatesOverride?.find(t => t.data?.type === 'pallet' && t.data?.active)
+    ?? savedTemplatesOverride?.find(t => t.data?.type === 'pallet')
 
   const html = savedPalletTemplate
     ? buildHTMLFromTemplate(allLabels, savedPalletTemplate.data.html, savedPalletTemplate.data.css)

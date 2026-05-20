@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Code, Eye, FloppyDisk, Upload, Download, ArrowCounterClockwise, FileHtml, SplitVertical, FolderOpen, CaretDown, CaretUp, Copy, Check, PencilSimple, Trash, CopySimple } from '@phosphor-icons/react'
+import { Code, Eye, FloppyDisk, Upload, Download, ArrowCounterClockwise, FileHtml, SplitVertical, FolderOpen, CaretDown, CaretUp, Copy, Check, PencilSimple, Trash, CopySimple, Star } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Order, Customer, Product } from '@/lib/types'
 import { format } from 'date-fns'
@@ -24,6 +24,7 @@ interface TemplateData {
   css: string
   timestamp: string
   description?: string
+  active?: boolean
   margins?: {
     top: string
     right: string
@@ -623,6 +624,14 @@ export function GithubStyleTemplateEditor() {
     toast.success('Sablon másolata létrehozva')
   }
 
+  const handleActivateTemplate = (saved: SavedTemplate) => {
+    setSavedTemplates(cur => (cur || []).map(s => ({
+      ...s,
+      data: { ...s.data, active: s.id === saved.id ? true : s.data.type === saved.data.type ? false : s.data.active }
+    })))
+    toast.success(`Aktív sablon beállítva: ${saved.name}`)
+  }
+
   const startRename = (saved: SavedTemplate) => {
     setRenameId(saved.id)
     setRenameValue(saved.name)
@@ -719,6 +728,14 @@ export function GithubStyleTemplateEditor() {
                           </div>
                           {/* Akció gombok */}
                           <div className="flex gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
+                            <Button
+                              size="sm" variant="ghost"
+                              className={`h-6 w-6 p-0 ${saved.data.active ? 'text-amber-500 hover:text-amber-600' : 'text-muted-foreground hover:text-amber-500'}`}
+                              title={saved.data.active ? 'Aktív sablon' : 'Beállítás aktívként'}
+                              onClick={() => handleActivateTemplate(saved)}
+                            >
+                              <Star className="w-3 h-3" weight={saved.data.active ? 'fill' : 'regular'} />
+                            </Button>
                             <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Átnevezés" onClick={() => startRename(saved)}>
                               <PencilSimple className="w-3 h-3" />
                             </Button>
