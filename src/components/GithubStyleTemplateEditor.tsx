@@ -31,6 +31,8 @@ interface TemplateData {
     bottom: string
     left: string
   }
+  gridCols?: number
+  gridRows?: number
 }
 
 interface SavedTemplate {
@@ -271,6 +273,8 @@ export function GithubStyleTemplateEditor() {
   const [marginRight, setMarginRight] = useState('10')
   const [marginBottom, setMarginBottom] = useState('10')
   const [marginLeft, setMarginLeft] = useState('10')
+  const [gridCols, setGridCols] = useState(4)
+  const [gridRows, setGridRows] = useState(10)
 
   // ------------------------------------------------------------------ Dialógusok
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
@@ -319,6 +323,8 @@ export function GithubStyleTemplateEditor() {
           setMarginBottom(saved.data.margins.bottom)
           setMarginLeft(saved.data.margins.left)
         }
+        if (saved.data.gridCols) setGridCols(saved.data.gridCols)
+        if (saved.data.gridRows) setGridRows(saved.data.gridRows)
         const hasDraft = draftHtml && draftHtml[saved.id]
         if (hasDraft) {
           setHtmlContent(draftHtml[saved.id] || saved.data.html)
@@ -532,6 +538,8 @@ export function GithubStyleTemplateEditor() {
       id: selectedTemplate.id, name: selectedTemplate.name, type: selectedTemplate.type,
       html: currentHtml, css: cssContent.trim(), timestamp: new Date().toISOString(),
       description: selectedTemplate.description, margins: { top: marginTop, right: marginRight, bottom: marginBottom, left: marginLeft },
+      gridCols: selectedTemplate.type === 'box-label' ? gridCols : undefined,
+      gridRows: selectedTemplate.type === 'box-label' ? gridRows : undefined,
     }
     setSavedTemplates(current => {
       const existing = (current || []).find(s => s.id === selectedTemplateId)
@@ -797,9 +805,9 @@ export function GithubStyleTemplateEditor() {
                   </Button>
                 </div>
 
-                {/* Margó beállítások */}
+                {/* Margó + Rács beállítások */}
                 <Card className="bg-muted/40">
-                  <CardContent className="p-3">
+                  <CardContent className="p-3 space-y-2">
                     <div className="flex items-center gap-3 flex-wrap">
                       <span className="text-sm font-medium shrink-0">Margó (mm):</span>
                       {[
@@ -813,8 +821,22 @@ export function GithubStyleTemplateEditor() {
                           <Input id={m.id} type="number" min={0} step="0.1" value={m.val} onChange={e => m.set(e.target.value)} className="w-16 h-7 text-xs" />
                         </div>
                       ))}
-                      <span className="text-xs text-muted-foreground">· Az előnézetben kék szaggatott vonal jelzi a margókat</span>
+                      <span className="text-xs text-muted-foreground">· Kék szaggatott vonal jelzi az előnézetben</span>
                     </div>
+                    {templateType === 'box-label' && (
+                      <div className="flex items-center gap-3 flex-wrap border-t pt-2">
+                        <span className="text-sm font-medium shrink-0">Rács (cimkék/oldal):</span>
+                        <div className="flex items-center gap-1">
+                          <Label htmlFor="grid-cols" className="text-xs text-muted-foreground">Oszlop</Label>
+                          <Input id="grid-cols" type="number" min={1} max={10} value={gridCols} onChange={e => setGridCols(Math.max(1, parseInt(e.target.value) || 1))} className="w-16 h-7 text-xs" />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Label htmlFor="grid-rows" className="text-xs text-muted-foreground">Sor</Label>
+                          <Input id="grid-rows" type="number" min={1} max={20} value={gridRows} onChange={e => setGridRows(Math.max(1, parseInt(e.target.value) || 1))} className="w-16 h-7 text-xs" />
+                        </div>
+                        <span className="text-xs text-muted-foreground">= {gridCols * gridRows} cimke/oldal</span>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
