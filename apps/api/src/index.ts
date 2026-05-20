@@ -170,9 +170,12 @@ async function start(): Promise<void> {
 
 // CommonJS-mentes ESM "vagyok-e a fő modul" trükk — pontosabb, mint a
 // require.main, mert ESM-ben nincs require.main.
+// pathToFileURL használata szükséges, mert a könyvtárnévben szóköz esetén
+// az import.meta.url URL-enkódolt (%20), míg a process.argv[1] nem.
+import { pathToFileURL } from 'node:url'
 const isEntry =
   process.argv[1] !== undefined &&
-  import.meta.url === `file://${process.argv[1]}`
+  import.meta.url === pathToFileURL(process.argv[1]).href
 
 if (isEntry) {
   start().catch((err: unknown) => {

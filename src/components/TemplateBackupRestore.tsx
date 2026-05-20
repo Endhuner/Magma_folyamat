@@ -16,7 +16,7 @@ import { hu } from 'date-fns/locale'
 interface TemplateData {
   id: string
   name: string
-  type: 'cmr' | 'delivery' | 'pallet'
+  type: 'cmr' | 'delivery' | 'pallet' | 'box-label'
   html: string
   css: string
   timestamp: string
@@ -32,8 +32,8 @@ interface SavedTemplate {
 }
 
 interface TemplateBackupRestoreProps {
-  activeTemplates: { cmr?: string; delivery?: string; pallet?: string }
-  setActiveTemplates: (v: { cmr?: string; delivery?: string; pallet?: string }) => Promise<void>
+  activeTemplates: { cmr?: string; delivery?: string; pallet?: string; 'box-label'?: string }
+  setActiveTemplates: (v: { cmr?: string; delivery?: string; pallet?: string; 'box-label'?: string }) => Promise<void>
 }
 
 export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: TemplateBackupRestoreProps) {
@@ -54,14 +54,14 @@ export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: T
   
   const [saveName, setSaveName] = useState('')
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
-  const [templateTypeToSave, setTemplateTypeToSave] = useState<'cmr' | 'delivery' | 'pallet' | null>(null)
+  const [templateTypeToSave, setTemplateTypeToSave] = useState<'cmr' | 'delivery' | 'pallet' | 'box-label' | null>(null)
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false)
   const [templateToRestore, setTemplateToRestore] = useState<SavedTemplate | null>(null)
 
-  const typeLabel = (type: 'cmr' | 'delivery' | 'pallet') =>
-    type === 'cmr' ? 'CMR' : type === 'pallet' ? 'Raklap cimke' : 'Szállítólevél'
+  const typeLabel = (type: 'cmr' | 'delivery' | 'pallet' | 'box-label') =>
+    type === 'cmr' ? 'CMR' : type === 'pallet' ? 'Raklap cimke' : type === 'box-label' ? 'Etiketta' : 'Szállítólevél'
 
-  const handleSaveTemplate = (type: 'cmr' | 'delivery' | 'pallet') => {
+  const handleSaveTemplate = (type: 'cmr' | 'delivery' | 'pallet' | 'box-label') => {
     const templateToSave = (templates || []).find(t => t.type === type)
 
     if (!templateToSave) {
@@ -125,6 +125,9 @@ export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: T
     } else if (templateData.type === 'pallet') {
       void setActiveTemplates({ ...activeTemplates, pallet: templateToRestore.id })
       toast.success('Raklap cimke sablon aktiválva')
+    } else if (templateData.type === 'box-label') {
+      void setActiveTemplates({ ...activeTemplates, 'box-label': templateToRestore.id })
+      toast.success('Etiketta sablon aktiválva')
     } else {
       void setActiveTemplates({ ...activeTemplates, delivery: templateToRestore.id })
       toast.success('Szállítólevél sablon aktiválva')
@@ -202,10 +205,12 @@ export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: T
   const cmrTemplate = (templates || []).find(t => t.type === 'cmr')
   const deliveryTemplate = (templates || []).find(t => t.type === 'delivery')
   const palletTemplate = (templates || []).find(t => t.type === 'pallet')
+  const boxLabelTemplate = (templates || []).find(t => t.type === 'box-label')
 
   const cmrTemplateExists = cmrTemplate && cmrTemplate.html && cmrTemplate.html.length > 0
   const deliveryTemplateExists = deliveryTemplate && deliveryTemplate.html && deliveryTemplate.html.length > 0
   const palletTemplateExists = palletTemplate && palletTemplate.html && palletTemplate.html.length > 0
+  const boxLabelTemplateExists = boxLabelTemplate && boxLabelTemplate.html && boxLabelTemplate.html.length > 0
 
   return (
     <div className="space-y-6">
@@ -214,7 +219,7 @@ export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: T
         <p className="text-muted-foreground">Sablonok mentése és visszatöltése</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -325,6 +330,43 @@ export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: T
             )}
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Etiketta Sablon</span>
+              {activeTemplates?.['box-label'] && (
+                <Badge variant="default" className="gap-1">
+                  <Check className="w-3 h-3" />
+                  Aktív
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {boxLabelTemplateExists ? (
+              <>
+                <div className="text-sm text-muted-foreground">
+                  <p>Méret: {formatFileSize(JSON.stringify(boxLabelTemplate).length)}</p>
+                  {boxLabelTemplate.timestamp && (
+                    <p>Utolsó módosítás: {format(new Date(boxLabelTemplate.timestamp), 'yyyy.MM.dd HH:mm', { locale: hu })}</p>
+                  )}
+                </div>
+                <Button onClick={() => handleSaveTemplate('box-label')} className="w-full">
+                  <FloppyDisk className="w-4 h-4 mr-2" />
+                  Sablon mentése
+                </Button>
+              </>
+            ) : (
+              <Alert>
+                <Info className="w-4 h-4" />
+                <AlertDescription>
+                  Nincs etiketta sablon. Hozz létre egyet a Sablon Szerkesztőben.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -353,7 +395,7 @@ export function TemplateBackupRestore({ activeTemplates, setActiveTemplates }: T
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-semibold truncate">{template.name}</h3>
                           <Badge variant="outline">
-                            {template.data.type === 'cmr' ? 'CMR' : template.data.type === 'pallet' ? 'Raklap cimke' : 'Szállítólevél'}
+                            {typeLabel(template.data.type)}
                           </Badge>
                           {activeTemplates?.[template.data.type] === template.id && (
                             <Badge variant="default" className="gap-1">

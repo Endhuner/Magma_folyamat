@@ -313,10 +313,11 @@ function buildHTMLFromTemplate(labels: PalletLabelData[], templateHtml: string, 
   <meta charset="UTF-8">
   <title>Raklap cimke</title>
   <style>
-    @page { size: A4 landscape; margin: 10mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #000; }
     ${templateCss}
+    /* Landscape és print mindig felülír mindent — sablon CSS nem írhatja felül */
+    @page { size: A4 landscape; margin: 10mm; }
     @media print { body { margin: 0; } }
   </style>
 </head>
