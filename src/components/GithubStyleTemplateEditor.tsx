@@ -14,11 +14,12 @@ import { toast } from 'sonner'
 import { Order, Customer, Product } from '@/lib/types'
 import { format } from 'date-fns'
 import { hu } from 'date-fns/locale'
+import { DEFAULT_BOX_LABEL_CELL_HTML, DEFAULT_BOX_LABEL_CSS } from '@/lib/boxLabelExport'
 
 interface TemplateData {
   id: string
   name: string
-  type: 'cmr' | 'delivery' | 'pallet'
+  type: 'cmr' | 'delivery' | 'pallet' | 'box-label'
   html: string
   css: string
   timestamp: string
@@ -216,6 +217,18 @@ const TEMPLATE_VARIABLES = [
       { token: '{{totalPallets}}',      label: 'Összes raklap' },
     ],
   },
+  {
+    group: '🏷️ Etiketta változók',
+    vars: [
+      { token: '{{designation}}',    label: 'Megnevezés (rendelésből)' },
+      { token: '{{drawingNumber}}',  label: 'Cikkszám / Rajzszám' },
+      { token: '{{piecesPerBox}}',   label: 'Db/karton (termékből)' },
+      { token: '{{material}}',       label: 'Anyag' },
+      { token: '{{orderNumber}}',    label: 'Vevő rendelési száma' },
+      { token: '{{requiredDate}}',   label: 'Határidő (ÉÉÉÉ.HH.NN)' },
+      { token: '{{customer}}',       label: 'Vevő neve' },
+    ],
+  },
 ]
 
 export function GithubStyleTemplateEditor() {
@@ -261,7 +274,7 @@ export function GithubStyleTemplateEditor() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [templateDescription, setTemplateDescription] = useState('')
-  const [templateType, setTemplateType] = useState<'cmr' | 'delivery' | 'pallet'>('delivery')
+  const [templateType, setTemplateType] = useState<'cmr' | 'delivery' | 'pallet' | 'box-label'>('delivery')
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importFileContent, setImportFileContent] = useState('')
 
@@ -472,7 +485,7 @@ export function GithubStyleTemplateEditor() {
         orderNumber: o.orderNumber || 'N/A', ownOrderNumber: o.ownOrderNumber || 'N/A',
       })),
       totalQuantity: String(totalQuantity), totalBoxes: String(totalBoxes), totalPallets: String(totalPallets), totalWeight: totalWeight.toFixed(2),
-      // Raklap cimke előnézet adatok
+      // Raklap cimke + Etiketta előnézet adatok
       customerStreet: (sampleCustomer as any).street || 'Minta utca 1.',
       customerPostalCode: (sampleCustomer as any).postalCode || '1234',
       orderNo: sampleOrders[0].orderNumber || '4500104784',
@@ -483,6 +496,10 @@ export function GithubStyleTemplateEditor() {
       nettoKg: 449,
       bruttoKg: 479,
       palletIndex: 1,
+      designation: (sampleOrders[0] as any).designation || '8024290',
+      material: (sampleOrders[0] as any).material || 'Zamak',
+      requiredDate: new Date().toISOString().slice(0, 10).replace(/-/g, '.'),
+      customer: sampleOrders[0].customer || 'Példa Cég Kft',
     }
   }
 
@@ -536,8 +553,8 @@ export function GithubStyleTemplateEditor() {
   const handleCreateNewTemplate = () => {
     if (!templateName.trim()) { toast.error('Add meg a sablon nevét'); return }
     const newId = `template-${Date.now()}`
-    const defaultHtml = templateType === 'cmr' ? DEFAULT_CMR_HTML : templateType === 'pallet' ? DEFAULT_PALLET_HTML : DEFAULT_DELIVERY_HTML
-    const defaultCss  = templateType === 'cmr' ? DEFAULT_CMR_CSS  : templateType === 'pallet' ? DEFAULT_PALLET_CSS  : DEFAULT_DELIVERY_CSS
+    const defaultHtml = templateType === 'cmr' ? DEFAULT_CMR_HTML : templateType === 'pallet' ? DEFAULT_PALLET_HTML : templateType === 'box-label' ? DEFAULT_BOX_LABEL_CELL_HTML : DEFAULT_DELIVERY_HTML
+    const defaultCss  = templateType === 'cmr' ? DEFAULT_CMR_CSS  : templateType === 'pallet' ? DEFAULT_PALLET_CSS  : templateType === 'box-label' ? DEFAULT_BOX_LABEL_CSS  : DEFAULT_DELIVERY_CSS
     const newData: TemplateData = { id: newId, name: templateName, type: templateType, html: defaultHtml, css: defaultCss, timestamp: new Date().toISOString(), description: templateDescription }
     const saveName = `${templateName} - ${format(new Date(), 'yyyy.MM.dd HH:mm', { locale: hu })}`
     setSavedTemplates(cur => [{ id: newId, name: saveName, timestamp: new Date().toISOString(), size: JSON.stringify(newData).length, data: newData }, ...(cur || [])])
@@ -621,8 +638,8 @@ export function GithubStyleTemplateEditor() {
   const handleResetToDefault = () => {
     if (!confirm('Biztosan visszaállítod az alapértelmezett sablont?')) return
     const t = selectedTemplate?.type
-    setHtmlContent(t === 'cmr' ? DEFAULT_CMR_HTML : t === 'pallet' ? DEFAULT_PALLET_HTML : DEFAULT_DELIVERY_HTML)
-    setCssContent(t === 'cmr' ? DEFAULT_CMR_CSS : t === 'pallet' ? DEFAULT_PALLET_CSS : DEFAULT_DELIVERY_CSS)
+    setHtmlContent(t === 'cmr' ? DEFAULT_CMR_HTML : t === 'pallet' ? DEFAULT_PALLET_HTML : t === 'box-label' ? DEFAULT_BOX_LABEL_CELL_HTML : DEFAULT_DELIVERY_HTML)
+    setCssContent(t === 'cmr' ? DEFAULT_CMR_CSS : t === 'pallet' ? DEFAULT_PALLET_CSS : t === 'box-label' ? DEFAULT_BOX_LABEL_CSS : DEFAULT_DELIVERY_CSS)
     toast.success('Alapértelmezett sablon visszaállítva')
   }
 
@@ -689,7 +706,7 @@ export function GithubStyleTemplateEditor() {
                             <div className="font-medium text-xs truncate leading-tight">{saved.name}</div>
                             <div className="flex items-center gap-1 mt-1">
                               <Badge variant="outline" className="text-[10px] py-0 px-1">
-                                {saved.data.type === 'cmr' ? 'CMR' : saved.data.type === 'pallet' ? 'Raklap cimke' : 'Szállítólevél'}
+                                {saved.data.type === 'cmr' ? 'CMR' : saved.data.type === 'pallet' ? 'Raklap cimke' : saved.data.type === 'box-label' ? 'Etiketta' : 'Szállítólevél'}
                               </Badge>
                               {hasUnsavedChanges && selectedTemplate?.id === saved.id && (
                                 <span className="text-[10px] text-amber-500 font-semibold">● módosítva</span>
@@ -920,12 +937,13 @@ export function GithubStyleTemplateEditor() {
             </div>
             <div>
               <Label>Típus</Label>
-              <Select value={templateType} onValueChange={v => setTemplateType(v as 'cmr' | 'delivery' | 'pallet')}>
+              <Select value={templateType} onValueChange={v => setTemplateType(v as 'cmr' | 'delivery' | 'pallet' | 'box-label')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="delivery">Szállítólevél</SelectItem>
                   <SelectItem value="cmr">CMR</SelectItem>
                   <SelectItem value="pallet">Raklap cimke</SelectItem>
+                  <SelectItem value="box-label">Etiketta</SelectItem>
                 </SelectContent>
               </Select>
             </div>

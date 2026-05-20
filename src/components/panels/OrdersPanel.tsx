@@ -69,6 +69,7 @@ import {
 import type { Order, OrderStatus, Customer, Product } from '@/lib/types'
 import { downloadOrderImportTemplate, exportOrdersToExcel } from '@/lib/orderExcelExport'
 import { generatePalletLabels } from '@/lib/palletLabelExport'
+import { generateBoxLabels } from '@/lib/boxLabelExport'
 
 export interface OrderColumnFilter {
   id: string
@@ -497,6 +498,26 @@ export function OrdersPanel({
                   >
                     <Package className="w-4 h-4" />
                     Raklap cimke nyomtatás
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled
+                    className="font-semibold text-foreground opacity-100 mt-1"
+                  >
+                    Etiketta
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      generateBoxLabels(
+                        selectedOrders,
+                        customers || [],
+                        products || [],
+                        savedDeliveryTemplates || undefined
+                      )
+                    }}
+                    className="pl-6 gap-2 text-purple-700 bg-purple-50 hover:bg-purple-100 focus:bg-purple-100 dark:text-purple-300 dark:bg-purple-950/30 dark:hover:bg-purple-950/50"
+                  >
+                    <Tag className="w-4 h-4" />
+                    Etiketta nyomtatás
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
