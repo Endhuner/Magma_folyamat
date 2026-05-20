@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { Order, Customer, Product } from '@/lib/types'
 import { format } from 'date-fns'
 import { hu } from 'date-fns/locale'
+import { DEFAULT_BOX_LABEL_CELL_HTML, DEFAULT_BOX_LABEL_CSS } from '@/lib/boxLabelExport'
 
 interface TemplateData {
   id: string
@@ -98,7 +99,8 @@ const DEFAULT_PALLET_HTML = `<div class="pallet-label">
 
 const DEFAULT_PALLET_CSS = `* { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #000; }
-.pallet-label { width: 190mm; min-height: 130mm; border: 2px solid #000; padding: 6mm; margin-bottom: 10mm; page-break-inside: avoid; display: flex; flex-direction: column; gap: 4mm; }
+.pallet-label { width: 277mm; height: 190mm; border: 2px solid #000; padding: 6mm; page-break-after: always; display: flex; flex-direction: column; gap: 4mm; }
+.pallet-label:last-child { page-break-after: avoid; }
 .header-row { display: flex; gap: 4mm; border-bottom: 1.5px solid #000; padding-bottom: 4mm; }
 .header-cell { flex: 1; }
 .right-cell { border-left: 1.5px solid #000; padding-left: 4mm; }
@@ -121,22 +123,6 @@ body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #000; 
 .weight-label { font-size: 9pt; color: #444; }
 .weight-value { font-size: 13pt; font-weight: bold; }
 .pallet-counter { margin-top: auto; text-align: right; font-size: 9pt; color: #666; border-top: 1px solid #ccc; padding-top: 2mm; }`
-
-const DEFAULT_BOX_LABEL_HTML = `<div class="label-designation">{{designation}} - {{drawingNumber}}</div>
-<div class="label-qty">{{piecesPerBox}} pcs-{{material}}</div>
-<div class="label-order">{{orderNumber}} - {{requiredDate}}</div>
-<div class="label-parties">From: MAGMA&nbsp;&nbsp;To: {{customer}}</div>`
-
-const DEFAULT_BOX_LABEL_CSS = `.label-designation {
-  font-size: 10pt;
-  font-weight: bold;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.label-qty { font-size: 9pt; margin-top: 1mm; }
-.label-order { font-size: 9pt; margin-top: 1mm; }
-.label-parties { font-size: 8pt; margin-top: 1mm; color: #333; }`
 
 // --- Változó lista definíció ---
 const TEMPLATE_VARIABLES = [
@@ -215,18 +201,6 @@ const TEMPLATE_VARIABLES = [
     ],
   },
   {
-    group: '🏷️ Etiketta változók (4×10 rács, egy cella tartalma)',
-    vars: [
-      { token: '{{designation}}',   label: 'Megnevezés (rendelésből)' },
-      { token: '{{drawingNumber}}', label: 'Rajzszám / cikkszám' },
-      { token: '{{piecesPerBox}}',  label: 'Db/karton' },
-      { token: '{{material}}',      label: 'Anyag' },
-      { token: '{{orderNumber}}',   label: 'Vevő rendelési száma' },
-      { token: '{{requiredDate}}',  label: 'Határidő (YYYY.MM.DD)' },
-      { token: '{{customer}}',      label: 'Vevő neve' },
-    ],
-  },
-  {
     group: '📦 Raklap cimke változók',
     vars: [
       { token: '{{customerName}}',      label: 'Vevő neve' },
@@ -242,6 +216,18 @@ const TEMPLATE_VARIABLES = [
       { token: '{{bruttoKg}}',          label: 'Bruttó súly (kg)' },
       { token: '{{palletIndex}}',       label: 'Raklap sorszáma' },
       { token: '{{totalPallets}}',      label: 'Összes raklap' },
+    ],
+  },
+  {
+    group: '🏷️ Etiketta változók',
+    vars: [
+      { token: '{{designation}}',    label: 'Megnevezés (rendelésből)' },
+      { token: '{{drawingNumber}}',  label: 'Cikkszám / Rajzszám' },
+      { token: '{{piecesPerBox}}',   label: 'Db/karton (termékből)' },
+      { token: '{{material}}',       label: 'Anyag' },
+      { token: '{{orderNumber}}',    label: 'Vevő rendelési száma' },
+      { token: '{{requiredDate}}',   label: 'Határidő (ÉÉÉÉ.HH.NN)' },
+      { token: '{{customer}}',       label: 'Vevő neve' },
     ],
   },
 ]
@@ -500,20 +486,21 @@ export function GithubStyleTemplateEditor() {
         orderNumber: o.orderNumber || 'N/A', ownOrderNumber: o.ownOrderNumber || 'N/A',
       })),
       totalQuantity: String(totalQuantity), totalBoxes: String(totalBoxes), totalPallets: String(totalPallets), totalWeight: totalWeight.toFixed(2),
-      // Etiketta + Raklap cimke előnézet adatok
-      designation: sampleOrders[0].designation || '8024290',
-      material: (sampleOrders[0] as any).material || 'Zamak',
-      requiredDate: new Date().toLocaleDateString('hu-HU').replace(/\. /g, '.').replace(/\.$/, '').replace(/\//g, '.'),
-      piecesPerBox: '350',
+      // Raklap cimke + Etiketta előnézet adatok
       customerStreet: (sampleCustomer as any).street || 'Minta utca 1.',
       customerPostalCode: (sampleCustomer as any).postalCode || '1234',
       orderNo: sampleOrders[0].orderNumber || '4500104784',
       drawingNumber: 'MA51',
       boxesOnPallet: 45,
+      piecesPerBox: 350,
       totalPieces: 15750,
       nettoKg: 449,
       bruttoKg: 479,
       palletIndex: 1,
+      designation: (sampleOrders[0] as any).designation || '8024290',
+      material: (sampleOrders[0] as any).material || 'Zamak',
+      requiredDate: new Date().toISOString().slice(0, 10).replace(/-/g, '.'),
+      customer: sampleOrders[0].customer || 'Példa Cég Kft',
     }
   }
 
@@ -567,7 +554,7 @@ export function GithubStyleTemplateEditor() {
   const handleCreateNewTemplate = () => {
     if (!templateName.trim()) { toast.error('Add meg a sablon nevét'); return }
     const newId = `template-${Date.now()}`
-    const defaultHtml = templateType === 'cmr' ? DEFAULT_CMR_HTML : templateType === 'pallet' ? DEFAULT_PALLET_HTML : templateType === 'box-label' ? DEFAULT_BOX_LABEL_HTML : DEFAULT_DELIVERY_HTML
+    const defaultHtml = templateType === 'cmr' ? DEFAULT_CMR_HTML : templateType === 'pallet' ? DEFAULT_PALLET_HTML : templateType === 'box-label' ? DEFAULT_BOX_LABEL_CELL_HTML : DEFAULT_DELIVERY_HTML
     const defaultCss  = templateType === 'cmr' ? DEFAULT_CMR_CSS  : templateType === 'pallet' ? DEFAULT_PALLET_CSS  : templateType === 'box-label' ? DEFAULT_BOX_LABEL_CSS  : DEFAULT_DELIVERY_CSS
     const newData: TemplateData = { id: newId, name: templateName, type: templateType, html: defaultHtml, css: defaultCss, timestamp: new Date().toISOString(), description: templateDescription }
     const saveName = `${templateName} - ${format(new Date(), 'yyyy.MM.dd HH:mm', { locale: hu })}`
@@ -652,7 +639,7 @@ export function GithubStyleTemplateEditor() {
   const handleResetToDefault = () => {
     if (!confirm('Biztosan visszaállítod az alapértelmezett sablont?')) return
     const t = selectedTemplate?.type
-    setHtmlContent(t === 'cmr' ? DEFAULT_CMR_HTML : t === 'pallet' ? DEFAULT_PALLET_HTML : t === 'box-label' ? DEFAULT_BOX_LABEL_HTML : DEFAULT_DELIVERY_HTML)
+    setHtmlContent(t === 'cmr' ? DEFAULT_CMR_HTML : t === 'pallet' ? DEFAULT_PALLET_HTML : t === 'box-label' ? DEFAULT_BOX_LABEL_CELL_HTML : DEFAULT_DELIVERY_HTML)
     setCssContent(t === 'cmr' ? DEFAULT_CMR_CSS : t === 'pallet' ? DEFAULT_PALLET_CSS : t === 'box-label' ? DEFAULT_BOX_LABEL_CSS : DEFAULT_DELIVERY_CSS)
     toast.success('Alapértelmezett sablon visszaállítva')
   }
@@ -957,7 +944,7 @@ export function GithubStyleTemplateEditor() {
                   <SelectItem value="delivery">Szállítólevél</SelectItem>
                   <SelectItem value="cmr">CMR</SelectItem>
                   <SelectItem value="pallet">Raklap cimke</SelectItem>
-                  <SelectItem value="box-label">Etiketta (4×10)</SelectItem>
+                  <SelectItem value="box-label">Etiketta</SelectItem>
                 </SelectContent>
               </Select>
             </div>

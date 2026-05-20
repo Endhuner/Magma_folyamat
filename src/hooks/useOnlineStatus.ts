@@ -11,7 +11,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
 const PING_INTERVAL_MS = 15_000
-const PING_URL = '/api/v1/health'
+const PING_URL = '/health'
 const PING_TIMEOUT_MS = 4_000
 
 async function pingServer(): Promise<boolean> {

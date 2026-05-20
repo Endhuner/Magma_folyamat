@@ -121,9 +121,9 @@ export function generateBoxLabels(
   products: Product[],
   savedTemplatesOverride?: Array<{ id: string; data: { type: string; html: string; css: string } }>
 ): void {
-  const palletTemplate = savedTemplatesOverride?.find(t => t.data?.type === 'box-label')
-  const cellHtml = palletTemplate?.data.html || DEFAULT_BOX_LABEL_CELL_HTML
-  const templateCss = palletTemplate?.data.css || DEFAULT_BOX_LABEL_CSS
+  const boxTemplate = savedTemplatesOverride?.find(t => t.data?.type === 'box-label')
+  const cellHtml = boxTemplate?.data.html || DEFAULT_BOX_LABEL_CELL_HTML
+  const templateCss = boxTemplate?.data.css || DEFAULT_BOX_LABEL_CSS
 
   const allPages: BoxLabelData[][] = []
 
@@ -133,7 +133,6 @@ export function generateBoxLabels(
       : products.find(p => p.customer.trim().toLowerCase() === order.customer.trim().toLowerCase())
 
     const labelData = buildLabelData(order, product)
-    // 40 db, minden ugyanolyan (egy rendelés = egy teljes lap)
     const page: BoxLabelData[] = Array(LABELS_PER_PAGE).fill(labelData)
     allPages.push(page)
   }

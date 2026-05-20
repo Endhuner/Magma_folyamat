@@ -213,10 +213,10 @@ export function useServerCrud<T extends { id: string }>(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
     }).then(() => { inFlightCount.current-- })
-      .catch((err: Error) => {
+      .catch((err: unknown) => {
         inFlightCount.current--
         reloadRef.current()
-        const msg = err?.message ?? 'Ismeretlen hiba'
+        const msg = (err instanceof Error) ? err.message : 'Ismeretlen hiba'
         toast.error(`Mentés sikertelen (${resource}): ${msg}`, { duration: 8000 })
       })
   }, [resource])

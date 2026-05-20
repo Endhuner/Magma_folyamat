@@ -91,7 +91,6 @@ export interface OrdersPanelProps {
   labelTemplates: LabelTemplate[] | null | undefined
   activeLabelTemplateId: string | null | undefined
   savedDeliveryTemplates?: Array<{ id: string; data: { type: string; html: string; css: string } }> | null
-  activeTemplates?: { cmr?: string; delivery?: string; pallet?: string }
 
   // UI state
   hideDelivered: boolean
@@ -144,7 +143,6 @@ export function OrdersPanel({
   labelTemplates,
   activeLabelTemplateId,
   savedDeliveryTemplates,
-  activeTemplates,
   hideDelivered,
   setHideDelivered,
   yearFilterEnabled,
@@ -493,8 +491,7 @@ export function OrdersPanel({
                         selectedOrders,
                         customers || [],
                         products || [],
-                        savedDeliveryTemplates || undefined,
-                        activeTemplates
+                        savedDeliveryTemplates || undefined
                       )
                     }}
                     className="pl-6 gap-2 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:bg-blue-100 dark:text-blue-300 dark:bg-blue-950/30 dark:hover:bg-blue-950/50"
@@ -517,10 +514,10 @@ export function OrdersPanel({
                         savedDeliveryTemplates || undefined
                       )
                     }}
-                    className="pl-6 gap-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 focus:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50"
+                    className="pl-6 gap-2 text-purple-700 bg-purple-50 hover:bg-purple-100 focus:bg-purple-100 dark:text-purple-300 dark:bg-purple-950/30 dark:hover:bg-purple-950/50"
                   >
                     <Tag className="w-4 h-4" />
-                    Etiketta nyomtatás (40 db/lap)
+                    Etiketta nyomtatás
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
