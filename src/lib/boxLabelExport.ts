@@ -12,6 +12,7 @@ interface BoxLabelData {
   orderNumber: string
   requiredDate: string
   customer: string
+  productNotes: string
 }
 
 function formatDate(iso: string): string {
@@ -29,6 +30,7 @@ function buildLabelData(order: Order, product: Product | undefined): BoxLabelDat
     orderNumber:   order.orderNumber || '',
     requiredDate:  formatDate(order.requiredDate),
     customer:      order.customer || '',
+    productNotes:  product?.notes || '',
   }
 }
 
@@ -41,6 +43,7 @@ function applyTemplate(templateHtml: string, d: BoxLabelData): string {
     .replace(/{{orderNumber}}/g, d.orderNumber)
     .replace(/{{requiredDate}}/g, d.requiredDate)
     .replace(/{{customer}}/g, d.customer)
+    .replace(/{{productNotes}}/g, d.productNotes)
 }
 
 function renderGrid(labels: BoxLabelData[], cellHtml: string): string {
