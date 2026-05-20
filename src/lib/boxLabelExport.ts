@@ -119,9 +119,10 @@ export function generateBoxLabels(
   orders: Order[],
   customers: Customer[],
   products: Product[],
-  savedTemplatesOverride?: Array<{ id: string; data: { type: string; html: string; css: string } }>
+  savedTemplatesOverride?: Array<{ id: string; data: { type: string; html: string; css: string; active?: boolean } }>
 ): void {
-  const boxTemplate = savedTemplatesOverride?.find(t => t.data?.type === 'box-label')
+  const boxTemplate = savedTemplatesOverride?.find(t => t.data?.type === 'box-label' && t.data?.active)
+    ?? savedTemplatesOverride?.find(t => t.data?.type === 'box-label')
   const cellHtml = boxTemplate?.data.html || DEFAULT_BOX_LABEL_CELL_HTML
   const templateCss = boxTemplate?.data.css || DEFAULT_BOX_LABEL_CSS
 
