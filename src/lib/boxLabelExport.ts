@@ -61,6 +61,8 @@ function buildHTMLFull(
   cols: number,
   rows: number,
   margins: BoxLabelMargins,
+  cellPaddingH: number,
+  cellPaddingV: number,
 ): string {
   const pages = allPages.map(page => renderGrid(page, cellHtml)).join('\n')
   const pageMargin = `${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm`
@@ -91,7 +93,7 @@ function buildHTMLFull(
       display: flex;
       flex-direction: column;
       justify-content: center;
-      padding: 2mm 3mm;
+      padding: ${cellPaddingV}mm ${cellPaddingH}mm;
       overflow: hidden;
     }
 
@@ -149,6 +151,8 @@ export function generateBoxLabels(
       active?: boolean
       gridCols?: number
       gridRows?: number
+      cellPaddingH?: number
+      cellPaddingV?: number
       margins?: { top: string; right: string; bottom: string; left: string }
     }
   }>
@@ -160,6 +164,8 @@ export function generateBoxLabels(
   const cols = boxTemplate?.data.gridCols ?? DEFAULT_COLS
   const rows = boxTemplate?.data.gridRows ?? DEFAULT_ROWS
   const margins = boxTemplate?.data.margins ?? DEFAULT_MARGINS
+  const cellPaddingH = boxTemplate?.data.cellPaddingH ?? 3
+  const cellPaddingV = boxTemplate?.data.cellPaddingV ?? 2
   const labelsPerPage = cols * rows
 
   const allPages: BoxLabelData[][] = []
@@ -179,7 +185,7 @@ export function generateBoxLabels(
     return
   }
 
-  const html = buildHTMLFull(allPages, templateCss, cellHtml, cols, rows, margins)
+  const html = buildHTMLFull(allPages, templateCss, cellHtml, cols, rows, margins, cellPaddingH, cellPaddingV)
   const win = window.open('', '_blank')
   if (!win) return
   win.document.write(html)

@@ -33,6 +33,8 @@ interface TemplateData {
   }
   gridCols?: number
   gridRows?: number
+  cellPaddingH?: number
+  cellPaddingV?: number
 }
 
 interface SavedTemplate {
@@ -275,6 +277,8 @@ export function GithubStyleTemplateEditor() {
   const [marginLeft, setMarginLeft] = useState('10')
   const [gridCols, setGridCols] = useState(4)
   const [gridRows, setGridRows] = useState(10)
+  const [cellPaddingH, setCellPaddingH] = useState(3)
+  const [cellPaddingV, setCellPaddingV] = useState(2)
 
   // ------------------------------------------------------------------ Dialógusok
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
@@ -325,6 +329,8 @@ export function GithubStyleTemplateEditor() {
         }
         if (saved.data.gridCols) setGridCols(saved.data.gridCols)
         if (saved.data.gridRows) setGridRows(saved.data.gridRows)
+        if (saved.data.cellPaddingH != null) setCellPaddingH(saved.data.cellPaddingH)
+        if (saved.data.cellPaddingV != null) setCellPaddingV(saved.data.cellPaddingV)
         const hasDraft = draftHtml && draftHtml[saved.id]
         if (hasDraft) {
           setHtmlContent(draftHtml[saved.id] || saved.data.html)
@@ -353,7 +359,7 @@ export function GithubStyleTemplateEditor() {
   }, [htmlContent, cssContent, selectedTemplate, setDraftHtml, setDraftCss])
 
   // ------------------------------------------------------------------ Előnézet frissítés
-  useEffect(() => { updatePreview() }, [htmlContent, cssContent, editMode, marginTop, marginRight, marginBottom, marginLeft])
+  useEffect(() => { updatePreview() }, [htmlContent, cssContent, editMode, marginTop, marginRight, marginBottom, marginLeft, gridCols, gridRows, cellPaddingH, cellPaddingV, selectedTemplate])
 
   // ------------------------------------------------------------------ Gyorsbillentyűk
   useEffect(() => {
@@ -436,7 +442,93 @@ export function GithubStyleTemplateEditor() {
     if (!previewRef.current) return
     const sampleData = generateSampleData()
     const processedHtml = processTemplate(htmlContent, sampleData)
-    const fullHtml = `<!DOCTYPE html>
+
+    let fullHtml: string
+
+    if (selectedTemplate?.type === 'box-label') {
+      // Box-label előnézet: valódi rács A4 arányban, scale-elve
+      const cellCount = gridCols * gridRows
+      const cells = Array(cellCount).fill(null).map(() =>
+        `<div class="label-cell">${processedHtml}</div>`
+      ).join('')
+
+      fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      margin: 0;
+      background: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+    .page {
+      width: 210mm;
+      height: 297mm;
+      background: white;
+      position: relative;
+      transform-origin: top center;
+      flex-shrink: 0;
+    }
+    .margin-indicator {
+      position: absolute;
+      top: ${marginTop}mm;
+      left: ${marginLeft}mm;
+      right: ${marginRight}mm;
+      bottom: ${marginBottom}mm;
+      border: 1.5px dashed rgba(59,130,246,0.5);
+      pointer-events: none;
+      z-index: 10;
+    }
+    .label-grid {
+      position: absolute;
+      top: ${marginTop}mm;
+      left: ${marginLeft}mm;
+      right: ${marginRight}mm;
+      bottom: ${marginBottom}mm;
+      display: grid;
+      grid-template-columns: repeat(${gridCols}, 1fr);
+      grid-template-rows: repeat(${gridRows}, 1fr);
+    }
+    .label-cell {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: ${cellPaddingV}mm ${cellPaddingH}mm;
+      overflow: hidden;
+      border: 1px dashed rgba(200,200,200,0.6);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 9pt;
+    }
+    ${cssContent}
+  </style>
+</head>
+<body>
+  <div class="page" id="page">
+    <div class="margin-indicator"></div>
+    <div class="label-grid">${cells}</div>
+  </div>
+  <script>
+    function scale() {
+      var iw = window.innerWidth;
+      var A4w = 210 * 3.7795;
+      var A4h = 297 * 3.7795;
+      var s = Math.min((iw - 16) / A4w, (window.innerHeight - 16) / A4h);
+      var page = document.getElementById('page');
+      page.style.transform = 'scale(' + s + ')';
+      document.body.style.minHeight = (A4h * s + 16) + 'px';
+    }
+    scale();
+    window.addEventListener('resize', scale);
+  </script>
+</body>
+</html>`
+    } else {
+      fullHtml = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -460,6 +552,8 @@ export function GithubStyleTemplateEditor() {
 </head>
 <body>${processedHtml}</body>
 </html>`
+    }
+
     const doc = previewRef.current.contentDocument
     if (doc) { doc.open(); doc.write(fullHtml); doc.close() }
   }
@@ -540,6 +634,8 @@ export function GithubStyleTemplateEditor() {
       description: selectedTemplate.description, margins: { top: marginTop, right: marginRight, bottom: marginBottom, left: marginLeft },
       gridCols: selectedTemplate.type === 'box-label' ? gridCols : undefined,
       gridRows: selectedTemplate.type === 'box-label' ? gridRows : undefined,
+      cellPaddingH: selectedTemplate.type === 'box-label' ? cellPaddingH : undefined,
+      cellPaddingV: selectedTemplate.type === 'box-label' ? cellPaddingV : undefined,
     }
     setSavedTemplates(current => {
       const existing = (current || []).find(s => s.id === selectedTemplateId)
@@ -578,6 +674,10 @@ export function GithubStyleTemplateEditor() {
     const tpl: TemplateData = { id: saved.id, name: saved.name, type: saved.data.type, html: saved.data.html, css: saved.data.css, timestamp: saved.timestamp, description: saved.data.description, margins: saved.data.margins }
     setSelectedTemplate(tpl); setSelectedTemplateId(saved.id)
     if (saved.data.margins) { setMarginTop(saved.data.margins.top); setMarginRight(saved.data.margins.right); setMarginBottom(saved.data.margins.bottom); setMarginLeft(saved.data.margins.left) }
+    if (saved.data.gridCols) setGridCols(saved.data.gridCols)
+    if (saved.data.gridRows) setGridRows(saved.data.gridRows)
+    if (saved.data.cellPaddingH != null) setCellPaddingH(saved.data.cellPaddingH)
+    if (saved.data.cellPaddingV != null) setCellPaddingV(saved.data.cellPaddingV)
     const hasDraft = draftHtml?.[saved.id]
     setHtmlContent(hasDraft ? (draftHtml[saved.id] || saved.data.html) : saved.data.html)
     setCssContent(hasDraft ? ((draftCss || {})[saved.id] || saved.data.css) : saved.data.css)
@@ -824,18 +924,32 @@ export function GithubStyleTemplateEditor() {
                       <span className="text-xs text-muted-foreground">· Kék szaggatott vonal jelzi az előnézetben</span>
                     </div>
                     {(selectedTemplate?.type === 'box-label' || templateType === 'box-label') && (
-                      <div className="flex items-center gap-3 flex-wrap border-t pt-2">
-                        <span className="text-sm font-medium shrink-0">Rács (cimkék/oldal):</span>
-                        <div className="flex items-center gap-1">
-                          <Label htmlFor="grid-cols" className="text-xs text-muted-foreground">Oszlop</Label>
-                          <Input id="grid-cols" type="number" min={1} max={10} value={gridCols} onChange={e => setGridCols(Math.max(1, parseInt(e.target.value) || 1))} className="w-16 h-7 text-xs" />
+                      <>
+                        <div className="flex items-center gap-3 flex-wrap border-t pt-2">
+                          <span className="text-sm font-medium shrink-0">Rács:</span>
+                          <div className="flex items-center gap-1">
+                            <Label htmlFor="grid-cols" className="text-xs text-muted-foreground w-12">Oszlop</Label>
+                            <Input id="grid-cols" type="number" min={1} max={10} value={gridCols} onChange={e => setGridCols(Math.max(1, parseInt(e.target.value) || 1))} className="w-16 h-7 text-xs" />
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Label htmlFor="grid-rows" className="text-xs text-muted-foreground w-8">Sor</Label>
+                            <Input id="grid-rows" type="number" min={1} max={20} value={gridRows} onChange={e => setGridRows(Math.max(1, parseInt(e.target.value) || 1))} className="w-16 h-7 text-xs" />
+                          </div>
+                          <span className="text-xs text-muted-foreground">= {gridCols * gridRows} cimke/oldal</span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Label htmlFor="grid-rows" className="text-xs text-muted-foreground">Sor</Label>
-                          <Input id="grid-rows" type="number" min={1} max={20} value={gridRows} onChange={e => setGridRows(Math.max(1, parseInt(e.target.value) || 1))} className="w-16 h-7 text-xs" />
+                        <div className="flex items-center gap-3 flex-wrap border-t pt-2">
+                          <span className="text-sm font-medium shrink-0">Cella belső tér (mm):</span>
+                          <div className="flex items-center gap-1">
+                            <Label htmlFor="cell-pad-h" className="text-xs text-muted-foreground w-16">Vízszintes</Label>
+                            <Input id="cell-pad-h" type="number" min={0} max={20} step={0.5} value={cellPaddingH} onChange={e => setCellPaddingH(Math.max(0, parseFloat(e.target.value) || 0))} className="w-16 h-7 text-xs" />
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Label htmlFor="cell-pad-v" className="text-xs text-muted-foreground w-16">Függőleges</Label>
+                            <Input id="cell-pad-v" type="number" min={0} max={20} step={0.5} value={cellPaddingV} onChange={e => setCellPaddingV(Math.max(0, parseFloat(e.target.value) || 0))} className="w-16 h-7 text-xs" />
+                          </div>
+                          <span className="text-xs text-muted-foreground">· az előnézet azonnal frissül</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">= {gridCols * gridRows} cimke/oldal</span>
-                      </div>
+                      </>
                     )}
                   </CardContent>
                 </Card>
