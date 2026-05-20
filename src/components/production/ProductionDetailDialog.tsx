@@ -475,7 +475,7 @@ export function ProductionDetailDialog({
                 id="start-shots"
                 type="number"
                 min={0}
-                className="text-4xl font-mono h-24 text-center"
+                className="text-4xl font-mono h-16 text-center"
                 value={startShots}
                 placeholder="pl. 12 500"
                 onChange={(e) => setStartShots(e.target.value)}
@@ -492,7 +492,7 @@ export function ProductionDetailDialog({
                 id="end-shots"
                 type="number"
                 min={0}
-                className="text-4xl font-mono h-24 text-center"
+                className="text-4xl font-mono h-16 text-center"
                 value={endShots}
                 placeholder="pl. 12 620"
                 onChange={(e) => setEndShots(e.target.value)}
