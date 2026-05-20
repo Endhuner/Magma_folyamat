@@ -134,7 +134,7 @@ function buildHTML(labels: PalletLabelData[]): string {
   <meta charset="UTF-8">
   <title>Raklap cimke</title>
   <style>
-    @page { size: A4; margin: 10mm; }
+    @page { size: A4 landscape; margin: 10mm; }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -145,8 +145,8 @@ function buildHTML(labels: PalletLabelData[]): string {
     }
 
     .pallet-label {
-      width: 190mm;
-      height: 277mm;
+      width: 277mm;
+      height: 190mm;
       border: 2px solid #000;
       padding: 6mm;
       page-break-after: always;
@@ -313,7 +313,7 @@ function buildHTMLFromTemplate(labels: PalletLabelData[], templateHtml: string, 
   <meta charset="UTF-8">
   <title>Raklap cimke</title>
   <style>
-    @page { size: A4; margin: 10mm; }
+    @page { size: A4 landscape; margin: 10mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #000; }
     ${templateCss}
