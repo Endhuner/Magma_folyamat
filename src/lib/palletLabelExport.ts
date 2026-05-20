@@ -146,15 +146,15 @@ function buildHTML(labels: PalletLabelData[]): string {
 
     .pallet-label {
       width: 190mm;
-      min-height: 130mm;
+      height: 277mm;
       border: 2px solid #000;
       padding: 6mm;
-      margin-bottom: 10mm;
-      page-break-inside: avoid;
+      page-break-after: always;
       display: flex;
       flex-direction: column;
       gap: 4mm;
     }
+    .pallet-label:last-child { page-break-after: avoid; }
 
     /* ── fejléc ── */
     .header-row {

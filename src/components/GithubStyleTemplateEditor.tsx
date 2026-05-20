@@ -99,7 +99,8 @@ const DEFAULT_PALLET_HTML = `<div class="pallet-label">
 
 const DEFAULT_PALLET_CSS = `* { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #000; }
-.pallet-label { width: 190mm; min-height: 130mm; border: 2px solid #000; padding: 6mm; margin-bottom: 10mm; page-break-inside: avoid; display: flex; flex-direction: column; gap: 4mm; }
+.pallet-label { width: 190mm; height: 277mm; border: 2px solid #000; padding: 6mm; page-break-after: always; display: flex; flex-direction: column; gap: 4mm; }
+.pallet-label:last-child { page-break-after: avoid; }
 .header-row { display: flex; gap: 4mm; border-bottom: 1.5px solid #000; padding-bottom: 4mm; }
 .header-cell { flex: 1; }
 .right-cell { border-left: 1.5px solid #000; padding-left: 4mm; }
