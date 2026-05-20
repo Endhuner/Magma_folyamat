@@ -104,29 +104,29 @@ const DEFAULT_PALLET_HTML = `<div class="pallet-label">
 
 const DEFAULT_PALLET_CSS = `* { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #000; }
-.pallet-label { width: 277mm; height: 190mm; border: 2px solid #000; padding: 6mm; page-break-after: always; display: flex; flex-direction: column; gap: 4mm; }
+.pallet-label { width: 277mm; height: 190mm; border: 2px solid #000; padding: 6mm; page-break-after: always; display: flex; flex-direction: column; gap: 3mm; }
 .pallet-label:last-child { page-break-after: avoid; }
-.header-row { display: flex; gap: 4mm; border-bottom: 1.5px solid #000; padding-bottom: 4mm; }
+.header-row { display: flex; gap: 4mm; border-bottom: 1.5px solid #000; padding-bottom: 3mm; }
 .header-cell { flex: 1; }
 .right-cell { border-left: 1.5px solid #000; padding-left: 4mm; }
 .header-title { font-size: 8pt; font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2mm; }
-.address-name { font-size: 13pt; font-weight: bold; line-height: 1.3; }
+.address-name { font-size: 14pt; font-weight: bold; line-height: 1.3; }
 .address-line { font-size: 11pt; line-height: 1.4; }
 .info-row { display: flex; gap: 3mm; align-items: baseline; }
-.info-label { font-size: 9pt; color: #444; min-width: 42mm; }
+.info-label { font-size: 9pt; color: #444; min-width: 48mm; }
 .info-value { font-size: 14pt; }
 .info-value.bold { font-weight: bold; }
-.info-value.order-no { font-size: 24pt; font-weight: bold; letter-spacing: 0.5px; }
-.qty-row { display: flex; gap: 3mm; border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; padding: 3mm 0; }
-.qty-cell { flex: 1; text-align: center; border-right: 1px solid #ccc; padding: 1mm 2mm; }
+.info-value.order-no { font-size: 28pt; font-weight: bold; letter-spacing: 0.5px; }
+.qty-row { flex: 1; display: flex; gap: 3mm; border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; padding: 3mm 0; align-items: center; }
+.qty-cell { flex: 1; text-align: center; border-right: 1px solid #ccc; padding: 2mm 2mm; display: flex; flex-direction: column; justify-content: center; }
 .qty-cell:last-child { border-right: none; }
 .qty-cell.highlight { background: #f0f0f0; }
-.qty-number { font-size: 22pt; font-weight: bold; line-height: 1.1; }
-.qty-unit { font-size: 8pt; color: #555; margin-top: 1mm; }
-.weight-row { display: flex; gap: 8mm; }
+.qty-number { font-size: 28pt; font-weight: bold; line-height: 1.1; }
+.qty-unit { font-size: 9pt; color: #555; margin-top: 1mm; }
+.weight-row { display: flex; gap: 10mm; }
 .weight-cell { display: flex; gap: 2mm; align-items: baseline; }
-.weight-label { font-size: 9pt; color: #444; }
-.weight-value { font-size: 13pt; font-weight: bold; }
+.weight-label { font-size: 10pt; color: #444; }
+.weight-value { font-size: 15pt; font-weight: bold; }
 .pallet-counter { margin-top: auto; text-align: right; font-size: 9pt; color: #666; border-top: 1px solid #ccc; padding-top: 2mm; }`
 
 // --- Változó lista definíció ---
@@ -517,6 +517,60 @@ export function GithubStyleTemplateEditor() {
       var iw = window.innerWidth;
       var A4w = 210 * 3.7795;
       var A4h = 297 * 3.7795;
+      var s = Math.min((iw - 16) / A4w, (window.innerHeight - 16) / A4h);
+      var page = document.getElementById('page');
+      page.style.transform = 'scale(' + s + ')';
+      document.body.style.minHeight = (A4h * s + 16) + 'px';
+    }
+    scale();
+    window.addEventListener('resize', scale);
+  </script>
+</body>
+</html>`
+    } else if (selectedTemplate?.type === 'pallet') {
+      // Pallet cimke előnézet: A4 landscape, scale-elve
+      fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      margin: 0;
+      background: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+    .page {
+      width: 297mm;
+      height: 210mm;
+      background: white;
+      position: relative;
+      transform-origin: top center;
+      flex-shrink: 0;
+      padding: 10mm;
+    }
+    /* Alap full-page biztosítás — sablon CSS felülírhatja */
+    .pallet-label {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    ${cssContent}
+  </style>
+</head>
+<body>
+  <div class="page" id="page">
+    ${processedHtml}
+  </div>
+  <script>
+    function scale() {
+      var iw = window.innerWidth;
+      var A4w = 297 * 3.7795;
+      var A4h = 210 * 3.7795;
       var s = Math.min((iw - 16) / A4w, (window.innerHeight - 16) / A4h);
       var page = document.getElementById('page');
       page.style.transform = 'scale(' + s + ')';

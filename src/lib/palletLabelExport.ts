@@ -315,8 +315,16 @@ function buildHTMLFromTemplate(labels: PalletLabelData[], templateHtml: string, 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #000; }
+    /* Alap: minden pallet-label kitölti az A4 landscape oldalt */
+    .pallet-label {
+      width: 277mm;
+      height: 190mm;
+      page-break-after: always;
+      display: flex;
+      flex-direction: column;
+    }
+    .pallet-label:last-child { page-break-after: avoid; }
     ${templateCss}
-    /* Landscape és print mindig felülír mindent — sablon CSS nem írhatja felül */
     @page { size: A4 landscape; margin: 10mm; }
     @media print { body { margin: 0; } }
   </style>
