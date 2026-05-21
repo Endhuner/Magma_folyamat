@@ -39,7 +39,7 @@ function buildLabelData(order: Order, product: Product | undefined): BoxLabelDat
   const piecesPerBox = parseFloat(product?.piecesPerBox || '0') || 0
   const weightPerPieceG = parseFloat(product?.weightPerPiece || '0') || 0
   const boxWeightKg = piecesPerBox * weightPerPieceG / 1000
-  const boxWeight = boxWeightKg > 0 ? boxWeightKg.toFixed(3).replace(/\.?0+$/, '') + ' kg' : ''
+  const boxWeight = boxWeightKg > 0 ? boxWeightKg.toFixed(1) + ' kg' : ''
 
   return {
     designation:   order.designation || order.productName || '',
