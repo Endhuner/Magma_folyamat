@@ -18,9 +18,19 @@ interface BoxLabelMargins {
   left: string
 }
 
+interface PageGroup {
+  cellHtml: string
+  templateCss: string
+  cols: number
+  rows: number
+  margins: BoxLabelMargins
+  cellPaddingH: number
+  cellPaddingV: number
+  pages: BoxLabelData[][]
+}
+
 function formatDate(iso: string): string {
   if (!iso) return ''
-  // "2026-05-16" → "2026.05.16"
   return iso.replace(/-/g, '.')
 }
 
@@ -49,25 +59,62 @@ function applyTemplate(templateHtml: string, d: BoxLabelData): string {
     .replace(/{{productNotes}}/g, d.productNotes)
 }
 
-function renderGrid(labels: BoxLabelData[], cellHtml: string): string {
-  const cells = labels.map(d => `<div class="label-cell">${applyTemplate(cellHtml, d)}</div>`).join('')
-  return `<div class="label-grid">${cells}</div>`
+// Scope CSS rules to a wrapper class so multiple templates don't conflict
+function scopeCSS(css: string, wrapperClass: string): string {
+  return css.replace(/([^{}]+)\{/g, (match, selector) => {
+    const trimmed = selector.trim()
+    // Skip at-rules (@media, @keyframes, etc.)
+    if (trimmed.startsWith('@')) return match
+    const scoped = trimmed.split(',')
+      .map(s => `.${wrapperClass} ${s.trim()}`)
+      .join(', ')
+    return `${scoped} {`
+  })
 }
 
-function buildHTMLFull(
-  allPages: BoxLabelData[][],
-  templateCss: string,
-  cellHtml: string,
-  cols: number,
-  rows: number,
-  margins: BoxLabelMargins,
-  cellPaddingH: number,
-  cellPaddingV: number,
-): string {
-  const pages = allPages.map(page => renderGrid(page, cellHtml)).join('\n')
-  const pageMargin = `${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm`
-  const gridH = 297 - parseFloat(margins.top) - parseFloat(margins.bottom)
-  const gridW = 210 - parseFloat(margins.left) - parseFloat(margins.right)
+function buildHTMLFull(groups: PageGroup[]): string {
+  let cssBlocks = ''
+  let pageBlocks = ''
+
+  groups.forEach((group, gi) => {
+    const cls = `tpl${gi}`
+    const { margins, cols, rows, cellPaddingH, cellPaddingV, templateCss, cellHtml } = group
+    const pageMargin = `${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm`
+    const gridH = 297 - parseFloat(margins.top) - parseFloat(margins.bottom)
+    const gridW = 210 - parseFloat(margins.left) - parseFloat(margins.right)
+
+    cssBlocks += `
+    /* ── Template ${gi} ── */
+    .${cls} .label-grid {
+      display: grid;
+      grid-template-columns: repeat(${cols}, 1fr);
+      grid-template-rows: repeat(${rows}, 1fr);
+      width: ${gridW}mm;
+      height: ${gridH}mm;
+    }
+    .${cls} .label-cell {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: ${cellPaddingV}mm ${cellPaddingH}mm;
+      overflow: hidden;
+    }
+    ${scopeCSS(templateCss, cls)}
+    `
+
+    group.pages.forEach((page, pi) => {
+      const isLast = gi === groups.length - 1 && pi === group.pages.length - 1
+      const cells = page.map(d => `<div class="label-cell">${applyTemplate(cellHtml, d)}</div>`).join('')
+      pageBlocks += `
+    <div class="${cls} label-page" style="@page{margin:${pageMargin}}${isLast ? '' : ''}">
+      <div class="label-grid">${cells}</div>
+    </div>`
+    })
+  })
+
+  // Use the first group's margins for @page (most common case: single template)
+  const firstMargins = groups[0].margins
+  const pageMargin = `${firstMargins.top}mm ${firstMargins.right}mm ${firstMargins.bottom}mm ${firstMargins.left}mm`
 
   return `<!DOCTYPE html>
 <html lang="hu">
@@ -78,32 +125,14 @@ function buildHTMLFull(
     @page { size: A4; margin: ${pageMargin}; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; }
-
-    .label-grid {
-      display: grid;
-      grid-template-columns: repeat(${cols}, 1fr);
-      grid-template-rows: repeat(${rows}, 1fr);
-      width: ${gridW}mm;
-      height: ${gridH}mm;
-      page-break-after: always;
-    }
-    .label-grid:last-child { page-break-after: avoid; }
-
-    .label-cell {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding: ${cellPaddingV}mm ${cellPaddingH}mm;
-      overflow: hidden;
-    }
-
-    ${templateCss}
-
+    .label-page { page-break-after: always; }
+    .label-page:last-child { page-break-after: avoid; }
+    ${cssBlocks}
     @media print { body { margin: 0; } }
   </style>
 </head>
 <body>
-${pages}
+${pageBlocks}
 </body>
 </html>`
 }
@@ -157,38 +186,52 @@ export function generateBoxLabels(
     }
   }>
 ): void {
-  const boxTemplate = savedTemplatesOverride?.find(t => t.data?.type === 'box-label' && t.data?.active)
+  const activeBoxTemplate = savedTemplatesOverride?.find(t => t.data?.type === 'box-label' && t.data?.active)
     ?? savedTemplatesOverride?.find(t => t.data?.type === 'box-label')
-  const cellHtml = boxTemplate?.data.html || DEFAULT_BOX_LABEL_CELL_HTML
-  const templateCss = boxTemplate?.data.css || DEFAULT_BOX_LABEL_CSS
-  const cols = boxTemplate?.data.gridCols ?? DEFAULT_COLS
-  const rows = boxTemplate?.data.gridRows ?? DEFAULT_ROWS
-  const margins = boxTemplate?.data.margins ?? DEFAULT_MARGINS
-  const cellPaddingH = boxTemplate?.data.cellPaddingH ?? 3
-  const cellPaddingV = boxTemplate?.data.cellPaddingV ?? 2
-  const labelsPerPage = cols * rows
 
-  const allPages: BoxLabelData[][] = []
+  // Group pages by template ID to avoid CSS conflicts
+  const groupMap = new Map<string, PageGroup>()
 
   for (const order of orders) {
     const product = order.productId
       ? products.find(p => p.id === order.productId)
       : products.find(p => p.customer.trim().toLowerCase() === order.customer.trim().toLowerCase())
 
+    const productTemplate = product?.labelTemplateId
+      ? savedTemplatesOverride?.find(t => t.id === product.labelTemplateId)
+      : undefined
+    const boxTemplate = productTemplate ?? activeBoxTemplate
+    const templateId = boxTemplate?.id ?? '__default__'
+
+    if (!groupMap.has(templateId)) {
+      groupMap.set(templateId, {
+        cellHtml:     boxTemplate?.data.html     || DEFAULT_BOX_LABEL_CELL_HTML,
+        templateCss:  boxTemplate?.data.css      || DEFAULT_BOX_LABEL_CSS,
+        cols:         boxTemplate?.data.gridCols  ?? DEFAULT_COLS,
+        rows:         boxTemplate?.data.gridRows  ?? DEFAULT_ROWS,
+        margins:      boxTemplate?.data.margins   ?? DEFAULT_MARGINS,
+        cellPaddingH: boxTemplate?.data.cellPaddingH ?? 3,
+        cellPaddingV: boxTemplate?.data.cellPaddingV ?? 2,
+        pages: [],
+      })
+    }
+
+    const group = groupMap.get(templateId)!
+    const labelsPerPage = group.cols * group.rows
     const labelData = buildLabelData(order, product)
     const boxCount = order.boxesCount || 1
     const pageCount = Math.ceil(boxCount / labelsPerPage)
     for (let i = 0; i < pageCount; i++) {
-      allPages.push(Array(labelsPerPage).fill(labelData))
+      group.pages.push(Array(labelsPerPage).fill(labelData))
     }
   }
 
-  if (allPages.length === 0) {
+  if (groupMap.size === 0) {
     alert('Nincsenek generálható etikettáák — ellenőrizd a kijelölt rendeléseket.')
     return
   }
 
-  const html = buildHTMLFull(allPages, templateCss, cellHtml, cols, rows, margins, cellPaddingH, cellPaddingV)
+  const html = buildHTMLFull(Array.from(groupMap.values()))
   const win = window.open('', '_blank')
   if (!win) return
   win.document.write(html)

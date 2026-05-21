@@ -4,16 +4,24 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Product } from '@/lib/types'
+
+interface BoxLabelTemplate {
+  id: string
+  name: string
+  data: { type: string; active?: boolean }
+}
 
 interface ProductDialogProps {
   open: boolean
   onClose: () => void
   onSave: (product: Partial<Product>) => void
   product: Product | null
+  savedTemplates?: BoxLabelTemplate[]
 }
 
-export function ProductDialog({ open, onClose, onSave, product }: ProductDialogProps) {
+export function ProductDialog({ open, onClose, onSave, product, savedTemplates }: ProductDialogProps) {
   const [formData, setFormData] = useState({
     customer: '',
     drawingNumber: '',
@@ -33,6 +41,7 @@ export function ProductDialog({ open, onClose, onSave, product }: ProductDialogP
     warehouse: '',
     spruWeight: '',
   })
+  const [labelTemplateId, setLabelTemplateId] = useState<string>('__active__')
 
   useEffect(() => {
     if (product) {
@@ -55,6 +64,7 @@ export function ProductDialog({ open, onClose, onSave, product }: ProductDialogP
         warehouse: product.warehouse || '',
         spruWeight: product.spruWeight || '',
       })
+      setLabelTemplateId(product.labelTemplateId || '__active__')
     } else {
       setFormData({
         customer: '',
@@ -75,6 +85,7 @@ export function ProductDialog({ open, onClose, onSave, product }: ProductDialogP
         warehouse: '',
         spruWeight: '',
       })
+      setLabelTemplateId('__active__')
     }
   }, [product, open])
 
@@ -82,6 +93,7 @@ export function ProductDialog({ open, onClose, onSave, product }: ProductDialogP
     e.preventDefault()
     const productData: Partial<Product> = {
       ...formData,
+      labelTemplateId: labelTemplateId === '__active__' ? null : labelTemplateId,
       updatedAt: new Date().toISOString(),
     }
     if (!product) {
@@ -260,6 +272,28 @@ export function ProductDialog({ open, onClose, onSave, product }: ProductDialogP
               value={formData.spruWeight}
               onChange={(e) => handleChange('spruWeight', e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="labelTemplateId">Etikett sablon</Label>
+            <Select value={labelTemplateId} onValueChange={setLabelTemplateId}>
+              <SelectTrigger id="labelTemplateId">
+                <SelectValue placeholder="Aktív sablon (alapértelmezett)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__active__">Aktív sablon (alapértelmezett)</SelectItem>
+                {(savedTemplates || [])
+                  .filter(t => t.data?.type === 'box-label')
+                  .map(t => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}{t.data?.active ? ' ★' : ''}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Ha nincs megadva, a csillaggal jelölt aktív etiketta sablon kerül nyomtatásra.
+            </p>
           </div>
 
           <DialogFooter>

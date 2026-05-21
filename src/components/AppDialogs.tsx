@@ -346,6 +346,7 @@ export function AppDialogs({
         onClose={() => { setProductDialogOpen(false); setSelectedProduct(null) }}
         onSave={handleSaveProduct}
         product={selectedProduct}
+        savedTemplates={savedTemplates?.map(t => ({ id: (t as any).id, name: (t as any).name || t.data?.name || '', data: { type: t.data?.type || '', active: t.data?.active } })) || []}
       />
 
       <ProductBulkImportDialog

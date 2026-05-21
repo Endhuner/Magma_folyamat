@@ -109,6 +109,8 @@ export interface Product {
   autoUpdateInventory?: boolean
   /** Alacsony készlet küszöb (db). A figyelmeztető banner ennél kevesebb darabszámot jelez. */
   lowStockThreshold?: number
+  /** Termékhez rendelt egyedi etiketta sablon ID (saved-templates). Ha null, az aktív sablon érvényes. */
+  labelTemplateId?: string | null
   createdAt: string
   updatedAt: string
 }
