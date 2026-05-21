@@ -64,6 +64,13 @@
       "when": 1747200000000,
       "tag": "0008_shift_end_shots_absolute",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1747900000000,
+      "tag": "0009_product_label_template",
+      "breakpoints": true
     }
   ]
 }
