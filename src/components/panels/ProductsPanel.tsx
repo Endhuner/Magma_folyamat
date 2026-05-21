@@ -10,6 +10,12 @@ import { Plus, Upload, MagnifyingGlass } from '@phosphor-icons/react'
 import { ProductsTable } from '@/components/ProductsTable'
 import type { Product, Order } from '@/lib/types'
 
+interface SavedTemplateRef {
+  id: string
+  name: string
+  data: { type: string; active?: boolean }
+}
+
 export interface ProductsPanelProps {
   filteredProducts: Product[]
   orders: Order[] | null | undefined
@@ -20,6 +26,7 @@ export interface ProductsPanelProps {
   handleEditProduct: (id: string) => void
   handleDeleteProduct: (id: string) => void
   handleBulkDeleteProducts: (ids: string[]) => void
+  savedTemplates?: SavedTemplateRef[]
 }
 
 export function ProductsPanel({
@@ -32,6 +39,7 @@ export function ProductsPanel({
   handleEditProduct,
   handleDeleteProduct,
   handleBulkDeleteProducts,
+  savedTemplates,
 }: ProductsPanelProps) {
   return (
     <TabsContent value="products" className="space-y-6">
@@ -68,6 +76,7 @@ export function ProductsPanel({
         onEdit={handleEditProduct}
         onDelete={handleDeleteProduct}
         onBulkDelete={handleBulkDeleteProducts}
+        savedTemplates={savedTemplates}
       />
     </TabsContent>
   )

@@ -19,11 +19,18 @@ import {
 import { memo, useMemo, useState } from 'react'
 import { EntityHistoryDialog } from '@/components/EntityHistoryDialog'
 
+interface SavedTemplateRef {
+  id: string
+  name: string
+  data: { type: string; active?: boolean }
+}
+
 interface ProductsTableProps {
   products: Product[]
   orders: Order[]
   onEdit: (id: string) => void
   onDelete: (id: string) => void
+  savedTemplates?: SavedTemplateRef[]
   /**
    * Opcionális tömeges törlés. Ha nincs megadva, a `onDelete` hívódik meg
    * soronként, ami szintén működőképes, csak több tost-üzenetet produkál.
@@ -42,7 +49,7 @@ function duplicateKey(p: Product): string {
   return [norm(p.customer), norm(p.drawingNumber), norm(p.productName)].join('||')
 }
 
-function ProductsTableImpl({ products, orders, onEdit, onDelete, onBulkDelete }: ProductsTableProps) {
+function ProductsTableImpl({ products, orders, onEdit, onDelete, onBulkDelete, savedTemplates }: ProductsTableProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState<string | null>(null)
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
@@ -252,6 +259,7 @@ function ProductsTableImpl({ products, orders, onEdit, onDelete, onBulkDelete }:
                   <TableHead className="min-w-[120px]">Arktikál nr.</TableHead>
                   <TableHead className="min-w-[100px]">Raktár</TableHead>
                   <TableHead className="min-w-[120px]">Engusz súly</TableHead>
+                  <TableHead className="min-w-[160px]">Etikett</TableHead>
                   <TableHead className="text-right min-w-[120px] sticky right-0 bg-card">Műveletek</TableHead>
                 </TableRow>
               </TableHeader>
@@ -303,6 +311,18 @@ function ProductsTableImpl({ products, orders, onEdit, onDelete, onBulkDelete }:
                       <TableCell className="font-mono min-w-[120px]">{product.articleNumber}</TableCell>
                       <TableCell className="min-w-[100px]">{product.warehouse}</TableCell>
                       <TableCell className="min-w-[120px]">{product.spruWeight}</TableCell>
+                      <TableCell className="min-w-[160px]">
+                        {product.labelTemplateId && (() => {
+                          const tpl = savedTemplates?.find(t => t.id === product.labelTemplateId)
+                          return tpl ? (
+                            <Badge variant="outline" className="text-xs font-normal max-w-[150px] truncate" title={tpl.name}>
+                              {tpl.name}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">törölt sablon</span>
+                          )
+                        })()}
+                      </TableCell>
                       <TableCell className="text-right min-w-[120px] sticky right-0 bg-card">
                         <div className="flex justify-end gap-2">
                           <Button

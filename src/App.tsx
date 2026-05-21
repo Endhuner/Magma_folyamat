@@ -1897,6 +1897,7 @@ function App() {
             handleEditProduct={handleEditProduct}
             handleDeleteProduct={handleDeleteProduct}
             handleBulkDeleteProducts={handleBulkDeleteProducts}
+            savedTemplates={savedTemplates?.map(t => ({ id: (t as any).id, name: (t as any).name || t.data?.name || '', data: { type: t.data?.type || '', active: t.data?.active } })) || []}
           />
 
 

@@ -229,10 +229,12 @@ const TEMPLATE_VARIABLES = [
       { token: '{{designation}}',    label: 'Megnevezés (rendelésből)' },
       { token: '{{drawingNumber}}',  label: 'Cikkszám / Rajzszám' },
       { token: '{{piecesPerBox}}',   label: 'Db/karton (termékből)' },
+      { token: '{{boxWeight}}',      label: 'Doboz súlya (db×súly/db, kg)' },
       { token: '{{material}}',       label: 'Anyag' },
       { token: '{{orderNumber}}',    label: 'Vevő rendelési száma' },
       { token: '{{requiredDate}}',   label: 'Határidő (ÉÉÉÉ.HH.NN)' },
       { token: '{{customer}}',       label: 'Vevő neve' },
+      { token: '{{productNotes}}',   label: 'Termék megjegyzés' },
     ],
   },
 ]
@@ -658,6 +660,8 @@ export function GithubStyleTemplateEditor() {
       material: (sampleOrders[0] as any).material || 'Zamak',
       requiredDate: new Date().toISOString().slice(0, 10).replace(/-/g, '.'),
       customer: sampleOrders[0].customer || 'Példa Cég Kft',
+      productNotes: 'Minta megjegyzés',
+      boxWeight: '4.725 kg',
     }
   }
 

@@ -9,6 +9,7 @@ interface BoxLabelData {
   requiredDate: string
   customer: string
   productNotes: string
+  boxWeight: string
 }
 
 interface BoxLabelMargins {
@@ -35,6 +36,11 @@ function formatDate(iso: string): string {
 }
 
 function buildLabelData(order: Order, product: Product | undefined): BoxLabelData {
+  const piecesPerBox = parseFloat(product?.piecesPerBox || '0') || 0
+  const weightPerPieceG = parseFloat(product?.weightPerPiece || '0') || 0
+  const boxWeightKg = piecesPerBox * weightPerPieceG / 1000
+  const boxWeight = boxWeightKg > 0 ? boxWeightKg.toFixed(3).replace(/\.?0+$/, '') + ' kg' : ''
+
   return {
     designation:   order.designation || order.productName || '',
     drawingNumber: product?.drawingNumber || order.productName || '',
@@ -44,6 +50,7 @@ function buildLabelData(order: Order, product: Product | undefined): BoxLabelDat
     requiredDate:  formatDate(order.requiredDate),
     customer:      order.customer || '',
     productNotes:  product?.notes || '',
+    boxWeight,
   }
 }
 
@@ -57,6 +64,7 @@ function applyTemplate(templateHtml: string, d: BoxLabelData): string {
     .replace(/{{requiredDate}}/g, d.requiredDate)
     .replace(/{{customer}}/g, d.customer)
     .replace(/{{productNotes}}/g, d.productNotes)
+    .replace(/{{boxWeight}}/g, d.boxWeight)
 }
 
 // Scope CSS rules to a wrapper class so multiple templates don't conflict
