@@ -176,8 +176,11 @@ export function generateBoxLabels(
       : products.find(p => p.customer.trim().toLowerCase() === order.customer.trim().toLowerCase())
 
     const labelData = buildLabelData(order, product)
-    const page: BoxLabelData[] = Array(labelsPerPage).fill(labelData)
-    allPages.push(page)
+    const boxCount = order.boxesCount || 1
+    const pageCount = Math.ceil(boxCount / labelsPerPage)
+    for (let i = 0; i < pageCount; i++) {
+      allPages.push(Array(labelsPerPage).fill(labelData))
+    }
   }
 
   if (allPages.length === 0) {
