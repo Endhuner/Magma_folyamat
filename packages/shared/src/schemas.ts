@@ -107,6 +107,7 @@ export const productCreateSchema = z.object({
   spruWeight: z.string().default(''),
   autoUpdateInventory: z.boolean().nullish(),
   lowStockThreshold: z.number().int().min(0).nullish(),
+  labelTemplateId: z.string().nullable().optional(),
   createdAt: z.string().nullish(),
   updatedAt: z.string().nullish(),
 })
