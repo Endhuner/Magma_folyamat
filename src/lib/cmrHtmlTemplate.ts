@@ -453,7 +453,8 @@ function applyTemplateData(
   deliveryNotes: DeliveryNote[],
   sequenceNumber: string,
   userSettings?: CmrLayoutSettings,
-  margins?: { top: string, right: string, bottom: string, left: string }
+  margins?: { top: string, right: string, bottom: string, left: string },
+  issueDate?: string
 ): string {
   const effectiveSettings = { ...DEFAULT_CMR_SETTINGS, ...userSettings }
   const firstCustomer = orders[0]?.customer || ''
@@ -566,8 +567,11 @@ function applyTemplateData(
   html = html.replace(/{{customerTaxNumber}}/g, esc(customerInfo?.taxNumber || ''))
   html = html.replace(/{{pickupLocation}}/g, esc(effectiveSettings.placeOfTakingOver || ''))
   html = html.replace(/{{deliveryLocation}}/g, esc(customerInfo?.city || ''))
-  html = html.replace(/{{deliveryDate}}/g, new Date().toLocaleDateString('hu-HU'))
-  html = html.replace(/{{issueDate}}/g, new Date().toLocaleDateString('hu-HU'))
+  const formattedIssueDate = issueDate
+    ? new Date(issueDate + 'T00:00:00').toLocaleDateString('hu-HU')
+    : new Date().toLocaleDateString('hu-HU')
+  html = html.replace(/{{deliveryDate}}/g, formattedIssueDate)
+  html = html.replace(/{{issueDate}}/g, formattedIssueDate)
   html = html.replace(/{{carrierName}}/g, esc(effectiveSettings.carrierName || ''))
   html = html.replace(/{{carrierAddress}}/g, esc(effectiveSettings.carrierAddress || ''))
   html = html.replace(/{{vehiclePlate}}/g, esc(effectiveSettings.vehiclePlate || ''))
@@ -634,7 +638,9 @@ export async function exportCmrAsHtml(
   /** Szerver-alapú sablonlista — ha átadják, nem olvas localStorage-ból */
   savedTemplatesOverride?: any[],
   /** Szerver-alapú aktív sablonok — ha átadják, nem olvas localStorage-ból */
-  activeTemplatesOverride?: { cmr?: string; delivery?: string }
+  activeTemplatesOverride?: { cmr?: string; delivery?: string },
+  /** Kiállítás dátuma (YYYY-MM-DD). Ha nincs megadva, az aktuális nap. */
+  issueDate?: string
 ) {
   if (!orders.length) {
     toast.error('Nincsenek exportálandó rendelések')
@@ -673,19 +679,20 @@ export async function exportCmrAsHtml(
         usedMargins = templateToUse.data.margins
         
         html = applyTemplateData(
-          templateToUse.data.html, 
-          templateToUse.data.css, 
-          orders, 
-          customers, 
-          products, 
-          deliveryNotes, 
-          sequenceNumber, 
+          templateToUse.data.html,
+          templateToUse.data.css,
+          orders,
+          customers,
+          products,
+          deliveryNotes,
+          sequenceNumber,
           userSettings,
-          templateToUse.data.margins
+          templateToUse.data.margins,
+          issueDate
         )
       }
     }
-    
+
     if (!templateToUse && activeTemplates?.cmr) {
       activeTemplate = savedTemplates?.find((t: any) => t.id === activeTemplates.cmr)
 
@@ -712,7 +719,8 @@ export async function exportCmrAsHtml(
           deliveryNotes,
           sequenceNumber,
           userSettings,
-          activeTemplate.data.margins
+          activeTemplate.data.margins,
+          issueDate
         )
       }
     }
@@ -721,7 +729,6 @@ export async function exportCmrAsHtml(
       const cmrTemplates = savedTemplates?.filter((t: any) => t.data?.type === 'cmr') || []
 
       if (cmrTemplates.length > 0) {
-        // Legfrissebb CMR sablon használata (timestamp szerint rendezve, csökkenő)
         const sortedCmrTemplates = [...cmrTemplates].sort((a: any, b: any) => {
           const ta = a.data?.timestamp || a.timestamp || ''
           const tb = b.data?.timestamp || b.timestamp || ''
@@ -745,7 +752,8 @@ export async function exportCmrAsHtml(
           deliveryNotes,
           sequenceNumber,
           userSettings,
-          defaultTemplate.data.margins
+          defaultTemplate.data.margins,
+          issueDate
         )
       } else {
         console.log('=== CMR Export - Nincs mentett sablon ===')
@@ -795,6 +803,7 @@ export async function exportCmrAsHtml(
       customer: firstCustomer,
       fileName: fileName,
       exportDate: new Date().toISOString(),
+      issueDate: issueDate ?? new Date().toISOString().slice(0, 10),
     }, sequenceNumber)
   }
 

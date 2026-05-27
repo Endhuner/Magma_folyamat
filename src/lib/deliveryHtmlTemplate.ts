@@ -380,7 +380,8 @@ function applyDeliveryTemplateData(
   deliveryNotes: DeliveryNote[],
   sequenceNumber: string,
   customStyles?: Partial<TemplateStyles>,
-  margins?: { top: string, right: string, bottom: string, left: string }
+  margins?: { top: string, right: string, bottom: string, left: string },
+  issueDate?: string
 ): string {
   const firstCustomer = orders[0]?.customer || ''
   const customerInfo = customers.find(c => c.name === firstCustomer)
@@ -469,8 +470,11 @@ function applyDeliveryTemplateData(
   html = html.replace(/{{customerCity}}/g, esc(customerInfo?.city || ''))
   html = html.replace(/{{customerCountry}}/g, esc(customerInfo?.country || ''))
   html = html.replace(/{{customerTaxNumber}}/g, esc(customerInfo?.taxNumber || ''))
-  html = html.replace(/{{deliveryDate}}/g, new Date().toLocaleDateString('hu-HU'))
-  html = html.replace(/{{issueDate}}/g, new Date().toLocaleDateString('hu-HU'))
+  const formattedIssueDate = issueDate
+    ? new Date(issueDate + 'T00:00:00').toLocaleDateString('hu-HU')
+    : new Date().toLocaleDateString('hu-HU')
+  html = html.replace(/{{deliveryDate}}/g, formattedIssueDate)
+  html = html.replace(/{{issueDate}}/g, formattedIssueDate)
   html = html.replace(/{{referenceNumber}}/g, esc(sequenceNumber))
   html = html.replace(/{{totalQuantity}}/g, String(totalQuantity))
   html = html.replace(/{{totalBoxes}}/g, String(totalBoxes))
@@ -535,7 +539,9 @@ export async function exportDeliveryAsHtml(
   /** Szerver-alapú sablonlista — ha átadják, nem olvas localStorage-ból */
   savedTemplatesOverride?: any[],
   /** Szerver-alapú aktív sablonok — ha átadják, nem olvas localStorage-ból */
-  activeTemplatesOverride?: { cmr?: string; delivery?: string }
+  activeTemplatesOverride?: { cmr?: string; delivery?: string },
+  /** Kiállítás dátuma (YYYY-MM-DD). Ha nincs megadva, az aktuális nap. */
+  issueDate?: string
 ) {
   if (!orders.length) {
     toast.error('Nincsenek exportálandó rendelések')
@@ -574,22 +580,23 @@ export async function exportDeliveryAsHtml(
         usedMargins = templateToUse.data.margins
         
         html = applyDeliveryTemplateData(
-          templateToUse.data.html, 
-          templateToUse.data.css, 
-          orders, 
-          customers, 
-          products, 
-          deliveryNotes, 
-          sequenceNumber, 
+          templateToUse.data.html,
+          templateToUse.data.css,
+          orders,
+          customers,
+          products,
+          deliveryNotes,
+          sequenceNumber,
           customStyles,
-          templateToUse.data.margins
+          templateToUse.data.margins,
+          issueDate
         )
       }
     }
-    
+
     if (!templateToUse && activeTemplates?.delivery) {
       activeTemplate = savedTemplates?.find((t: any) => t.id === activeTemplates.delivery)
-      
+
       if (activeTemplate && activeTemplate.data && activeTemplate.data.html) {
         console.log('=== Szállítólevél Export Aktív Sablonnal ===')
         console.log('Sablon forrás: Aktív sablon mentésből')
@@ -597,24 +604,25 @@ export async function exportDeliveryAsHtml(
         console.log('Sablon ID:', activeTemplate.id)
         templateSource = 'aktív sablon: ' + activeTemplate.name
         usedMargins = activeTemplate.data.margins
-        
+
         html = applyDeliveryTemplateData(
-          activeTemplate.data.html, 
-          activeTemplate.data.css, 
-          orders, 
-          customers, 
-          products, 
-          deliveryNotes, 
-          sequenceNumber, 
+          activeTemplate.data.html,
+          activeTemplate.data.css,
+          orders,
+          customers,
+          products,
+          deliveryNotes,
+          sequenceNumber,
           customStyles,
-          activeTemplate.data.margins
+          activeTemplate.data.margins,
+          issueDate
         )
       }
     }
-    
+
     if (!templateToUse && (!activeTemplate || !activeTemplate.data || !activeTemplate.data.html)) {
       const deliveryTemplates = savedTemplates?.filter((t: any) => t.data?.type === 'delivery') || []
-      
+
       if (deliveryTemplates.length > 0) {
         const defaultTemplate = deliveryTemplates[0]
         console.log('=== Szállítólevél Export Mentett Sablonnal (nincs aktív beállítva) ===')
@@ -623,17 +631,18 @@ export async function exportDeliveryAsHtml(
         console.log('Sablon ID:', defaultTemplate.id)
         templateSource = 'mentett sablon: ' + defaultTemplate.name
         usedMargins = defaultTemplate.data.margins
-        
+
         html = applyDeliveryTemplateData(
-          defaultTemplate.data.html, 
-          defaultTemplate.data.css, 
-          orders, 
-          customers, 
-          products, 
-          deliveryNotes, 
-          sequenceNumber, 
+          defaultTemplate.data.html,
+          defaultTemplate.data.css,
+          orders,
+          customers,
+          products,
+          deliveryNotes,
+          sequenceNumber,
           customStyles,
-          defaultTemplate.data.margins
+          defaultTemplate.data.margins,
+          issueDate
         )
       } else {
         console.log('=== Szállítólevél Export - Nincs mentett sablon ===')
@@ -686,6 +695,7 @@ export async function exportDeliveryAsHtml(
       customer: firstCustomer,
       fileName: fileName,
       exportDate: new Date().toISOString(),
+      issueDate: issueDate ?? new Date().toISOString().slice(0, 10),
     }, sequenceNumber)
   }
 

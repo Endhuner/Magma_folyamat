@@ -89,6 +89,9 @@ export const config = {
   cookieSecure: parseBool(requireEnv('COOKIE_SECURE', 'false')),
   defaultAdminName: requireEnv('DEFAULT_ADMIN_NAME', 'Admin'),
   defaultAdminPin: process.env.DEFAULT_ADMIN_PIN || '',
+
+  // Dev-only: ha true, minden auth-ellenőrzés átugorható (sosem production!)
+  disableAuth: parseBool(requireEnv('DISABLE_AUTH', 'false')),
 } as const
 
 export type AppConfig = typeof config

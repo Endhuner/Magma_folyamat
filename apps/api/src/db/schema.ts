@@ -174,6 +174,7 @@ export const deliveryNotes = sqliteTable('delivery_notes', {
   orderIds: text('order_ids').notNull().default('[]'),
   fileName: text('file_name').notNull().default(''),
   exportDate: text('export_date').notNull().default(''),
+  issueDate: text('issue_date'),
   // JSON: Record<string, string|number|null|undefined>[]
   exportData: text('export_data'),
   createdAt: text('created_at').notNull().default(nowDefault),

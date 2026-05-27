@@ -57,6 +57,7 @@ import { MachinesPanel } from '@/components/panels/MachinesPanel'
 import { UsersPanel } from '@/components/panels/UsersPanel'
 import { MaterialsPanel } from '@/components/panels/MaterialsPanel'
 import { AppDialogs } from '@/components/AppDialogs'
+import { IssueDateDialog } from '@/components/IssueDateDialog'
 
 type LastAction =
   | { type: 'delete', orders: Order[] }
@@ -239,6 +240,9 @@ function App() {
   const [validationDialogOpen, setValidationDialogOpen] = useState(false)
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
   const [pendingExportType, setPendingExportType] = useState<'cmr' | 'delivery' | null>(null)
+  const [issueDateDialogOpen, setIssueDateDialogOpen] = useState(false)
+  const [issueDateDialogType, setIssueDateDialogType] = useState<'delivery' | 'cmr'>('delivery')
+  const [pendingIssueDate, setPendingIssueDate] = useState<string | null>(null)
   
   const [deliveryStyles] = useAppSetting<Partial<TemplateStyles>>('delivery-html-styles', {})
   // Aktív sablonok (melyik saved-template van CMR/szállítólevélhez beállítva)
@@ -1357,19 +1361,8 @@ function App() {
       toast.error('Nincsenek kiválasztott rendelések')
       return
     }
-
-    const selectedOrders = (orders || []).filter(o => selectedOrderIds.includes(o.id))
-    
-    const validation = validateDeliveryExport(selectedOrders, customers || [], products || [])
-    
-    if (!validation.isValid || validation.warnings.length > 0) {
-      setValidationResult(validation)
-      setPendingExportType('delivery')
-      setValidationDialogOpen(true)
-      return
-    }
-
-    await executeDeliveryExport()
+    setIssueDateDialogType('delivery')
+    setIssueDateDialogOpen(true)
   }
   
   /**
@@ -1383,7 +1376,35 @@ function App() {
     )
   }
 
-  const actuallyRunDeliveryExport = async (selectedOrders: Order[]) => {
+  /** Dátumválasztó megerősítése után fut — elvégzi a validációt, majd exportál. */
+  const handleIssueDateConfirm = async (issueDate: string) => {
+    setPendingIssueDate(issueDate)
+    setIssueDateDialogOpen(false)
+
+    const selectedOrders = (orders || []).filter(o => selectedOrderIds.includes(o.id))
+
+    if (issueDateDialogType === 'delivery') {
+      const validation = validateDeliveryExport(selectedOrders, customers || [], products || [])
+      if (!validation.isValid || validation.warnings.length > 0) {
+        setValidationResult(validation)
+        setPendingExportType('delivery')
+        setValidationDialogOpen(true)
+        return
+      }
+      await executeDeliveryExport(issueDate)
+    } else {
+      const validation = validateCmrExport(selectedOrders, customers || [], products || [], cmrSettings)
+      if (!validation.isValid || validation.warnings.length > 0) {
+        setValidationResult(validation)
+        setPendingExportType('cmr')
+        setValidationDialogOpen(true)
+        return
+      }
+      await executeCmrExport(issueDate)
+    }
+  }
+
+  const actuallyRunDeliveryExport = async (selectedOrders: Order[], issueDate?: string) => {
     await exportDeliveryAsHtml(
       selectedOrders,
       customers || [],
@@ -1412,11 +1433,12 @@ function App() {
       },
       deliveryStyles,
       savedTemplates,
-      activeTemplates
+      activeTemplates,
+      issueDate ?? undefined
     )
   }
 
-  const executeDeliveryExport = async () => {
+  const executeDeliveryExport = async (issueDate?: string) => {
     const selectedOrders = (orders || []).filter((o) => selectedOrderIds.includes(o.id))
 
     // Készletlevonás csak olyan rendelésekre, amelyeknél még nem történt szállítói levonás
@@ -1424,7 +1446,7 @@ function App() {
 
     if (ordersForDeduction.length === 0) {
       // Nincs mit levonni — közvetlenül exportálunk
-      await actuallyRunDeliveryExport(selectedOrders)
+      await actuallyRunDeliveryExport(selectedOrders, issueDate)
       return
     }
 
@@ -1443,7 +1465,7 @@ function App() {
       setDeductionContext('szállítólevél')
       setPendingStatusChange(null)
       setPendingPostDeduction(() => async () => {
-        await actuallyRunDeliveryExport(selectedOrders)
+        await actuallyRunDeliveryExport(selectedOrders, issueDate)
       })
       setInventoryDeductionDialogOpen(true)
       return
@@ -1451,7 +1473,6 @@ function App() {
 
     // Teljes fedezet — automatikusan levonjuk, majd exportálunk
     if (deductionResult.deductedItems.length > 0) {
-      // Atomicus commit: lásd inventoryService.commitInventoryDeduction.
       commitInventoryDeduction(
         deductionResult,
         setInventory,
@@ -1459,7 +1480,7 @@ function App() {
       )
       toast.success(`Készlet csökkentve: ${deductionResult.deductedItems.length} tétel`)
     }
-    await actuallyRunDeliveryExport(selectedOrders)
+    await actuallyRunDeliveryExport(selectedOrders, issueDate)
   }
 
   const handleExportCmr = async () => {
@@ -1467,24 +1488,13 @@ function App() {
       toast.error('Nincsenek kiválasztott rendelések')
       return
     }
-
-    const selectedOrders = (orders || []).filter(o => selectedOrderIds.includes(o.id))
-    
-    const validation = validateCmrExport(selectedOrders, customers || [], products || [], cmrSettings)
-    
-    if (!validation.isValid || validation.warnings.length > 0) {
-      setValidationResult(validation)
-      setPendingExportType('cmr')
-      setValidationDialogOpen(true)
-      return
-    }
-
-    await executeCmrExport()
+    setIssueDateDialogType('cmr')
+    setIssueDateDialogOpen(true)
   }
   
-  const executeCmrExport = async () => {
+  const executeCmrExport = async (issueDate?: string) => {
     const selectedOrders = (orders || []).filter(o => selectedOrderIds.includes(o.id))
-    
+
     await exportCmrAsHtml(
       selectedOrders,
       customers || [],
@@ -1513,17 +1523,18 @@ function App() {
       },
       cmrSettings,
       savedTemplates,
-      activeTemplates
+      activeTemplates,
+      issueDate ?? undefined
     )
   }
 
   const handleValidationContinue = async () => {
     setValidationDialogOpen(false)
-    
+
     if (pendingExportType === 'cmr') {
-      await executeCmrExport()
+      await executeCmrExport(pendingIssueDate ?? undefined)
     } else if (pendingExportType === 'delivery') {
-      await executeDeliveryExport()
+      await executeDeliveryExport(pendingIssueDate ?? undefined)
     }
     
     setPendingExportType(null)
@@ -2006,6 +2017,13 @@ function App() {
           />
         </Tabs>
       </div>
+
+      <IssueDateDialog
+        open={issueDateDialogOpen}
+        type={issueDateDialogType}
+        onConfirm={handleIssueDateConfirm}
+        onClose={() => setIssueDateDialogOpen(false)}
+      />
 
       <AppDialogs
         inventoryDialogOpen={inventoryDialogOpen}

@@ -84,6 +84,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   // ---------- ME ----------
   app.get('/auth/me', async (req, reply) => {
+    if (config.disableAuth) {
+      return { sub: 'dev-admin', name: 'Dev Admin', role: 'admin' }
+    }
     try {
       await req.jwtVerify()
     } catch {

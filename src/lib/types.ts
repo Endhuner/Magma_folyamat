@@ -123,6 +123,7 @@ export interface DeliveryNote {
   orderIds: string[]
   fileName: string
   exportDate: string
+  issueDate?: string
   exportData?: Record<string, string | number | null | undefined>[]
   createdAt: string
   updatedAt: string

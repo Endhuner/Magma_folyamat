@@ -124,6 +124,7 @@ export const deliveryNoteCreateSchema = z.object({
   orderIds: z.array(z.string()).default([]),
   fileName: z.string().default(''),
   exportDate: z.string().default(''),
+  issueDate: z.string().optional(),
   exportData: z.array(z.record(z.unknown())).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),

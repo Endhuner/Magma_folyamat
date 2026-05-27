@@ -16,8 +16,19 @@
  */
 import type { FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify'
 import type { UserRole } from '@produktivpro/shared'
+import { config } from '../config.js'
+
+/** Dev-only bypass: beállít egy fake admin usert, hogy az audit-log ne legyen üres. */
+function applyDevBypass(req: FastifyRequest): void {
+  ;(req as unknown as { user: unknown }).user = {
+    sub: 'dev-admin',
+    name: 'Dev Admin',
+    role: 'admin' as UserRole,
+  }
+}
 
 export const requireAuth: preHandlerHookHandler = async (req, reply) => {
+  if (config.disableAuth) { applyDevBypass(req); return }
   try {
     await req.jwtVerify()
   } catch {
@@ -27,6 +38,7 @@ export const requireAuth: preHandlerHookHandler = async (req, reply) => {
 
 export function requireRole(...allowed: UserRole[]): preHandlerHookHandler {
   return async (req, reply) => {
+    if (config.disableAuth) { applyDevBypass(req); return }
     try {
       await req.jwtVerify()
     } catch {
@@ -35,7 +47,7 @@ export function requireRole(...allowed: UserRole[]): preHandlerHookHandler {
     const role = req.user?.role
     if (!role || !allowed.includes(role)) {
       return reply.code(403).send({
-        error: 'Nincs jogosultságod ehhez a művelethez',
+        error: 'Nincs jogosultságod ehhez aművelethez',
         required: allowed,
         actual: role,
       })
@@ -49,6 +61,7 @@ export function requireRole(...allowed: UserRole[]): preHandlerHookHandler {
  * tovább. A CRUD-factory használja az audit-userId-hez.
  */
 export const tryAuth: preHandlerHookHandler = async (req: FastifyRequest, _reply: FastifyReply) => {
+  if (config.disableAuth) { applyDevBypass(req); return }
   try {
     await req.jwtVerify()
   } catch {
