@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Card } from '@/components/ui/card'
 import { DeliveryNote, Order, Customer, Product, ColumnFilter } from '@/lib/types'
-import { Trash, FileText, FileCsv, Eye, FileArrowDown, MagnifyingGlass, X, PencilSimple, Funnel, CalendarBlank, TrendUp } from '@phosphor-icons/react'
+import { Trash, FileText, FileCsv, Eye, FileArrowDown, MagnifyingGlass, X, PencilSimple, Funnel, CalendarBlank, TrendUp, Envelope } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 import { hu } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -539,6 +539,33 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
                         >
                           <FileArrowDown className="w-4 h-4" />
                         </Button>
+                        {(() => {
+                          const customer = customers.find(c => c.name === note.customer)
+                          const email = customer?.email
+                          const docLabel = note.type === 'cmr' ? 'CMR' : 'Szállítólevél'
+                          const subject = encodeURIComponent(`${docLabel} – ${note.sequenceNumber}`)
+                          const body = encodeURIComponent(
+                            `Tisztelt ${note.customer}!\n\nMellékeljük a(z) ${note.sequenceNumber} számú ${docLabel.toLowerCase()}t.\n\nÜdvözlettel,\nMagma Kft`
+                          )
+                          return (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title={email ? `Email küldése: ${email}` : 'Az ügyfélnek nincs email-címe'}
+                              disabled={!email}
+                              asChild={!!email}
+                            >
+                              {email ? (
+                                <a href={`mailto:${email}?subject=${subject}&body=${body}`}>
+                                  <Envelope className="w-4 h-4" />
+                                </a>
+                              ) : (
+                                <span><Envelope className="w-4 h-4" /></span>
+                              )}
+                            </Button>
+                          )
+                        })()}
                         <Button
                           variant="ghost"
                           size="icon"

@@ -78,6 +78,7 @@ export const customerCreateSchema = z.object({
   deliveryTemplateId: z.string().nullable().optional(),
   cmrTemplateId: z.string().nullable().optional(),
   labelTemplateId: z.string().nullable().optional(),
+  email: z.string().email().or(z.literal('')).default(''),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 })

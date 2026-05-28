@@ -38,6 +38,7 @@ export function CustomerDialog({ open, onClose, onSave, customer, savedTemplates
     deliveryTemplateId: customer?.deliveryTemplateId || null,
     cmrTemplateId: customer?.cmrTemplateId || null,
     labelTemplateId: customer?.labelTemplateId || null,
+    email: customer?.email || '',
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -56,6 +57,7 @@ export function CustomerDialog({ open, onClose, onSave, customer, savedTemplates
       deliveryTemplateId: formData.deliveryTemplateId,
       cmrTemplateId: formData.cmrTemplateId,
       labelTemplateId: formData.labelTemplateId,
+      email: formData.email,
       updatedAt: new Date().toISOString(),
     }
 
@@ -158,6 +160,17 @@ export function CustomerDialog({ open, onClose, onSave, customer, savedTemplates
                 value={formData.taxNumber}
                 onChange={(e) => setFormData({ ...formData, taxNumber: e.target.value })}
                 required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email-cím</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="pl. info@ceg.hu"
               />
             </div>
 

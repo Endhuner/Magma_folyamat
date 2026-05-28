@@ -74,6 +74,7 @@ export const customers = sqliteTable('customers', {
   country: text('country').notNull().default(''),
   fullAddress: text('full_address').notNull().default(''),
   taxNumber: text('tax_number').notNull().default(''),
+  email: text('email').notNull().default(''),
   deliveryTemplateId: text('delivery_template_id'),
   cmrTemplateId: text('cmr_template_id'),
   labelTemplateId: text('label_template_id'),

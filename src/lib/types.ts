@@ -79,6 +79,7 @@ export interface Customer {
   country: string
   fullAddress: string
   taxNumber: string
+  email?: string
   deliveryTemplateId?: string | null
   cmrTemplateId?: string | null
   labelTemplateId?: string | null
