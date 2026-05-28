@@ -2094,6 +2094,7 @@ function App() {
         selectedProduct={selectedProduct}
         setSelectedProduct={setSelectedProduct}
         handleSaveProduct={handleSaveProduct}
+        materials={materialsApi.items}
         productBulkImportDialogOpen={productBulkImportDialogOpen}
         setProductBulkImportDialogOpen={setProductBulkImportDialogOpen}
         handleProductBulkImport={handleProductBulkImport}

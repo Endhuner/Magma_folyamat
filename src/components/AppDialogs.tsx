@@ -28,6 +28,7 @@ import type {
   OrderStatus,
   Customer,
   Product,
+  Material,
   InventoryItem,
   InventoryTransaction,
 } from '@/lib/types'
@@ -135,6 +136,7 @@ interface AppDialogsProps {
   selectedProduct: Product | null
   setSelectedProduct: (v: Product | null) => void
   handleSaveProduct: (data: Partial<Product>) => void
+  materials?: Material[]
 
   productBulkImportDialogOpen: boolean
   setProductBulkImportDialogOpen: (v: boolean) => void
@@ -193,7 +195,7 @@ export function AppDialogs({
   savedTemplates, labelTemplates,
   bulkImportDialogOpen, setBulkImportDialogOpen, handleBulkImport,
   productDialogOpen, setProductDialogOpen,
-  selectedProduct, setSelectedProduct, handleSaveProduct,
+  selectedProduct, setSelectedProduct, handleSaveProduct, materials,
   productBulkImportDialogOpen, setProductBulkImportDialogOpen, handleProductBulkImport,
   newFilterDialogOpen, setNewFilterDialogOpen, setDocumentFilters,
   newOrderFilterDialogOpen, setNewOrderFilterDialogOpen,
@@ -347,6 +349,8 @@ export function AppDialogs({
         onSave={handleSaveProduct}
         product={selectedProduct}
         savedTemplates={savedTemplates?.map(t => ({ id: (t as any).id, name: (t as any).name || t.data?.name || '', data: { type: t.data?.type || '', active: t.data?.active } })) || []}
+        customers={customers || []}
+        materials={materials || []}
       />
 
       <ProductBulkImportDialog

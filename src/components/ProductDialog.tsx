@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Product } from '@/lib/types'
+import { Product, Customer, Material } from '@/lib/types'
 
 interface BoxLabelTemplate {
   id: string
@@ -19,9 +19,11 @@ interface ProductDialogProps {
   onSave: (product: Partial<Product>) => void
   product: Product | null
   savedTemplates?: BoxLabelTemplate[]
+  customers?: Customer[]
+  materials?: Material[]
 }
 
-export function ProductDialog({ open, onClose, onSave, product, savedTemplates }: ProductDialogProps) {
+export function ProductDialog({ open, onClose, onSave, product, savedTemplates, customers = [], materials = [] }: ProductDialogProps) {
   const [formData, setFormData] = useState({
     customer: '',
     drawingNumber: '',
@@ -117,11 +119,16 @@ export function ProductDialog({ open, onClose, onSave, product, savedTemplates }
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="customer">Ügyfél</Label>
-              <Input
-                id="customer"
-                value={formData.customer}
-                onChange={(e) => handleChange('customer', e.target.value)}
-              />
+              <Select value={formData.customer} onValueChange={(v) => handleChange('customer', v)}>
+                <SelectTrigger id="customer">
+                  <SelectValue placeholder="Válassz ügyfelet…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map(c => (
+                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="drawingNumber">Termék rajzszáma</Label>
@@ -174,11 +181,16 @@ export function ProductDialog({ open, onClose, onSave, product, savedTemplates }
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="material">Anyag</Label>
-              <Input
-                id="material"
-                value={formData.material}
-                onChange={(e) => handleChange('material', e.target.value)}
-              />
+              <Select value={formData.material} onValueChange={(v) => handleChange('material', v)}>
+                <SelectTrigger id="material">
+                  <SelectValue placeholder="Válassz anyagot…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {materials.map(m => (
+                    <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="surfaceTreatment">Felületkezelés</Label>
