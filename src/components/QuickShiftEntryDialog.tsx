@@ -1,6 +1,6 @@
 import { generateId } from '@/lib/generateId'
 import { useEffect, useMemo, useState } from 'react'
-import type { Order, Product, ProductionShift } from '@/lib/types'
+import type { Machine, Order, Product, ProductionShift } from '@/lib/types'
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { parseFloatSafe } from '@/lib/helpers'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ArrowRight, CheckCircle, Info } from '@phosphor-icons/react'
@@ -29,6 +36,9 @@ interface QuickShiftEntryDialogProps {
   shift: 'de' | 'du'
   onSave: (shift: ProductionShift) => void
   userId?: string
+  machines?: Machine[]
+  /** Utolsó gép ID auto-kitöltéshez */
+  lastMachineId?: string
 }
 
 /**
@@ -44,10 +54,13 @@ export function QuickShiftEntryDialog({
   shift,
   onSave,
   userId,
+  machines = [],
+  lastMachineId,
 }: QuickShiftEntryDialogProps) {
   const [startShots, setStartShots] = useState<string>('')
   const [endShots, setEndShots] = useState<string>('')
   const [notes, setNotes] = useState<string>('')
+  const [machineId, setMachineId] = useState<string>('')
 
   const nestCountNum = useMemo(() => {
     const n = parseFloatSafe(product?.nestCount, 1, { allowNegative: false })
@@ -59,7 +72,8 @@ export function QuickShiftEntryDialog({
     setStartShots('')
     setEndShots('')
     setNotes('')
-  }, [open, order?.id, date, shift])
+    setMachineId(lastMachineId ?? '')
+  }, [open, order?.id, date, shift, lastMachineId])
 
   const startNum = parseFloatSafe(startShots, 0, { allowNegative: false })
   const endNum = parseFloatSafe(endShots, 0, { allowNegative: false })
@@ -88,6 +102,7 @@ export function QuickShiftEntryDialog({
       producedQuantity: producedPreview,
       notes: notes.trim(),
       userId,
+      machineId: machineId || undefined,
       createdAt: now,
       updatedAt: now,
     }
@@ -117,6 +132,23 @@ export function QuickShiftEntryDialog({
               {shiftLabel(shift)}
             </Badge>
           </div>
+
+          {machines.length > 0 && (
+            <div className="grid gap-2">
+              <Label htmlFor="qs-machine" className="text-base font-medium">Gép</Label>
+              <Select value={machineId || 'none'} onValueChange={(v) => setMachineId(v === 'none' ? '' : v)}>
+                <SelectTrigger id="qs-machine" className="text-base h-10">
+                  <SelectValue placeholder="Válassz gépet…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none" className="text-base text-muted-foreground">— Nincs megadva —</SelectItem>
+                  {machines.map((m) => (
+                    <SelectItem key={m.id} value={m.id} className="text-base">{m.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Kezdő / Vég lövésszám */}
           <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-end">

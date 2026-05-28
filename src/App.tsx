@@ -58,6 +58,7 @@ import { UsersPanel } from '@/components/panels/UsersPanel'
 import { MaterialsPanel } from '@/components/panels/MaterialsPanel'
 import { AppDialogs } from '@/components/AppDialogs'
 import { IssueDateDialog } from '@/components/IssueDateDialog'
+import { ProductionHistoryView } from '@/components/ProductionHistoryView'
 
 type LastAction =
   | { type: 'delete', orders: Order[] }
@@ -1747,6 +1748,10 @@ function App() {
                   <DropdownMenuItem onSelect={() => setCurrentTab('materials')}>
                     Anyaglista
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setCurrentTab('production-history')}>
+                    Gyártás előzmények
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>}
 
@@ -1967,6 +1972,15 @@ function App() {
 
           <TabsContent value="saves" className="space-y-6">
             <BackupRestore />
+          </TabsContent>
+
+          <TabsContent value="production-history" className="space-y-6">
+            <ProductionHistoryView
+              shifts={productionShifts || []}
+              orders={orders || []}
+              products={products || []}
+              machines={machinesApi.items || []}
+            />
           </TabsContent>
 
           <TabsContent value="deliveries" className="space-y-6">

@@ -191,6 +191,8 @@ export interface ProductionShift {
   userId?: string
   /** Abszolút vég lövésszám (a számlálón lévő érték a műszak végén). A következő műszak kezdő értékének auto-kitöltéséhez. */
   endShotsAbsolute?: number
+  /** Opcionális gép-hivatkozás (Machine.id). */
+  machineId?: string
   createdAt: string
   updatedAt?: string
 }

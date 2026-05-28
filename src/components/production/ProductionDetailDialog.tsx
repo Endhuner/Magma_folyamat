@@ -120,6 +120,7 @@ export function ProductionDetailDialog({
   const [startShots, setStartShots] = useState<string>('')
   const [endShots, setEndShots] = useState<string>('')
   const [notes, setNotes] = useState<string>('')
+  const [machineId, setMachineId] = useState<string>('')
   const [editingId, setEditingId] = useState<string | null>(null)
   // Selejt-dialógus állapota
   const [defectDialogOpen, setDefectDialogOpen] = useState(false)
@@ -156,7 +157,12 @@ export function ProductionDetailDialog({
     setEndShots('')
     setNotes('')
     setEditingId(null)
-  }, [open, prefillDate, prefillShift, order?.id])
+    // Auto-fill machine: a termékhez legutóbb rögzített műszak gépe
+    const lastWithMachine = [...orderShifts]
+      .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
+      .find((s) => s.machineId)
+    setMachineId(lastWithMachine?.machineId ?? '')
+  }, [open, prefillDate, prefillShift, order?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Új rögzítésnél: ha dátum vagy műszak változik, a kezdő lövésszámot
   // az előző műszak endShotsAbsolute-jából töltjük ki (átírható).
@@ -236,6 +242,7 @@ export function ProductionDetailDialog({
       notes: notes.trim(),
       userId,
       endShotsAbsolute: !isNaN(endShotsNum ?? NaN) ? endShotsNum : undefined,
+      machineId: machineId || undefined,
       createdAt: editingId
         ? orderShifts.find((s) => s.id === editingId)?.createdAt || now
         : now,
@@ -251,6 +258,7 @@ export function ProductionDetailDialog({
     setStartShots('')
     setEndShots('')
     setNotes('')
+    setMachineId('')
     setEditingId(null)
 
     // Auto-completion ellenőrzés: ha az új műszakkal eléri vagy meghaladja a rendelt mennyiséget
@@ -274,6 +282,7 @@ export function ProductionDetailDialog({
       setEndShots(String(s.shotsCount))
     }
     setNotes(s.notes)
+    setMachineId(s.machineId ?? '')
     setEditingId(s.id)
   }
 
@@ -283,6 +292,7 @@ export function ProductionDetailDialog({
     setStartShots('')
     setEndShots('')
     setNotes('')
+    setMachineId('')
     setEditingId(null)
   }
 
@@ -437,8 +447,8 @@ export function ProductionDetailDialog({
             </h3>
           </div>
 
-          {/* Dátum + Műszak sor */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Dátum + Műszak + Gép sor */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="shift-date" className="text-lg font-medium">Dátum</Label>
               <Input
@@ -460,6 +470,20 @@ export function ProductionDetailDialog({
                 <SelectContent>
                   <SelectItem value="de" className="text-lg">Délelőtt (de)</SelectItem>
                   <SelectItem value="du" className="text-lg">Délután (du)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="shift-machine" className="text-lg font-medium">Gép</Label>
+              <Select value={machineId || 'none'} onValueChange={(v) => setMachineId(v === 'none' ? '' : v)}>
+                <SelectTrigger id="shift-machine" className="text-lg h-12">
+                  <SelectValue placeholder="Válassz gépet…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none" className="text-lg text-muted-foreground">— Nincs megadva —</SelectItem>
+                  {machines.map((m) => (
+                    <SelectItem key={m.id} value={m.id} className="text-lg">{m.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -585,7 +609,7 @@ export function ProductionDetailDialog({
                       editingId === s.id ? 'border-primary bg-primary/5' : ''
                     }`}
                   >
-                    <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-2 items-center">
+                    <div className="flex-1 grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
                       <div className="font-mono text-lg">
                         {format(new Date(s.date), 'yyyy-MM-dd')}
                       </div>
@@ -597,6 +621,9 @@ export function ProductionDetailDialog({
                       >
                         {shiftLabel(s.shift)}
                       </Badge>
+                      <div className="text-base text-muted-foreground truncate">
+                        {machines.find(m => m.id === s.machineId)?.name ?? (s.machineId ? '?' : '—')}
+                      </div>
                       <div className="text-lg">
                         <span className="text-muted-foreground">Lövés: </span>
                         <span className="font-mono font-semibold">{fmtInt(s.shotsCount)}</span>
