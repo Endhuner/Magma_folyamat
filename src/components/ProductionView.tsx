@@ -85,7 +85,7 @@ export function ProductionView({
 }: ProductionViewProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
-  const [summaryOpen, setSummaryOpen] = useState(true)
+  const [summaryOpen, setSummaryOpen] = useState(false)
 
   // Dialógus-állapotok a nézeten belül — egyszerűbb így, mint prop-ban felhúzni az App.tsx-ig.
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null)
