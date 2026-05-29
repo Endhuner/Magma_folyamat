@@ -33,7 +33,7 @@ import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { Order, OrderStatus, Customer, Product, DeliveryNote, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
 import { diffObjects, buildAuditEntry, pruneAuditLog, AUDIT_LOG_MAX_ENTRIES } from '@/lib/auditLog'
-import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered } from '@/lib/helpers'
+import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered, isInvoiced } from '@/lib/helpers'
 import { computeAutoFieldsForOrder } from '@/lib/orderService'
 import { CmrLayoutSettings } from '@/lib/cmrTemplateBuilder'
 import { useAuth } from '@/lib/auth'
@@ -226,6 +226,7 @@ function App() {
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
   const [hideDelivered, setHideDelivered] = useState(true)
+  const [hideInvoiced, setHideInvoiced] = useState(true)
   
   const currentYear = new Date().getFullYear()
   const [selectedYears, setSelectedYears] = useState<number[]>([])
@@ -1548,6 +1549,10 @@ function App() {
     if (hideDelivered) {
       filtered = filtered.filter(o => !isDelivered(o.status))
     }
+
+    if (hideInvoiced) {
+      filtered = filtered.filter(o => !isInvoiced(o.status))
+    }
     
     if (yearFilterEnabled && selectedYears.length > 0 && yearOptions.length > 0) {
       const yearSet = new Set(selectedYears)
@@ -1558,7 +1563,7 @@ function App() {
     }
     
     return filtered
-  }, [orders, hideDelivered, selectedYears, yearOptions.length, yearFilterEnabled])
+  }, [orders, hideDelivered, hideInvoiced, selectedYears, yearOptions.length, yearFilterEnabled])
 
   const filteredOrders = useMemo(() => {
     let filtered = activeOrders
@@ -1860,6 +1865,8 @@ function App() {
             activeLabelTemplateId={activeLabelTemplateId}
             hideDelivered={hideDelivered}
             setHideDelivered={setHideDelivered}
+            hideInvoiced={hideInvoiced}
+            setHideInvoiced={setHideInvoiced}
             yearFilterEnabled={yearFilterEnabled}
             setYearFilterEnabled={setYearFilterEnabled}
             yearOptions={yearOptions}

@@ -22,6 +22,7 @@ const ORDER_STATUSES = [
   'Felvéve',
   'Szünetel',
   'Kiszállítva',
+  'Kiszállítva/Számlázva',
   'Csomagolás alatt',
   'Folyamatban',
   'Előkészítve',

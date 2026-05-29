@@ -23,7 +23,12 @@ export function stripDiacritics(s: string | undefined | null): string {
  */
 export function isDelivered(status: string): boolean {
   const st = stripDiacritics(status)
-  return st === 'kiszallitva' || st.includes('kiszallitva')
+  return st === 'kiszallitva' || st === 'kiszallitva/szamlazva' || st.startsWith('kiszallitva')
+}
+
+export function isInvoiced(status: string): boolean {
+  const st = stripDiacritics(status)
+  return st === 'kiszallitva/szamlazva'
 }
 
 export function calculateDashboardMetrics(

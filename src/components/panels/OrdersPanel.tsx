@@ -103,6 +103,8 @@ export interface OrdersPanelProps {
   // UI state
   hideDelivered: boolean
   setHideDelivered: (v: boolean) => void
+  hideInvoiced: boolean
+  setHideInvoiced: (v: boolean) => void
   yearFilterEnabled: boolean
   setYearFilterEnabled: (v: boolean) => void
   yearOptions: number[]
@@ -154,6 +156,8 @@ export function OrdersPanel({
   activeTemplates,
   hideDelivered,
   setHideDelivered,
+  hideInvoiced,
+  setHideInvoiced,
   yearFilterEnabled,
   setYearFilterEnabled,
   yearOptions,
@@ -202,6 +206,7 @@ export function OrdersPanel({
       'Csomagolás alatt',
       'Elkészült',
       'Kiszállítva',
+      'Kiszállítva/Számlázva',
     ]
     const byStatus = STATUS_ORDER.map((status) => {
       const group = allOrders.filter((o) => o.status === status)
@@ -290,6 +295,17 @@ export function OrdersPanel({
 
             <div className="flex items-center gap-2">
               <Switch
+                id="hide-invoiced"
+                checked={hideInvoiced}
+                onCheckedChange={setHideInvoiced}
+              />
+              <Label htmlFor="hide-invoiced" className="cursor-pointer text-sm">
+                Kiszállítva/Számlázva elrejtése
+              </Label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
                 id="year-filter"
                 checked={yearFilterEnabled}
                 onCheckedChange={setYearFilterEnabled}
@@ -346,6 +362,7 @@ export function OrdersPanel({
               <SelectItem value="Felvéve">Felvéve</SelectItem>
               <SelectItem value="Szünetel">Szünetel</SelectItem>
               <SelectItem value="Kiszállítva">Kiszállítva</SelectItem>
+              <SelectItem value="Kiszállítva/Számlázva">Kiszállítva/Számlázva</SelectItem>
               <SelectItem value="Csomagolás alatt">Csomagolás alatt</SelectItem>
               <SelectItem value="Folyamatban">Folyamatban</SelectItem>
               <SelectItem value="Előkészítve">Előkészítve</SelectItem>
@@ -672,6 +689,14 @@ export function OrdersPanel({
                     }}
                   >
                     Kiszállítva
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      handleBatchStatusChange(selectedOrderIds, 'Kiszállítva/Számlázva')
+                      toast.success(`${selectedOrderIds.length} rendelés státusza: Kiszállítva/Számlázva`)
+                    }}
+                  >
+                    Kiszállítva/Számlázva
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => {

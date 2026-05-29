@@ -23,6 +23,7 @@ export const orderStatusSchema = z.enum([
   'Felvéve',
   'Szünetel',
   'Kiszállítva',
+  'Kiszállítva/Számlázva',
   'Csomagolás alatt',
   'Folyamatban',
   'Előkészítve',

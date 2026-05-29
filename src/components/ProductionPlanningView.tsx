@@ -383,7 +383,7 @@ export function ProductionPlanningView({ machines, orders }: Props) {
   const activeAssignments = useMemo(
     () => assignments.filter(a => {
       const s = orderMap.get(a.orderId)?.status
-      return s !== 'Elkészült' && s !== 'Kiszállítva'
+      return s !== 'Elkészült' && s !== 'Kiszállítva' && s !== 'Kiszállítva/Számlázva'
     }),
     [assignments, orderMap]
   )
@@ -552,7 +552,7 @@ export function ProductionPlanningView({ machines, orders }: Props) {
 
   const unassigned = orders
     .filter(o => {
-      if (assignedOrderIds.has(o.id) || o.status === 'Kiszállítva' || o.status === 'Elkészült') return false
+      if (assignedOrderIds.has(o.id) || o.status === 'Kiszállítva' || o.status === 'Kiszállítva/Számlázva' || o.status === 'Elkészült') return false
       if (!search) return true
       const q = search.toLowerCase()
       return [o.customer, o.productName, o.designation, o.ownOrderNumber].some(f => f?.toLowerCase().includes(q))
