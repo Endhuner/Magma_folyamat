@@ -706,3 +706,59 @@ export async function exportDeliveryAsHtml(
     toast.success(`Szállítólevél dokumentum generálva: ${fileName}`)
   }
 }
+
+/**
+ * Visszaadja a szállítólevél HTML stringet az aktív/mentett sablon alapján,
+ * ablak-nyitás és DB-mentés nélkül. PDF-generáláshoz használható.
+ */
+export function getDeliveryHtml(
+  orders: Order[],
+  customers: Customer[],
+  products: Product[],
+  deliveryNotes: DeliveryNote[],
+  customStyles?: Partial<TemplateStyles>,
+  sequenceNumber?: string,
+  savedTemplatesOverride?: any[],
+  activeTemplatesOverride?: { cmr?: string; delivery?: string },
+  issueDate?: string
+): string {
+  const seqNum = sequenceNumber || generateDeliveryNoteSequenceNumber(deliveryNotes, 'delivery')
+
+  try {
+    const activeTemplates = activeTemplatesOverride ?? kvStore.get<{ cmr?: string, delivery?: string }>('active-templates')
+    const savedTemplates = savedTemplatesOverride ?? kvStore.get<any[]>('saved-templates')
+
+    const firstOrder = orders[0]
+    const customer = customers.find(c => c.name === firstOrder?.customer)
+
+    // 1. Vevőhöz rendelt sablon
+    if (customer?.deliveryTemplateId) {
+      const t = savedTemplates?.find((s: any) => s.id === customer.deliveryTemplateId)
+      if (t?.data?.html) {
+        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate)
+      }
+    }
+
+    // 2. Aktív sablon
+    if (activeTemplates?.delivery) {
+      const t = savedTemplates?.find((s: any) => s.id === activeTemplates.delivery)
+      if (t?.data?.html) {
+        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate)
+      }
+    }
+
+    // 3. Legfrissebb mentett szállítólevél sablon
+    const deliveryTemplates = (savedTemplates || []).filter((s: any) => s.data?.type === 'delivery')
+    if (deliveryTemplates.length > 0) {
+      const t = deliveryTemplates[0]
+      if (t?.data?.html) {
+        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate)
+      }
+    }
+  } catch (err) {
+    console.warn('getDeliveryHtml: sablon betöltési hiba, beégetett sablon használata', err)
+  }
+
+  // 4. Beégetett sablon (fallback)
+  return generateDeliveryHtmlTemplate(orders, customers, products, deliveryNotes, customStyles, seqNum)
+}

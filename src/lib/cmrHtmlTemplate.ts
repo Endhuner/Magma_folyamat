@@ -814,3 +814,60 @@ export async function exportCmrAsHtml(
     toast.success(`CMR dokumentum generálva: ${fileName}`)
   }
 }
+
+/**
+ * Visszaadja a CMR HTML stringet az aktív/mentett sablon alapján,
+ * ablak-nyitás és DB-mentés nélkül. PDF-generáláshoz használható.
+ */
+export function getCmrHtml(
+  orders: Order[],
+  customers: Customer[],
+  products: Product[],
+  deliveryNotes: DeliveryNote[],
+  userSettings?: CmrLayoutSettings,
+  sequenceNumber?: string,
+  savedTemplatesOverride?: any[],
+  activeTemplatesOverride?: { cmr?: string; delivery?: string },
+  issueDate?: string
+): string {
+  const seqNum = sequenceNumber || generateDeliveryNoteSequenceNumber(deliveryNotes, 'cmr')
+
+  try {
+    const activeTemplates = activeTemplatesOverride ?? kvStore.get<{ cmr?: string, delivery?: string }>('active-templates')
+    const savedTemplates = savedTemplatesOverride ?? kvStore.get<any[]>('saved-templates')
+
+    const firstOrder = orders[0]
+    const customer = customers.find(c => c.name === firstOrder?.customer)
+
+    // 1. Vevőhöz rendelt sablon
+    if (customer?.cmrTemplateId) {
+      const t = savedTemplates?.find((s: any) => s.id === customer.cmrTemplateId)
+      if (t?.data?.html) {
+        return applyTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, userSettings, t.data.margins, issueDate)
+      }
+    }
+
+    // 2. Aktív sablon
+    if (activeTemplates?.cmr) {
+      const t = savedTemplates?.find((s: any) => s.id === activeTemplates.cmr)
+      if (t?.data?.html) {
+        return applyTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, userSettings, t.data.margins, issueDate)
+      }
+    }
+
+    // 3. Legfrissebb mentett CMR sablon
+    const cmrTemplates = (savedTemplates || []).filter((s: any) => s.data?.type === 'cmr')
+    if (cmrTemplates.length > 0) {
+      const sorted = [...cmrTemplates].sort((a: any, b: any) => (b.data?.timestamp || '').localeCompare(a.data?.timestamp || ''))
+      const t = sorted[0]
+      if (t?.data?.html) {
+        return applyTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, userSettings, t.data.margins, issueDate)
+      }
+    }
+  } catch (err) {
+    console.warn('getCmrHtml: sablon betöltési hiba, beégetett sablon használata', err)
+  }
+
+  // 4. Beégetett sablon (fallback)
+  return generateCmrHtmlTemplate(orders, customers, products, deliveryNotes, userSettings, seqNum)
+}

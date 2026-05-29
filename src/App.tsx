@@ -41,8 +41,8 @@ import { listUsers, createUser, updateUser, deleteUser } from '@/lib/api/usersAp
 import type { UserRole } from '@produktivpro/shared'
 import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { exportCmrAsHtml, generateCmrHtmlTemplate } from '@/lib/cmrHtmlTemplate'
-import { exportDeliveryAsHtml, generateDeliveryHtmlTemplate, TemplateStyles } from '@/lib/deliveryHtmlTemplate'
+import { exportCmrAsHtml, generateCmrHtmlTemplate, getCmrHtml } from '@/lib/cmrHtmlTemplate'
+import { exportDeliveryAsHtml, generateDeliveryHtmlTemplate, getDeliveryHtml, TemplateStyles } from '@/lib/deliveryHtmlTemplate'
 import { validateCmrExport, validateDeliveryExport, ValidationResult } from '@/lib/exportValidation'
 import { LabelTemplate } from '@/lib/labelTemplate'
 import { deductInventoryForOrders, commitInventoryDeduction, InventoryDeductionResult } from '@/lib/inventoryService'
@@ -1382,15 +1382,15 @@ function App() {
   const handleDownloadPdf = async (note: DeliveryNote) => {
     const noteOrders = (orders || []).filter(o => note.orderIds.includes(o.id))
 
-    // HTML generálás (aktív sablonnal, meglévő sorszámmal)
+    // HTML generálás az aktív/mentett sablon alapján (nem a beégetett!)
     let html = ''
     if (note.type === 'cmr') {
-      html = generateCmrHtmlTemplate(
+      html = getCmrHtml(
         noteOrders, customers || [], products || [], deliveryNotes || [],
         cmrSettings, note.sequenceNumber
       )
     } else {
-      html = generateDeliveryHtmlTemplate(
+      html = getDeliveryHtml(
         noteOrders, customers || [], products || [], deliveryNotes || [],
         undefined, note.sequenceNumber
       )
