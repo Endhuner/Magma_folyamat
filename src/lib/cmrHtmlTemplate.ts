@@ -641,14 +641,16 @@ export async function exportCmrAsHtml(
   /** Szerver-alapú aktív sablonok — ha átadják, nem olvas localStorage-ból */
   activeTemplatesOverride?: { cmr?: string; delivery?: string },
   /** Kiállítás dátuma (YYYY-MM-DD). Ha nincs megadva, az aktuális nap. */
-  issueDate?: string
+  issueDate?: string,
+  /** Ha megadva, ezt a sorszámot használja új generálás helyett (előnézetnél). */
+  overrideSequenceNumber?: string
 ) {
   if (!orders.length) {
     toast.error('Nincsenek exportálandó rendelések')
     return
   }
 
-  const sequenceNumber = generateDeliveryNoteSequenceNumber(deliveryNotes, 'cmr')
+  const sequenceNumber = overrideSequenceNumber || generateDeliveryNoteSequenceNumber(deliveryNotes, 'cmr')
   const firstCustomer = orders[0]?.customer || 'export'
   const firstWord = firstCustomer.split(/\s+/)[0] || 'export'
   const safeCustomerName = firstWord.replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -796,7 +798,7 @@ export async function exportCmrAsHtml(
     'Mennyiség': order.amountPc,
   }))
 
-  if (onExportSaved) {
+  if (onExportSaved && !overrideSequenceNumber) {
     onExportSaved({
       type: 'cmr',
       orderIds: orders.map(o => o.id),
@@ -808,5 +810,7 @@ export async function exportCmrAsHtml(
     }, sequenceNumber)
   }
 
-  toast.success(`CMR dokumentum generálva: ${fileName}`)
+  if (!overrideSequenceNumber) {
+    toast.success(`CMR dokumentum generálva: ${fileName}`)
+  }
 }

@@ -542,14 +542,16 @@ export async function exportDeliveryAsHtml(
   /** Szerver-alapú aktív sablonok — ha átadják, nem olvas localStorage-ból */
   activeTemplatesOverride?: { cmr?: string; delivery?: string },
   /** Kiállítás dátuma (YYYY-MM-DD). Ha nincs megadva, az aktuális nap. */
-  issueDate?: string
+  issueDate?: string,
+  /** Ha megadva, ezt a sorszámot használja új generálás helyett (előnézetnél). */
+  overrideSequenceNumber?: string
 ) {
   if (!orders.length) {
     toast.error('Nincsenek exportálandó rendelések')
     return
   }
 
-  const sequenceNumber = generateDeliveryNoteSequenceNumber(deliveryNotes, 'delivery')
+  const sequenceNumber = overrideSequenceNumber || generateDeliveryNoteSequenceNumber(deliveryNotes, 'delivery')
   const firstCustomer = orders[0]?.customer || 'export'
   const firstWord = firstCustomer.split(/\s+/)[0] || 'export'
   const safeCustomerName = firstWord.replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -688,7 +690,7 @@ export async function exportDeliveryAsHtml(
     'Bruttó súly': order.grossWeightKg,
   }))
 
-  if (onExportSaved) {
+  if (onExportSaved && !overrideSequenceNumber) {
     onExportSaved({
       type: 'delivery',
       orderIds: orders.map(o => o.id),
@@ -700,5 +702,7 @@ export async function exportDeliveryAsHtml(
     }, sequenceNumber)
   }
 
-  toast.success(`Szállítólevél dokumentum generálva: ${fileName}`)
+  if (!overrideSequenceNumber) {
+    toast.success(`Szállítólevél dokumentum generálva: ${fileName}`)
+  }
 }

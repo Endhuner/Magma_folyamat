@@ -1358,31 +1358,31 @@ function App() {
     toast.success('Szállítólevél sikeresen frissítve')
   }
 
-  const handlePreviewNote = (note: DeliveryNote) => {
+  const handlePreviewNote = async (note: DeliveryNote) => {
     const noteOrders = (orders || []).filter(o => note.orderIds.includes(o.id))
-    let html: string
     if (note.type === 'cmr') {
-      html = generateCmrHtmlTemplate(
+      await exportCmrAsHtml(
         noteOrders, customers || [], products || [], deliveryNotes || [],
-        cmrSettings, note.sequenceNumber
+        undefined, cmrSettings, savedTemplates, activeTemplates,
+        note.issueDate, note.sequenceNumber
       )
     } else {
-      html = generateDeliveryHtmlTemplate(
+      await exportDeliveryAsHtml(
         noteOrders, customers || [], products || [], deliveryNotes || [],
-        undefined, note.sequenceNumber
+        undefined, undefined, savedTemplates, activeTemplates,
+        note.issueDate, note.sequenceNumber
       )
     }
-    const w = window.open('', '_blank')
-    if (w) { w.document.write(html); w.document.close() }
   }
 
-  const handleEmailNote = (note: DeliveryNote) => {
+  const handleEmailNote = (note: DeliveryNote, ccEmails?: string) => {
     const customer = (customers || []).find(c => c.name === note.customer)
     const email = customer?.email || ''
     const type = note.type === 'cmr' ? 'CMR' : 'Szállítólevél'
     const subject = `${type} - ${note.sequenceNumber}`
     const body = `Tisztelt Partnerünk!\n\nMellékletben küldjük a ${note.sequenceNumber} számú ${type.toLowerCase()} dokumentumot.\n\nÜdvözlettel,\nMagma Kft`
-    window.open(`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`)
+    const cc = ccEmails ? `&cc=${encodeURIComponent(ccEmails)}` : ''
+    window.open(`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}${cc}`)
   }
 
   const handleExportDelivery = async () => {

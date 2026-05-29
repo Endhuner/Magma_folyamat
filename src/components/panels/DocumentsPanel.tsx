@@ -21,9 +21,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Funnel, CaretDown, Plus, FilePdf, EnvelopeSimple } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { useState } from 'react'
 import { DeliveryNotesTable } from '@/components/DeliveryNotesTable'
 import { AuditLogView } from '@/components/AuditLogView'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import type {
   Order,
   Customer,
@@ -61,8 +63,8 @@ export interface DocumentsPanelProps {
     id: string,
     updatedData: Record<string, string | number | null | undefined>[]
   ) => void
-  handlePreviewNote: (note: DeliveryNote) => void
-  handleEmailNote: (note: DeliveryNote) => void
+  handlePreviewNote: (note: DeliveryNote) => void | Promise<void>
+  handleEmailNote: (note: DeliveryNote, ccEmails?: string) => void
 }
 
 export function DocumentsPanel({
@@ -81,6 +83,8 @@ export function DocumentsPanel({
   handlePreviewNote,
   handleEmailNote,
 }: DocumentsPanelProps) {
+  const [ccEmails, setCcEmails] = useState<Record<string, string>>({})
+
   return (
     <TabsContent value="documents" className="space-y-6">
       <div>
@@ -178,8 +182,9 @@ export function DocumentsPanel({
                   <tr>
                     <th className="text-left p-3 font-medium">Típus</th>
                     <th className="text-left p-3 font-medium">Sorszám</th>
-                    <th className="text-left p-3 font-medium">Vevő</th>
+                    <th className="text-left p-3 font-medium">Vevő / Email</th>
                     <th className="text-left p-3 font-medium">Dátum</th>
+                    <th className="text-left p-3 font-medium">CC (másolatot kap)</th>
                     <th className="text-right p-3 font-medium">Műveletek</th>
                   </tr>
                 </thead>
@@ -207,6 +212,14 @@ export function DocumentsPanel({
                             {note.issueDate || note.exportDate?.slice(0, 10) || note.createdAt.slice(0, 10)}
                           </td>
                           <td className="p-3">
+                            <Input
+                              className="h-8 text-xs w-48"
+                              placeholder="cc@example.com, cc2@..."
+                              value={ccEmails[note.id] || ''}
+                              onChange={e => setCcEmails(prev => ({ ...prev, [note.id]: e.target.value }))}
+                            />
+                          </td>
+                          <td className="p-3">
                             <div className="flex gap-2 justify-end">
                               <Button
                                 size="sm"
@@ -225,7 +238,7 @@ export function DocumentsPanel({
                                     toast.error(`${note.customer} vevőhöz nincs email cím megadva`)
                                     return
                                   }
-                                  handleEmailNote(note)
+                                  handleEmailNote(note, ccEmails[note.id] || undefined)
                                 }}
                                 title={hasEmail ? `Email küldés: ${customer?.email}` : 'Nincs email cím a vevőnél'}
                               >
