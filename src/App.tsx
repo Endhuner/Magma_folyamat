@@ -1382,17 +1382,19 @@ function App() {
   const handleDownloadPdf = async (note: DeliveryNote) => {
     const noteOrders = (orders || []).filter(o => note.orderIds.includes(o.id))
 
-    // HTML generálás az aktív/mentett sablon alapján (nem a beégetett!)
+    // HTML generálás az aktív/mentett sablon alapján (szerver-oldali adatokkal)
     let html = ''
     if (note.type === 'cmr') {
       html = getCmrHtml(
         noteOrders, customers || [], products || [], deliveryNotes || [],
-        cmrSettings, note.sequenceNumber
+        cmrSettings, note.sequenceNumber,
+        savedTemplates, activeTemplates, note.issueDate
       )
     } else {
       html = getDeliveryHtml(
         noteOrders, customers || [], products || [], deliveryNotes || [],
-        undefined, note.sequenceNumber
+        undefined, note.sequenceNumber,
+        savedTemplates, activeTemplates, note.issueDate
       )
     }
 
