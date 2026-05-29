@@ -15,7 +15,7 @@
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { closeDb, getDb } from './connection.js'
+import { closeDb, getSqlite } from './connection.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -39,7 +39,7 @@ function isAlreadyApplied(msg: string): boolean {
 }
 
 async function run(): Promise<void> {
-  const db = getDb()
+  const db = getSqlite()
   const folder = path.resolve(__dirname, 'migrations')
   // eslint-disable-next-line no-console
   console.log(`[migrate] Mappából futtatok: ${folder}`)
