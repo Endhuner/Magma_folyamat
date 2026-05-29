@@ -24,7 +24,7 @@ const AVAILABLE_COLUMNS = [
   { id: 'amountPc', label: 'Amount/pc' },
   { id: 'orderDate', label: 'Order date' },
   { id: 'requiredDate', label: 'Required delivery date' },
-  { id: 'pickupDate', label: 'Actual pickup date' },
+  { id: 'pickupDate', label: 'CMR / Szállítólevél dátuma' },
   { id: 'invoiced', label: 'Számlázva (x)' },
   { id: 'ready', label: 'Szállításra kész' },
   { id: 'surfaceTreatment', label: 'Felületkezelés' },

@@ -201,7 +201,7 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
                 {isColumnVisible('amountPc') && <TableHead className="cursor-pointer" onClick={() => handleSort('amountPc')}>Mennyiség (db)</TableHead>}
                 {isColumnVisible('orderDate') && <TableHead className="cursor-pointer" onClick={() => handleSort('orderDate')}>Rendelés dátuma</TableHead>}
                 {isColumnVisible('requiredDate') && <TableHead className="cursor-pointer" onClick={() => handleSort('requiredDate')}>Szükséges szállítási dátum</TableHead>}
-                {isColumnVisible('pickupDate') && <TableHead className="cursor-pointer" onClick={() => handleSort('pickupDate')}>Tényleges átvételi dátum</TableHead>}
+                {isColumnVisible('pickupDate') && <TableHead className="cursor-pointer" onClick={() => handleSort('pickupDate')}>CMR / Szállítólevél dátuma</TableHead>}
                 {isColumnVisible('invoiced') && <TableHead className="cursor-pointer" onClick={() => handleSort('invoiced')}>Számlázva</TableHead>}
                 {isColumnVisible('ready') && <TableHead className="cursor-pointer" onClick={() => handleSort('ready')}>Szállításra kész</TableHead>}
                 {isColumnVisible('surfaceTreatment') && <TableHead className="cursor-pointer" onClick={() => handleSort('surfaceTreatment')}>Felületkezelés</TableHead>}

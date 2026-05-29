@@ -434,6 +434,16 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
                   required
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="pickupDate">CMR / Szállítólevél kiállítási dátuma</Label>
+                <Input
+                  id="pickupDate"
+                  type="date"
+                  value={ymdToInputDate(formData.pickupDate || '')}
+                  onChange={(e) => setFormData({ ...formData, pickupDate: inputDateToYMD(e.target.value) })}
+                />
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t">
