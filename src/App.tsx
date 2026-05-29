@@ -249,6 +249,10 @@ function App() {
   const [deliveryStyles] = useAppSetting<Partial<TemplateStyles>>('delivery-html-styles', {})
   // Aktív sablonok (melyik saved-template van CMR/szállítólevélhez beállítva)
   const [activeTemplates, setActiveTemplates] = useAppSetting<{ cmr?: string; delivery?: string; pallet?: string; 'box-label'?: string }>('active-templates', {})
+  const [emailTemplate, setEmailTemplate] = useAppSetting<string>(
+    'email-body-template',
+    'Tisztelt Partnerünk!\n\nMellékletben küldjük a {{sorszam}} számú {{tipus}} dokumentumot.\n\nÜdvözlettel,\nMagma Kft'
+  )
   
   const [documentFilters, setDocumentFilters] = useKV<Array<{id: string, name: string, columns: string[]}>>('document-filters', [])
   const [activeFilterId, setActiveFilterId] = useState<string | null>(null)
@@ -1380,7 +1384,11 @@ function App() {
     const email = customer?.email || ''
     const type = note.type === 'cmr' ? 'CMR' : 'Szállítólevél'
     const subject = `${type} - ${note.sequenceNumber}`
-    const body = `Tisztelt Partnerünk!\n\nMellékletben küldjük a ${note.sequenceNumber} számú ${type.toLowerCase()} dokumentumot.\n\nÜdvözlettel,\nMagma Kft`
+    const body = (emailTemplate || '')
+      .replace(/\{\{sorszam\}\}/g, note.sequenceNumber)
+      .replace(/\{\{tipus\}\}/g, type.toLowerCase())
+      .replace(/\{\{Tipus\}\}/g, type)
+      .replace(/\{\{vevo\}\}/g, note.customer)
     const cc = ccEmails ? `&cc=${encodeURIComponent(ccEmails)}` : ''
     window.open(`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}${cc}`)
   }
@@ -2004,6 +2012,8 @@ function App() {
             handleUpdateDeliveryNote={handleUpdateDeliveryNote}
             handlePreviewNote={handlePreviewNote}
             handleEmailNote={handleEmailNote}
+            emailTemplate={emailTemplate}
+            setEmailTemplate={setEmailTemplate}
           />
 
           <TabsContent value="saves" className="space-y-6">

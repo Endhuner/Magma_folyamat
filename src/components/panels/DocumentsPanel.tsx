@@ -26,6 +26,8 @@ import { DeliveryNotesTable } from '@/components/DeliveryNotesTable'
 import { AuditLogView } from '@/components/AuditLogView'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 import type {
   Order,
   Customer,
@@ -65,6 +67,8 @@ export interface DocumentsPanelProps {
   ) => void
   handlePreviewNote: (note: DeliveryNote) => void | Promise<void>
   handleEmailNote: (note: DeliveryNote, ccEmails?: string) => void
+  emailTemplate: string
+  setEmailTemplate: (t: string) => void
 }
 
 export function DocumentsPanel({
@@ -82,8 +86,12 @@ export function DocumentsPanel({
   handleUpdateDeliveryNote,
   handlePreviewNote,
   handleEmailNote,
+  emailTemplate,
+  setEmailTemplate,
 }: DocumentsPanelProps) {
   const [ccEmails, setCcEmails] = useState<Record<string, string>>({})
+  const [templateDraft, setTemplateDraft] = useState(emailTemplate)
+  const [templateSaved, setTemplateSaved] = useState(false)
 
   return (
     <TabsContent value="documents" className="space-y-6">
@@ -168,9 +176,37 @@ export function DocumentsPanel({
         <TabsContent value="levelezés" className="space-y-4 mt-6">
           <div>
             <h3 className="text-lg font-semibold mb-1">Levelezés</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Szállítólevelek és CMR dokumentumok PDF-ben való elküldése. Kattints a <strong>PDF megnyitás</strong> gombra, majd a megnyíló ablakban nyomtasd/mentsd el PDF-ként, ezután küld el a <strong>Email küldés</strong> gombbal.
+            <p className="text-sm text-muted-foreground">
+              Kattints a <strong>PDF megnyitás</strong> gombra → mentsd el PDF-ként → majd <strong>Email küldés</strong>.
             </p>
+          </div>
+
+          {/* Levél sablon */}
+          <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">Levél sablon szövege</Label>
+              <span className="text-xs text-muted-foreground">
+                Változók: <code className="bg-muted px-1 rounded">{'{{sorszam}}'}</code>{' '}
+                <code className="bg-muted px-1 rounded">{'{{Tipus}}'}</code>{' '}
+                <code className="bg-muted px-1 rounded">{'{{vevo}}'}</code>
+              </span>
+            </div>
+            <Textarea
+              className="min-h-[120px] text-sm font-mono"
+              value={templateDraft}
+              onChange={e => { setTemplateDraft(e.target.value); setTemplateSaved(false) }}
+            />
+            <div className="flex items-center gap-3">
+              <Button
+                size="sm"
+                onClick={() => { setEmailTemplate(templateDraft); setTemplateSaved(true) }}
+              >
+                Sablon mentése
+              </Button>
+              {templateSaved && (
+                <span className="text-xs text-green-600">✓ Mentve</span>
+              )}
+            </div>
           </div>
 
           {(deliveryNotes || []).length === 0 ? (
