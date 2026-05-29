@@ -1379,6 +1379,62 @@ function App() {
     }
   }
 
+  const handleDownloadPdf = async (note: DeliveryNote) => {
+    const noteOrders = (orders || []).filter(o => note.orderIds.includes(o.id))
+
+    // HTML generálás (aktív sablonnal, meglévő sorszámmal)
+    let html = ''
+    if (note.type === 'cmr') {
+      html = generateCmrHtmlTemplate(
+        noteOrders, customers || [], products || [], deliveryNotes || [],
+        cmrSettings, note.sequenceNumber
+      )
+    } else {
+      html = generateDeliveryHtmlTemplate(
+        noteOrders, customers || [], products || [], deliveryNotes || [],
+        undefined, note.sequenceNumber
+      )
+    }
+
+    const type = note.type === 'cmr' ? 'CMR' : 'Szallitolevel'
+    const filename = `${type}_${note.sequenceNumber}_${note.customer.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
+
+    try {
+      const token = document.cookie
+        .split(';')
+        .map(c => c.trim())
+        .find(c => c.startsWith('pp_session='))
+        ?.split('=')[1] ?? ''
+
+      const res = await fetch('/api/v1/generate-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ html, filename }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(`PDF generálás sikertelen: ${(err as any).detail || res.statusText}`)
+        return
+      }
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`PDF letöltve: ${filename}`)
+    } catch (err) {
+      toast.error(`PDF generálás sikertelen: ${String(err)}`)
+    }
+  }
+
   const handleEmailNote = (note: DeliveryNote, ccEmails?: string) => {
     const customer = (customers || []).find(c => c.name === note.customer)
     const email = customer?.email || ''
@@ -2011,6 +2067,7 @@ function App() {
             handleDeleteDeliveryNote={handleDeleteDeliveryNote}
             handleUpdateDeliveryNote={handleUpdateDeliveryNote}
             handlePreviewNote={handlePreviewNote}
+            handleDownloadPdf={handleDownloadPdf}
             handleEmailNote={handleEmailNote}
             emailTemplate={emailTemplate}
             setEmailTemplate={setEmailTemplate}

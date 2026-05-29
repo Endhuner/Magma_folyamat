@@ -70,11 +70,24 @@ RUN npm run build
 WORKDIR /repo
 RUN npm prune --workspace=@produktivpro/api --omit=dev || true
 
-# ── 3. Runtime image — csak Node.js, semmi más ─────────────────────────────
+# ── 3. Runtime image ────────────────────────────────────────────────────────
 FROM node:22-alpine AS runtime
 WORKDIR /app
 
 RUN mkdir -p /data
+
+# Chromium — PDF generáláshoz (HTML → PDF)
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    font-noto
+
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # ── API futtatható fájlok ───────────────────────────────────────────────────
 COPY --from=build-api /repo/node_modules          ./node_modules

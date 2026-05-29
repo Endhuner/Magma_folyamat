@@ -66,6 +66,7 @@ export interface DocumentsPanelProps {
     updatedData: Record<string, string | number | null | undefined>[]
   ) => void
   handlePreviewNote: (note: DeliveryNote) => void | Promise<void>
+  handleDownloadPdf: (note: DeliveryNote) => Promise<void>
   handleEmailNote: (note: DeliveryNote, ccEmails?: string) => void
   emailTemplate: string
   setEmailTemplate: (t: string) => void
@@ -85,6 +86,7 @@ export function DocumentsPanel({
   handleDeleteDeliveryNote,
   handleUpdateDeliveryNote,
   handlePreviewNote,
+  handleDownloadPdf,
   handleEmailNote,
   emailTemplate,
   setEmailTemplate,
@@ -259,12 +261,20 @@ export function DocumentsPanel({
                             <div className="flex gap-2 justify-end">
                               <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={() => handlePreviewNote(note)}
-                                title="PDF megnyitás nyomtatáshoz"
+                                variant="default"
+                                onClick={() => handleDownloadPdf(note)}
+                                title="PDF generálás és letöltés"
                               >
                                 <FilePdf className="w-4 h-4 mr-1" />
-                                PDF megnyitás
+                                PDF letöltés
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handlePreviewNote(note)}
+                                title="Előnézet megnyitása (nyomtatható ablak)"
+                              >
+                                Előnézet
                               </Button>
                               <Button
                                 size="sm"

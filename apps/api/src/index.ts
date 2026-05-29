@@ -29,6 +29,7 @@ import { settingsRoutes } from './routes/settings.js'
 import { customerSequencesRoutes } from './routes/customerSequences.js'
 import { templatesRoutes } from './routes/templates.js'
 import { planningRoutes } from './routes/planning.js'
+import { pdfRoutes } from './routes/pdf.js'
 import { registerRequestLogger } from './lib/requestLogger.js'
 import { registerAuthPlugins } from './lib/authPlugin.js'
 import { bootstrapAdmin } from './lib/bootstrap.js'
@@ -132,6 +133,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     await api.register(customerSequencesRoutes)
     await api.register(templatesRoutes)
     await api.register(planningRoutes)
+    await api.register(pdfRoutes)
   }, { prefix: '/api/v1' })
 
   // 404-kezelő:
