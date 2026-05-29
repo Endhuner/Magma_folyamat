@@ -11,9 +11,14 @@
  * mutáció a hívó (App.tsx) handler-jein keresztül történik, hogy a panel
  * tisztán prezentációs maradjon.
  */
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { TabsContent } from '@/components/ui/tabs'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,12 +56,14 @@ import {
   FilePdf,
   Tag,
   CaretDown,
+  CaretUp,
   X,
   ArrowCounterClockwise,
   CopySimple,
   DownloadSimple,
   Export,
   Package,
+  ChartBar,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { OrdersTable } from '@/components/OrdersTable'
@@ -179,11 +186,94 @@ export function OrdersPanel({
   handleExportCmr,
 }: OrdersPanelProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(false)
   const activeTemplate = labelTemplates?.find((t) => t.id === activeLabelTemplateId)
   const selectedOrders = (orders || []).filter((o) => selectedOrderIds.includes(o.id))
 
+  /** Rendelésállomány összesítő — státuszok szerint csoportosítva */
+  const orderSummary = useMemo(() => {
+    const allOrders = orders || []
+    const STATUS_ORDER: import('@/lib/types').OrderStatus[] = [
+      'Felvéve',
+      'Előkészítve',
+      'Folyamatban',
+      'Szünetel',
+      'Javítás alatt',
+      'Csomagolás alatt',
+      'Elkészült',
+      'Kiszállítva',
+    ]
+    const byStatus = STATUS_ORDER.map((status) => {
+      const group = allOrders.filter((o) => o.status === status)
+      return {
+        status,
+        count: group.length,
+        totalPc: group.reduce((s, o) => s + (o.amountPc || 0), 0),
+      }
+    }).filter((g) => g.count > 0)
+
+    const total = {
+      count: allOrders.length,
+      totalPc: allOrders.reduce((s, o) => s + (o.amountPc || 0), 0),
+    }
+    return { byStatus, total }
+  }, [orders])
+
   return (
     <TabsContent value="orders" className="space-y-6 pb-32">
+
+      {/* ── Rendelésállomány összesítő ──────────────────────────────── */}
+      <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
+        <CollapsibleTrigger asChild>
+          <button className="w-full flex items-center justify-between bg-card border rounded-lg px-4 py-3 hover:bg-muted/40 transition-colors text-left">
+            <div className="flex items-center gap-2">
+              <ChartBar className="w-4 h-4 text-muted-foreground" weight="duotone" />
+              <span className="text-sm font-medium">Rendelésállomány összesítő</span>
+              <span className="text-xs text-muted-foreground font-mono">
+                {orderSummary.total.count} rendelés · {orderSummary.total.totalPc.toLocaleString('hu-HU')} db
+              </span>
+            </div>
+            {summaryOpen
+              ? <CaretUp className="w-4 h-4 text-muted-foreground" />
+              : <CaretDown className="w-4 h-4 text-muted-foreground" />}
+          </button>
+        </CollapsibleTrigger>
+
+        <CollapsibleContent>
+          <div className="border border-t-0 rounded-b-lg bg-card overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/30">
+                  <th className="text-left px-4 py-2 font-medium text-muted-foreground">Státusz</th>
+                  <th className="text-right px-4 py-2 font-medium text-muted-foreground">Rendelések</th>
+                  <th className="text-right px-4 py-2 font-medium text-muted-foreground">Mennyiség (db)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orderSummary.byStatus.map((row, i) => (
+                  <tr key={row.status} className={i % 2 === 0 ? '' : 'bg-muted/20'}>
+                    <td className="px-4 py-2">{row.status}</td>
+                    <td className="px-4 py-2 text-right font-mono">{row.count}</td>
+                    <td className="px-4 py-2 text-right font-mono font-semibold">
+                      {row.totalPc.toLocaleString('hu-HU')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t font-semibold bg-muted/30">
+                  <td className="px-4 py-2">Összesen</td>
+                  <td className="px-4 py-2 text-right font-mono">{orderSummary.total.count}</td>
+                  <td className="px-4 py-2 text-right font-mono text-accent">
+                    {orderSummary.total.totalPc.toLocaleString('hu-HU')}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
       <div className="bg-card border rounded-lg p-4 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
