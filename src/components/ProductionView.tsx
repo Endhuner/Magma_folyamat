@@ -587,6 +587,7 @@ export function ProductionView({
         order={detailOrder}
         product={detailOrder ? findProduct(detailOrder) : undefined}
         shifts={shifts}
+        orders={orders}
         onSaveShift={onSaveShift}
         onDeleteShift={onDeleteShift}
         onStatusChange={onStatusChange}

@@ -67,6 +67,8 @@ interface ProductionDetailDialogProps {
   order: Order | null
   product?: Product
   shifts: ProductionShift[]
+  /** Összes rendelés — a termékazonosító alapján visszakeresett utolsó gép meghatározásához. */
+  orders?: Order[]
   onSaveShift: (shift: ProductionShift) => void
   onDeleteShift: (shiftId: string) => void
   /** Rendelés státusz-változtatásához — a gyártás indítás/szünetelés/leállítás gombokhoz. */
@@ -104,6 +106,7 @@ export function ProductionDetailDialog({
   order,
   product,
   shifts,
+  orders = [],
   onSaveShift,
   onDeleteShift,
   onStatusChange,
@@ -148,6 +151,39 @@ export function ProductionDetailDialog({
       })
   }, [order, shifts])
 
+  /**
+   * Az utolsó gép ID, amelyet ennél a terméknél (productId alapján, az összes
+   * rendelés között) használtak — a production history-ból.
+   * Ha a rendelésnek nincs productId-ja, csak az aktuális rendelés műszakait nézi.
+   */
+  const lastMachineIdForProduct = useMemo(() => {
+    const productId = order?.productId
+    let candidateShifts: ProductionShift[]
+
+    if (productId) {
+      // Az összes olyan rendelés ID-je, amelynek ugyanaz a productId-ja
+      const sameProductOrderIds = new Set(
+        orders.filter((o) => o.productId === productId).map((o) => o.id)
+      )
+      candidateShifts = shifts.filter(
+        (s) => sameProductOrderIds.has(s.orderId) && s.machineId
+      )
+    } else {
+      // Fallback: csak az aktuális rendelés műszakait nézzük
+      candidateShifts = orderShifts.filter((s) => s.machineId)
+    }
+
+    // Legutolsó: dátum + műszak szerint rendezve (de/du), majd createdAt
+    return (
+      [...candidateShifts].sort((a, b) => {
+        const da = a.date + (a.shift === 'du' ? '1' : '0')
+        const db = b.date + (b.shift === 'du' ? '1' : '0')
+        if (da !== db) return da > db ? -1 : 1
+        return a.createdAt > b.createdAt ? -1 : 1
+      })[0]?.machineId ?? ''
+    )
+  }, [order?.productId, orders, shifts, orderShifts])
+
   // Reset form whenever the dialog opens or prefills change.
   useEffect(() => {
     if (!open) return
@@ -157,12 +193,8 @@ export function ProductionDetailDialog({
     setEndShots('')
     setNotes('')
     setEditingId(null)
-    // Auto-fill machine: a termékhez legutóbb rögzített műszak gépe
-    const lastWithMachine = [...orderShifts]
-      .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
-      .find((s) => s.machineId)
-    setMachineId(lastWithMachine?.machineId ?? '')
-  }, [open, prefillDate, prefillShift, order?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    setMachineId(lastMachineIdForProduct)
+  }, [open, prefillDate, prefillShift, order?.id, lastMachineIdForProduct])
 
   // Új rögzítésnél: ha dátum vagy műszak változik, a kezdő lövésszámot
   // az előző műszak endShotsAbsolute-jából töltjük ki (átírható).

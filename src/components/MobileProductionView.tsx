@@ -470,6 +470,7 @@ export function MobileProductionView({
         order={detailOrder}
         product={detailOrder ? findProduct(detailOrder) : undefined}
         shifts={shifts}
+        orders={orders}
         onSaveShift={onSaveShift}
         onDeleteShift={onDeleteShift}
         onStatusChange={onStatusChange}
