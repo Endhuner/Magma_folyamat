@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card } from '@/components/ui/card'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
-import { PencilSimple, Trash, UserCircle, ClockCounterClockwise } from '@phosphor-icons/react'
+import { PencilSimple, Trash, UserCircle, ClockCounterClockwise, EnvelopeSimple } from '@phosphor-icons/react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -82,6 +82,7 @@ function CustomersTableImpl({ customers, orders, onEdit, onDelete }: CustomersTa
                   <TableHead className="min-w-[120px]">Ország</TableHead>
                   <TableHead className="min-w-[250px]">Cím</TableHead>
                   <TableHead className="min-w-[150px]">Adószám</TableHead>
+                  <TableHead className="min-w-[200px]">E-mail</TableHead>
                   <TableHead className="text-right min-w-[120px] sticky right-0 bg-card">Műveletek</TableHead>
                 </TableRow>
               </TableHeader>
@@ -96,6 +97,20 @@ function CustomersTableImpl({ customers, orders, onEdit, onDelete }: CustomersTa
                     <TableCell className="min-w-[120px]">{customer.country}</TableCell>
                     <TableCell className="min-w-[250px]">{customer.fullAddress}</TableCell>
                     <TableCell className="font-mono min-w-[150px]">{customer.taxNumber}</TableCell>
+                    <TableCell className="min-w-[200px]">
+                      {customer.email ? (
+                        <a
+                          href={`mailto:${customer.email}`}
+                          className="flex items-center gap-1 text-primary hover:underline text-sm"
+                          title={customer.email}
+                        >
+                          <EnvelopeSimple className="w-4 h-4 shrink-0" />
+                          {customer.email}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right min-w-[120px] sticky right-0 bg-card">
                       <div className="flex justify-end gap-2">
                         <Button
