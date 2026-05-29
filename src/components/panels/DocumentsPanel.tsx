@@ -19,10 +19,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Funnel, CaretDown, Plus } from '@phosphor-icons/react'
+import { Funnel, CaretDown, Plus, FilePdf, EnvelopeSimple } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { DeliveryNotesTable } from '@/components/DeliveryNotesTable'
 import { AuditLogView } from '@/components/AuditLogView'
+import { Badge } from '@/components/ui/badge'
 import type {
   Order,
   Customer,
@@ -60,6 +61,8 @@ export interface DocumentsPanelProps {
     id: string,
     updatedData: Record<string, string | number | null | undefined>[]
   ) => void
+  handlePreviewNote: (note: DeliveryNote) => void
+  handleEmailNote: (note: DeliveryNote) => void
 }
 
 export function DocumentsPanel({
@@ -75,6 +78,8 @@ export function DocumentsPanel({
   auditLog,
   handleDeleteDeliveryNote,
   handleUpdateDeliveryNote,
+  handlePreviewNote,
+  handleEmailNote,
 }: DocumentsPanelProps) {
   return (
     <TabsContent value="documents" className="space-y-6">
@@ -86,6 +91,7 @@ export function DocumentsPanel({
       <Tabs defaultValue="delivery-notes" className="w-full">
         <TabsList>
           <TabsTrigger value="delivery-notes">Szállítólevelek és CMR</TabsTrigger>
+          <TabsTrigger value="levelezés">Levelezés</TabsTrigger>
           <TabsTrigger value="audit-log">Változások</TabsTrigger>
         </TabsList>
 
@@ -153,6 +159,88 @@ export function DocumentsPanel({
                 : undefined
             }
           />
+        </TabsContent>
+
+        <TabsContent value="levelezés" className="space-y-4 mt-6">
+          <div>
+            <h3 className="text-lg font-semibold mb-1">Levelezés</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Szállítólevelek és CMR dokumentumok PDF-ben való elküldése. Kattints a <strong>PDF megnyitás</strong> gombra, majd a megnyíló ablakban nyomtasd/mentsd el PDF-ként, ezután küld el a <strong>Email küldés</strong> gombbal.
+            </p>
+          </div>
+
+          {(deliveryNotes || []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nincs még kiállított dokumentum.</p>
+          ) : (
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left p-3 font-medium">Típus</th>
+                    <th className="text-left p-3 font-medium">Sorszám</th>
+                    <th className="text-left p-3 font-medium">Vevő</th>
+                    <th className="text-left p-3 font-medium">Dátum</th>
+                    <th className="text-right p-3 font-medium">Műveletek</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...(deliveryNotes || [])]
+                    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+                    .map((note) => {
+                      const customer = (customers || []).find(c => c.name === note.customer)
+                      const hasEmail = !!customer?.email
+                      return (
+                        <tr key={note.id} className="border-t hover:bg-muted/30">
+                          <td className="p-3">
+                            <Badge variant={note.type === 'cmr' ? 'default' : 'secondary'}>
+                              {note.type === 'cmr' ? 'CMR' : 'Szállítólevél'}
+                            </Badge>
+                          </td>
+                          <td className="p-3 font-mono text-xs">{note.sequenceNumber}</td>
+                          <td className="p-3">
+                            <div>{note.customer}</div>
+                            {customer?.email && (
+                              <div className="text-xs text-muted-foreground">{customer.email}</div>
+                            )}
+                          </td>
+                          <td className="p-3 text-muted-foreground">
+                            {note.issueDate || note.exportDate?.slice(0, 10) || note.createdAt.slice(0, 10)}
+                          </td>
+                          <td className="p-3">
+                            <div className="flex gap-2 justify-end">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handlePreviewNote(note)}
+                                title="PDF megnyitás nyomtatáshoz"
+                              >
+                                <FilePdf className="w-4 h-4 mr-1" />
+                                PDF megnyitás
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={hasEmail ? 'default' : 'outline'}
+                                onClick={() => {
+                                  if (!hasEmail) {
+                                    toast.error(`${note.customer} vevőhöz nincs email cím megadva`)
+                                    return
+                                  }
+                                  handleEmailNote(note)
+                                }}
+                                title={hasEmail ? `Email küldés: ${customer?.email}` : 'Nincs email cím a vevőnél'}
+                              >
+                                <EnvelopeSimple className="w-4 h-4 mr-1" />
+                                Email küldés
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="audit-log" className="space-y-6 mt-6">

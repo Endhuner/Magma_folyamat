@@ -25,10 +25,11 @@ export function generateCmrHtmlTemplate(
   customers: Customer[],
   products: Product[],
   deliveryNotes: DeliveryNote[],
-  userSettings?: CmrLayoutSettings
+  userSettings?: CmrLayoutSettings,
+  overrideSequenceNumber?: string
 ): string {
   const effectiveSettings = { ...DEFAULT_CMR_SETTINGS, ...userSettings }
-  const sequenceNumber = generateDeliveryNoteSequenceNumber(deliveryNotes, 'cmr')
+  const sequenceNumber = overrideSequenceNumber || generateDeliveryNoteSequenceNumber(deliveryNotes, 'cmr')
   
   const firstCustomer = orders[0]?.customer || ''
   const customerInfo = customers.find(c => c.name === firstCustomer)

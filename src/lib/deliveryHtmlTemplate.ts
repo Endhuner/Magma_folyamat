@@ -53,10 +53,11 @@ export function generateDeliveryHtmlTemplate(
   customers: Customer[],
   products: Product[],
   deliveryNotes: DeliveryNote[],
-  customStyles?: Partial<TemplateStyles>
+  customStyles?: Partial<TemplateStyles>,
+  overrideSequenceNumber?: string
 ): string {
   const styles = { ...DEFAULT_DELIVERY_STYLES, ...customStyles }
-  const sequenceNumber = generateDeliveryNoteSequenceNumber(deliveryNotes, 'delivery')
+  const sequenceNumber = overrideSequenceNumber || generateDeliveryNoteSequenceNumber(deliveryNotes, 'delivery')
   
   const firstCustomer = orders[0]?.customer || ''
   const customerInfo = customers.find(c => c.name === firstCustomer)
