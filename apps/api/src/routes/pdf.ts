@@ -20,7 +20,10 @@ const CHROMIUM_PATH =
 
 const PDF_OUTPUT_DIR = process.env.PDF_OUTPUT_DIR || ''
 
-async function generatePdfBuffer(html: string): Promise<Buffer> {
+async function generatePdfBuffer(html: string, log?: (msg: string) => void): Promise<Buffer> {
+  log?.(`[PDF] HTML hossza: ${html.length} karakter`)
+  log?.(`[PDF] HTML első 300 char: ${html.slice(0, 300)}`)
+
   const browser = await puppeteer.launch({
     executablePath: CHROMIUM_PATH,
     headless: true,
@@ -33,11 +36,14 @@ async function generatePdfBuffer(html: string): Promise<Buffer> {
   })
   try {
     const page = await browser.newPage()
+    // Screen media type → ugyanolyan CSS mint a böngésző előnézetben
+    await page.emulateMediaType('screen')
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 })
     const pdfUint8Array = await page.pdf({
       format: 'A4',
       printBackground: true,
-      margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
+      // Nulla margó: a sablon saját CSS-e kezeli a margókat
+      margin: { top: '0', bottom: '0', left: '0', right: '0' },
     })
     return Buffer.from(pdfUint8Array)
   } finally {
@@ -69,7 +75,7 @@ export async function pdfRoutes(app: FastifyInstance): Promise<void> {
 
     let pdfBuffer: Buffer
     try {
-      pdfBuffer = await generatePdfBuffer(html)
+      pdfBuffer = await generatePdfBuffer(html, (msg) => app.log.info(msg))
     } catch (err) {
       app.log.error({ err }, 'PDF generálás sikertelen')
       return reply.code(500).send({ error: 'PDF generálás sikertelen', detail: String(err) })
