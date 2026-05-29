@@ -12,6 +12,7 @@ import type { FastifyInstance } from 'fastify'
 import fs from 'node:fs'
 import path from 'node:path'
 import puppeteer from 'puppeteer-core'
+import { tryAuth } from '../lib/authGuards.js'
 
 const CHROMIUM_PATH =
   process.env.PUPPETEER_EXECUTABLE_PATH ||
@@ -58,7 +59,7 @@ export async function pdfRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
-    preHandler: [app.authenticate],
+    preHandler: [tryAuth],
   }, async (request, reply) => {
     const { html, filename } = request.body
 
