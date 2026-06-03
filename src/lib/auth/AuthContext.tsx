@@ -27,6 +27,7 @@ import {
 } from 'react'
 import * as authApi from './authApi'
 import { BackendUnavailableError } from './authApi'
+import { installSessionWatch, SESSION_EXPIRED_EVENT } from './sessionWatch'
 import type { AuthState, CurrentUser, PublicUser, UserRole } from './types'
 import {
   Dialog,
@@ -216,6 +217,31 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
     void refresh()
     void refreshPublicUsers()
   }, [refresh, refreshPublicUsers])
+
+  // ---------------------------------------------------------------------------
+  // Lejárt szerver-munkamenet figyelése (8 órás SESSION_TTL után 401)
+  // ---------------------------------------------------------------------------
+  // Egy globális fetch-figyelő bármelyik API-hívás 401-jét elkapja, és ilyenkor
+  // átváltunk `unauthenticated`-re → az AuthGate azonnal a bejelentkezési
+  // képernyőt mutatja (nem hagy a felhasználót a lejárt oldalon).
+  useEffect(() => {
+    installSessionWatch()
+    const onExpired = () => {
+      setState((s) => {
+        // Csak akkor reagálunk, ha tényleg be voltunk jelentkezve — így a
+        // bejelentkező képernyőn lévő hibák nem váltanak ki felesleges állapotot.
+        if (s.status !== 'authenticated') return s
+        return {
+          ...s,
+          status: 'unauthenticated',
+          user: null,
+          error: 'A munkamenet lejárt. Jelentkezz be újra.',
+        }
+      })
+    }
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired)
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired)
+  }, [])
 
   const bypassAuth = useCallback(() => {
     setState((s) => ({ ...s, status: 'bypass', user: null, error: null }))
