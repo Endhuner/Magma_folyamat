@@ -58,11 +58,13 @@ jobs:
             MINOR="${SEMVER%.*}"
             TAGS="${IMAGE}:latest,${IMAGE}:${VERSION},${IMAGE}:${SEMVER},${IMAGE}:${MINOR}"
           else
+            VERSION="dev-${GITHUB_SHA::7}"
             TAGS="${IMAGE}:latest"
           fi
 
-          echo "image=${IMAGE}"   >> $GITHUB_OUTPUT
-          echo "tags=${TAGS}"     >> $GITHUB_OUTPUT
+          echo "image=${IMAGE}"     >> $GITHUB_OUTPUT
+          echo "tags=${TAGS}"       >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
       # All-in-one image build + push
       - name: Build & push image
@@ -72,11 +74,14 @@ jobs:
           file: Dockerfile
           push: true
           platforms: linux/amd64
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: |
             org.opencontainers.image.title=ProduktívPro
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
           cache-from: type=gha,scope=unraid
           cache-to: type=gha,scope=unraid,mode=max
 

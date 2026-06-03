@@ -26,6 +26,11 @@
 FROM node:22-alpine AS build-frontend
 WORKDIR /app
 
+# Verziószám build-időben (a release.yml a git tag-et adja át, pl. v1.40.0).
+# A Vite a VITE_ prefixű env-et beégeti a kliens bundle-be.
+ARG APP_VERSION=dev
+ENV VITE_APP_VERSION=$APP_VERSION
+
 COPY package.json package-lock.json ./
 COPY packages/ packages/
 RUN npm ci

@@ -1774,7 +1774,12 @@ function App() {
                 <Factory className="w-8 h-8" weight="duotone" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">ProduktívPro</h1>
+                <h1 className="text-2xl font-bold tracking-tight">
+                  ProduktívPro
+                  <span className="ml-2 align-middle text-xs font-mono font-normal text-muted-foreground">
+                    {import.meta.env.VITE_APP_VERSION || 'dev'}
+                  </span>
+                </h1>
                 <p className="text-sm text-muted-foreground">Termelés Irányítási Rendszer</p>
               </div>
             </div>
