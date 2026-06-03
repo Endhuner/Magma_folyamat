@@ -22,10 +22,12 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
+        // A `coarse:` variáns érintőképernyőn (tablet/telefon) nagyobb
+        // tap-targetre vált; egérrel a kompakt méret marad.
+        default: "h-9 px-4 py-2 has-[>svg]:px-3 coarse:h-11 coarse:px-5",
+        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5 coarse:h-10 coarse:px-4",
+        lg: "h-10 rounded-md px-6 has-[>svg]:px-4 coarse:h-12 coarse:px-7",
+        icon: "size-9 coarse:size-11",
       },
     },
     defaultVariants: {

@@ -24,7 +24,7 @@ import { BackupRestore } from '@/components/BackupRestore'
 // Code-split heavy editors — lásd `src/components/lazy.ts`.
 import { GithubStyleTemplateEditor, TemplateBackupRestore } from '@/components/lazy'
 import { ProductionPlanningView } from '@/components/ProductionPlanningView'
-import { useIsMobile } from '@/hooks/useMediaQuery'
+import { useIsTouchLayout } from '@/hooks/useMediaQuery'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { Order, OrderStatus, Customer, Product, DeliveryNote, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
@@ -63,8 +63,10 @@ type LastAction =
   | null
 
 function App() {
-  // Mobil eszközön a Gyártás fülön a kompakt érintőbarát nézetet renderelünk.
-  const isMobile = useIsMobile()
+  // Mobil ÉS tablet eszközön a Gyártás fülön a kompakt érintőbarát nézetet
+  // renderelünk (≤1024px), hogy ne kelljen a sok-oszlopos táblázatot oldalra
+  // görgetni. Asztali (egér) nézeten marad a teljes táblázat.
+  const isMobile = useIsTouchLayout()
   // ──────────────────────────────────────────────────────────────────────────
   // ADAT — IndexedDB (Dexie repos) az entitásokra. Az `useEntityKV` adapter
   // megőrzi a `useKV` API-t (tuple: [értékek, setter]), de írásnál a diff-et

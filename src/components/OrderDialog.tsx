@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { Order, Customer, Product } from '@/lib/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -74,6 +74,38 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
   const [productSearchQuery, setProductSearchQuery] = useState('')
   const [showCustomerList, setShowCustomerList] = useState(false)
   const [showProductList, setShowProductList] = useState(false)
+
+  // A két kereső-legördülő dobozának külső kerete — ehhez mérjük, hogy a
+  // kattintás/koppintás kívülre esett-e (akkor zárjuk a listát).
+  const customerBoxRef = useRef<HTMLDivElement>(null)
+  const productBoxRef = useRef<HTMLDivElement>(null)
+
+  // Kívülre koppintás → zárás. Touch eszközön (tablet) ettől nem ragad ott a
+  // lenyíló lista. Esc szintén zár.
+  useEffect(() => {
+    if (!showCustomerList && !showProductList) return
+    const handlePointer = (e: PointerEvent) => {
+      const t = e.target as Node
+      if (showCustomerList && customerBoxRef.current && !customerBoxRef.current.contains(t)) {
+        setShowCustomerList(false)
+      }
+      if (showProductList && productBoxRef.current && !productBoxRef.current.contains(t)) {
+        setShowProductList(false)
+      }
+    }
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowCustomerList(false)
+        setShowProductList(false)
+      }
+    }
+    document.addEventListener('pointerdown', handlePointer)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointer)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [showCustomerList, showProductList])
 
   const customerOptions = useMemo(() => {
     const names = customers.map(c => c.name.trim()).filter(Boolean)
@@ -213,7 +245,7 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
           <form onSubmit={handleSubmit} className="space-y-6 pr-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="customer">Customer *</Label>
+                <Label htmlFor="customer">Vevő *</Label>
                 {order ? (
                   <Input
                     id="customer"
@@ -222,10 +254,11 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
                     className="bg-muted"
                   />
                 ) : (
-                  <div className="relative">
+                  <div className="relative" ref={customerBoxRef}>
                     <div className="relative">
                       <MagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
+                        autoFocus
                         placeholder="Keresés vevő neve szerint..."
                         value={formData.customer || customerSearchQuery}
                         onChange={(e) => {
@@ -276,7 +309,7 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
                     className="bg-muted"
                   />
                 ) : (
-                  <div className="relative">
+                  <div className="relative" ref={productBoxRef}>
                     <div className="relative">
                       <MagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -358,6 +391,7 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
                 <Input
                   id="pos"
                   type="number"
+                  inputMode="numeric"
                   value={formData.pos ?? ''}
                   onChange={(e) => {
                     const raw = e.target.value
@@ -401,18 +435,20 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="amountPc">Amount/pc</Label>
+                <Label htmlFor="amountPc">Mennyiség (db)</Label>
                 <Input
                   id="amountPc"
                   type="number"
-                  value={formData.amountPc}
+                  inputMode="numeric"
+                  value={formData.amountPc || ''}
                   onChange={(e) => setFormData({ ...formData, amountPc: parseIntSafe(e.target.value, 0, { allowNegative: false }) })}
                   min={0}
+                  placeholder="0"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="orderDate">Order date *</Label>
+                <Label htmlFor="orderDate">Rendelés dátuma *</Label>
                 <Input
                   id="orderDate"
                   type="date"
@@ -425,7 +461,7 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="requiredDate">Required delivery date *</Label>
+                <Label htmlFor="requiredDate">Kért szállítási határidő *</Label>
                 <Input
                   id="requiredDate"
                   type="date"

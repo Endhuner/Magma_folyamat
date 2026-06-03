@@ -40,3 +40,12 @@ export function useMediaQuery(query: string): boolean {
 export function useIsMobile(): boolean {
   return useMediaQuery('(max-width: 767px)')
 }
+
+/**
+ * Convenience: telefon ÉS tablet (Tailwind `lg` alatt, ≤1024px — pl. iPad
+ * álló és fekvő nézet is). Ott használjuk, ahol a kompakt, érintőbarát
+ * nézetet a tabletre is ki akarjuk terjeszteni (pl. a gyártás-panel).
+ */
+export function useIsTouchLayout(): boolean {
+  return useMediaQuery('(max-width: 1024px)')
+}
