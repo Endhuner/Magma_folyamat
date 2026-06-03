@@ -19,18 +19,41 @@ interface MetricCardProps {
   iconColor?: string
   onViewClick?: () => void
   subtitle?: string
+  /** Opcionális trend az előző időszakhoz képest (százalék). Pozitív = növekedés. */
+  trend?: { value: number; label?: string }
 }
 
-function MetricCard({ title, value, icon: Icon, iconColor = 'text-primary', onViewClick, subtitle }: MetricCardProps) {
+function MetricCard({ title, value, icon: Icon, iconColor = 'text-primary', onViewClick, subtitle, trend }: MetricCardProps) {
+  // Számokat ezres tagolással jelenítünk meg (hu-HU), a string értéket változatlanul.
+  const displayValue = typeof value === 'number' ? value.toLocaleString('hu-HU') : value
   return (
     <Card className="p-6 hover:shadow-lg transition-shadow">
       <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">{title}</p>
-          <p className="text-4xl font-bold font-mono">{value}</p>
+          {/* Rugalmas méret + tabular-nums + truncate → nagy szám sem csordul túl */}
+          <p
+            className="font-bold font-mono tabular-nums truncate"
+            style={{ fontSize: 'clamp(1.5rem, 2.4vw, 2.25rem)' }}
+            title={String(displayValue)}
+          >
+            {displayValue}
+          </p>
           {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
+          {trend && (
+            <div className="flex items-center gap-2 text-xs mt-2">
+              <span
+                className={`px-1.5 py-0.5 rounded font-semibold ${
+                  trend.value >= 0 ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'
+                }`}
+              >
+                {trend.value >= 0 ? '▲' : '▼'} {Math.abs(trend.value)}%
+              </span>
+              {trend.label && <span className="text-muted-foreground">{trend.label}</span>}
+            </div>
+          )}
         </div>
-        <div className={`p-3 rounded-lg bg-muted ${iconColor}`}>
+        <div className={`p-3 rounded-lg bg-muted ${iconColor} shrink-0`}>
           <Icon className="w-6 h-6" weight="duotone" />
         </div>
       </div>
@@ -64,6 +87,11 @@ export function Dashboard({ metrics, productionKPIs, lowStockItems = [], onFilte
 
   const invoicedRate = metrics.totalOrders > 0
     ? Math.round((metrics.invoicedOrders / metrics.totalOrders) * 100)
+    : 0
+
+  // Valós arány az összes rendeléshez — nem a korábbi félrevezető 0/100%.
+  const readyRate = metrics.totalOrders > 0
+    ? Math.round((metrics.readyForDeliveryOrders / metrics.totalOrders) * 100)
     : 0
 
   return (
@@ -102,18 +130,19 @@ export function Dashboard({ metrics, productionKPIs, lowStockItems = [], onFilte
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
           <Card className="p-6">
             <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">Szállításra kész</p>
-            <p className="text-4xl font-bold font-mono">{metrics.readyForDeliveryOrders}</p>
+            <p className="text-4xl font-bold font-mono tabular-nums">{metrics.readyForDeliveryOrders.toLocaleString('hu-HU')}</p>
             <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-accent to-success transition-all duration-500"
-                style={{ width: `${metrics.readyForDeliveryOrders > 0 ? 100 : 0}%` }}
+                style={{ width: `${readyRate}%` }}
               />
             </div>
+            <p className="text-sm text-muted-foreground mt-2">{readyRate}% az összes rendelésből</p>
           </Card>
 
           <Card className="p-6">
             <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">Kiszállítva</p>
-            <p className="text-4xl font-bold font-mono">{metrics.deliveredOrders}</p>
+            <p className="text-4xl font-bold font-mono tabular-nums">{metrics.deliveredOrders.toLocaleString('hu-HU')}</p>
             <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-success to-primary transition-all duration-500"
@@ -125,7 +154,7 @@ export function Dashboard({ metrics, productionKPIs, lowStockItems = [], onFilte
 
           <Card className="p-6">
             <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">Számlázva</p>
-            <p className="text-4xl font-bold font-mono">{metrics.invoicedOrders}</p>
+            <p className="text-4xl font-bold font-mono tabular-nums">{metrics.invoicedOrders.toLocaleString('hu-HU')}</p>
             <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-500"

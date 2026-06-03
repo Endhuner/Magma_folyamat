@@ -16,10 +16,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
-  DropdownMenuPortal,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { Dashboard } from '@/components/Dashboard'
@@ -39,7 +35,8 @@ import { CmrLayoutSettings } from '@/lib/cmrTemplateBuilder'
 import { useAuth } from '@/lib/auth'
 import { listUsers, createUser, updateUser, deleteUser } from '@/lib/api/usersApi'
 import type { UserRole } from '@produktivpro/shared'
-import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database } from '@phosphor-icons/react'
+import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database, SignOut, Gear } from '@phosphor-icons/react'
+import { ACTIVE_WORK_STATUSES } from '@/lib/constants/orderStatus'
 import { toast } from 'sonner'
 import { exportCmrAsHtml, generateCmrHtmlTemplate, getCmrHtml } from '@/lib/cmrHtmlTemplate'
 import { exportDeliveryAsHtml, generateDeliveryHtmlTemplate, getDeliveryHtml, TemplateStyles } from '@/lib/deliveryHtmlTemplate'
@@ -1757,11 +1754,7 @@ function App() {
   }
 
   const activeWorkCount = useMemo(() => {
-    return filteredOrders.filter(o => 
-      o.status === 'Folyamatban' || 
-      o.status === 'Előkészítve' || 
-      o.status === 'Csomagolás alatt'
-    ).length
+    return filteredOrders.filter(o => ACTIVE_WORK_STATUSES.includes(o.status)).length
   }, [filteredOrders])
 
   return (
@@ -1783,25 +1776,56 @@ function App() {
                 <p className="text-sm text-muted-foreground">Termelés Irányítási Rendszer</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">Aktív Munkák</p>
-                <p className="text-3xl font-bold font-mono text-accent">{activeWorkCount}</p>
-              </div>
+            <div className="flex items-center gap-3">
               {auth.user && (
                 <div className="flex items-center gap-2 border-l pl-4">
-                  <div className="text-right">
+                  <div className="text-right hidden sm:block">
                     <p className="text-sm font-medium">{auth.user.name}</p>
                     <p className="text-xs text-muted-foreground capitalize">{auth.user.role === 'admin' ? 'Adminisztrátor' : auth.user.role === 'operator' ? 'Operátor' : 'Megfigyelő'}</p>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => auth.logout()} title="Kijelentkezés">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 256 256" fill="currentColor">
-                      <path d="M120,216a8,8,0,0,1-8,8H48a8,8,0,0,1-8-8V40a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H56V208h56A8,8,0,0,1,120,216Zm109.66-93.66-40-40a8,8,0,0,0-11.32,11.32L204.69,120H112a8,8,0,0,0,0,16h92.69l-26.35,26.34a8,8,0,0,0,11.32,11.32l40-40A8,8,0,0,0,229.66,122.34Z"/>
-                    </svg>
+                    <SignOut className="w-4 h-4" weight="bold" />
                   </Button>
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Állapot-csík — egy pillantásra a műhely legfontosabb mutatói.
+              Minden csempe a megfelelő szűrt nézetre ugrik. */}
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentTab('production')}
+              className="text-left rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors px-3 py-2"
+            >
+              <div className="text-[11px] uppercase tracking-wide text-accent/80">Aktív munka</div>
+              <div className="text-2xl font-bold font-mono tabular-nums text-accent">{activeWorkCount}</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleFilterByStatus('Folyamatban')}
+              className="text-left rounded-lg bg-warning/10 hover:bg-warning/20 transition-colors px-3 py-2"
+            >
+              <div className="text-[11px] uppercase tracking-wide text-warning/80">Gyártás alatt</div>
+              <div className="text-2xl font-bold font-mono tabular-nums text-warning">{metrics.inProductionOrders}</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentTab('deliveries')}
+              className="text-left rounded-lg bg-success/10 hover:bg-success/20 transition-colors px-3 py-2"
+            >
+              <div className="text-[11px] uppercase tracking-wide text-success/80">Szállításra kész</div>
+              <div className="text-2xl font-bold font-mono tabular-nums text-success">{metrics.readyForDeliveryOrders}</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentTab('inventory')}
+              className={`text-left rounded-lg transition-colors px-3 py-2 ${lowStockItems.length > 0 ? 'bg-destructive/10 hover:bg-destructive/20 ring-1 ring-destructive/30' : 'bg-muted hover:bg-muted/70'}`}
+            >
+              <div className={`text-[11px] uppercase tracking-wide ${lowStockItems.length > 0 ? 'text-destructive/80' : 'text-muted-foreground'}`}>Alacsony készlet</div>
+              <div className={`text-2xl font-bold font-mono tabular-nums ${lowStockItems.length > 0 ? 'text-destructive' : ''}`}>{lowStockItems.length}</div>
+            </button>
           </div>
         </div>
       </div>
@@ -1827,11 +1851,12 @@ function App() {
             </TabsList>
 
             <div className="flex items-center gap-2 ml-auto">
+              {/* Törzsadatok — alap nyilvántartások */}
               {(auth.user?.role === 'admin' || auth.user?.role === 'operator') && <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2">
                     <Database className="w-4 h-4" />
-                    Adatok
+                    Törzsadatok
                     <CaretDown className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -1845,12 +1870,12 @@ function App() {
                   <DropdownMenuItem onSelect={() => setCurrentTab('machines')}>
                     Gépek
                   </DropdownMenuItem>
-                  {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('users')}>
-                    Felhasználók
-                  </DropdownMenuItem>}
                   <DropdownMenuItem onSelect={() => setCurrentTab('materials')}>
                     Anyaglista
                   </DropdownMenuItem>
+                  {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('users')}>
+                    Felhasználók
+                  </DropdownMenuItem>}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => setCurrentTab('production-history')}>
                     Gyártás előzmények
@@ -1858,6 +1883,7 @@ function App() {
                 </DropdownMenuContent>
               </DropdownMenu>}
 
+              {/* Dokumentumok — kimenő iratok és mentett fájlok */}
               {auth.user?.role === 'admin' && <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2">
@@ -1867,28 +1893,33 @@ function App() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>Sablonok</DropdownMenuSubTrigger>
-                    <DropdownMenuPortal>
-                      <DropdownMenuSubContent>
-                        <DropdownMenuItem onSelect={() => setCurrentTab('github-editor')}>
-                          Sablon Szerkesztő
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setCurrentTab('template-saves')}>
-                          Sablon Mentések
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setCurrentTab('label-templates')}>
-                          Címke Sablonok
-                        </DropdownMenuItem>
-                      </DropdownMenuSubContent>
-                    </DropdownMenuPortal>
-                  </DropdownMenuSub>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => setCurrentTab('documents')}>
-                    Dokumentumok
+                    Szállítólevelek / CMR
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setCurrentTab('saves')}>
-                    Mentések
+                    Mentett fájlok
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>}
+
+              {/* Beállítások — sablonok és nyomtatás */}
+              {auth.user?.role === 'admin' && <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Gear className="w-4 h-4" />
+                    Beállítások
+                    <CaretDown className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => setCurrentTab('github-editor')}>
+                    Sablon szerkesztő
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setCurrentTab('template-saves')}>
+                    Sablon mentések
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setCurrentTab('label-templates')}>
+                    Címke sablonok
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>}
