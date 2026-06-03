@@ -427,22 +427,23 @@ export function ProductionDetailDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Összesítő */}
+        {/* Összesítő — a számok min-w-0 + truncate + reszponzív méret miatt
+            sosem lógnak át a szomszéd kártyába (pl. Selejt). */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-3">
-          <div className="bg-muted/50 rounded-lg p-4">
+          <div className="bg-muted/50 rounded-lg p-4 min-w-0">
             <div className="text-base text-muted-foreground mb-1">Összes lövés</div>
-            <div className="text-4xl font-bold font-mono">{fmtInt(totalShots)}</div>
+            <div className="font-bold font-mono tabular-nums truncate" style={{ fontSize: 'clamp(1.25rem, 2.2vw, 2.25rem)' }}>{fmtInt(totalShots)}</div>
           </div>
-          <div className="bg-muted/50 rounded-lg p-4">
+          <div className="bg-muted/50 rounded-lg p-4 min-w-0">
             <div className="text-base text-muted-foreground mb-1">Gyártott darab</div>
-            <div className="text-4xl font-bold font-mono">{fmtInt(totalProduced)}</div>
+            <div className="font-bold font-mono tabular-nums truncate" style={{ fontSize: 'clamp(1.25rem, 2.2vw, 2.25rem)' }}>{fmtInt(totalProduced)}</div>
           </div>
-          <div className="bg-muted/50 rounded-lg p-4">
+          <div className="bg-muted/50 rounded-lg p-4 min-w-0">
             <div className="text-base text-muted-foreground mb-1">Fészekszám</div>
-            <div className="text-4xl font-bold font-mono">{fmtInt(nestCountNum)}</div>
+            <div className="font-bold font-mono tabular-nums truncate" style={{ fontSize: 'clamp(1.25rem, 2.2vw, 2.25rem)' }}>{fmtInt(nestCountNum)}</div>
           </div>
           <div
-            className={`rounded-lg p-4 ${
+            className={`rounded-lg p-4 min-w-0 ${
               totalDefects > 0
                 ? 'bg-destructive/10 ring-1 ring-destructive/20'
                 : 'bg-muted/50'
@@ -452,9 +453,10 @@ export function ProductionDetailDialog({
               <Warning className="w-5 h-5" weight="fill" /> Selejt (db)
             </div>
             <div
-              className={`text-4xl font-bold font-mono ${
+              className={`font-bold font-mono tabular-nums truncate ${
                 totalDefects > 0 ? 'text-destructive' : ''
               }`}
+              style={{ fontSize: 'clamp(1.25rem, 2.2vw, 2.25rem)' }}
             >
               {fmtInt(totalDefects)}
             </div>
@@ -622,78 +624,89 @@ export function ProductionDetailDialog({
 
         <Separator />
 
-        {/* Meglévő műszakok listája */}
+        {/* Meglévő műszakok listája — görgethető táblázat rögzített (sticky)
+            fejléccel. A számok jobbra zárva, tabular-nums-szal igazítva, így
+            akárhány sornál és bármilyen nagy számnál áttekinthető marad. */}
         <div>
           <h3 className="text-lg font-semibold mb-3">
             Rögzített műszakok ({orderShifts.length})
           </h3>
-          <ScrollArea className="max-h-[320px] pr-2">
-            {orderShifts.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-lg border border-dashed rounded-md">
-                Ehhez a rendeléshez még nincs rögzített műszak
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {orderShifts.map((s) => (
-                  <div
-                    key={s.id}
-                    className={`flex items-center gap-3 border rounded-lg p-3 ${
-                      editingId === s.id ? 'border-primary bg-primary/5' : ''
-                    }`}
-                  >
-                    <div className="flex-1 grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
-                      <div className="font-mono text-lg">
-                        {format(new Date(s.date), 'yyyy-MM-dd')}
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={`justify-center text-base py-1 ${
-                          s.shift === 'de' ? '' : 'bg-accent/10'
-                        }`}
+          {orderShifts.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-lg border border-dashed rounded-md">
+              Ehhez a rendeléshez még nincs rögzített műszak
+            </div>
+          ) : (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="max-h-[320px] overflow-y-auto">
+                <table className="w-full text-base border-collapse">
+                  <thead className="sticky top-0 z-10 bg-muted">
+                    <tr className="text-left text-muted-foreground">
+                      <th className="p-3 font-medium whitespace-nowrap">Dátum</th>
+                      <th className="p-3 font-medium">Műsz.</th>
+                      <th className="p-3 font-medium">Gép</th>
+                      <th className="p-3 font-medium text-right">Lövés</th>
+                      <th className="p-3 font-medium text-right">Darab</th>
+                      <th className="p-3 font-medium">Megjegyzés</th>
+                      <th className="p-3 font-medium text-right">Művelet</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderShifts.map((s) => (
+                      <tr
+                        key={s.id}
+                        className={`border-t ${editingId === s.id ? 'bg-primary/5' : ''}`}
                       >
-                        {shiftLabel(s.shift)}
-                      </Badge>
-                      <div className="text-base text-muted-foreground truncate">
-                        {machines.find(m => m.id === s.machineId)?.name ?? (s.machineId ? '?' : '—')}
-                      </div>
-                      <div className="text-lg">
-                        <span className="text-muted-foreground">Lövés: </span>
-                        <span className="font-mono font-semibold">{fmtInt(s.shotsCount)}</span>
-                      </div>
-                      <div className="text-lg">
-                        <span className="text-muted-foreground">Darab: </span>
-                        <span className="font-mono font-semibold text-accent">
+                        <td className="p-3 font-mono whitespace-nowrap">
+                          {format(new Date(s.date), 'yyyy-MM-dd')}
+                        </td>
+                        <td className="p-3">
+                          <Badge
+                            variant="outline"
+                            className={`justify-center text-base py-1 ${
+                              s.shift === 'de' ? '' : 'bg-accent/10'
+                            }`}
+                          >
+                            {shiftLabel(s.shift)}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-muted-foreground max-w-[10rem] truncate">
+                          {machines.find(m => m.id === s.machineId)?.name ?? (s.machineId ? '?' : '—')}
+                        </td>
+                        <td className="p-3 text-right font-mono font-semibold tabular-nums whitespace-nowrap">
+                          {fmtInt(s.shotsCount)}
+                        </td>
+                        <td className="p-3 text-right font-mono font-semibold tabular-nums text-accent whitespace-nowrap">
                           {fmtInt(s.producedQuantity)}
-                        </span>
-                      </div>
-                      <div className="text-base text-muted-foreground truncate col-span-2 md:col-span-1">
-                        {s.notes || '-'}
-                      </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-lg"
-                        onClick={() => handleEdit(s)}
-                        disabled={editingId === s.id}
-                      >
-                        Szerk.
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(s)}
-                      >
-                        <Trash className="w-5 h-5" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                        </td>
+                        <td className="p-3 text-muted-foreground max-w-[14rem] truncate" title={s.notes || ''}>
+                          {s.notes || '-'}
+                        </td>
+                        <td className="p-3 text-right whitespace-nowrap">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-base"
+                            onClick={() => handleEdit(s)}
+                            disabled={editingId === s.id}
+                          >
+                            Szerk.
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDelete(s)}
+                          >
+                            <Trash className="w-5 h-5" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </ScrollArea>
+            </div>
+          )}
         </div>
 
         {/* Selejt szekció */}
