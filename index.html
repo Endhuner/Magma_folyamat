@@ -71,16 +71,31 @@
         }
 
         if ('serviceWorker' in navigator) {
+          // Ha egy ÚJ service worker veszi át az irányítást (új verzió települt),
+          // egyszer automatikusan újratöltjük az oldalt — így a felhasználó
+          // azonnal a friss appot kapja, kézi cache-ürítés nélkül.
+          var refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', function () {
+            if (refreshing) return;
+            refreshing = true;
+            window.location.reload();
+          });
+
           window.addEventListener('load', function () {
+            // A ?v=VERZIÓ query minden kiadásnál más → a böngésző biztosan
+            // letölti az új SW-t (és az új cache-eket), nem ragad be a régibe.
             navigator.serviceWorker
-              .register('/sw.js', { scope: '/' })
+              .register('/sw.js?v=%VITE_APP_VERSION%', { scope: '/' })
               .then(function (reg) {
                 reg.addEventListener('updatefound', function () {
                   var nw = reg.installing;
                   if (!nw) return;
                   nw.addEventListener('statechange', function () {
                     if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                      console.log('[PWA] Új verzió letöltve. Frissítéshez töltsd újra az oldalt.');
+                      console.log('[PWA] Új verzió letöltve — automatikus újratöltés.');
+                      // Az új SW azonnal vegye át (skipWaiting), ami kiváltja
+                      // a controllerchange → reload folyamatot.
+                      if (nw.postMessage) nw.postMessage({ type: 'SKIP_WAITING' });
                     }
                   });
                 });

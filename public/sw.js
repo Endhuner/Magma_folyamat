@@ -13,9 +13,12 @@
  * mert minden adat localStorage-ban él.
  */
 
-const VERSION = 'pp-v1.0.0';
-const APP_SHELL_CACHE = `${VERSION}-shell`;
-const RUNTIME_CACHE = `${VERSION}-runtime`;
+// A verziót a regisztrációs URL ?v= paramétere adja (index.html →
+// /sw.js?v=VERZIÓ). Minden kiadásnál más → új cache-nevek → az activate
+// törli a régi (elavult) gyorsítótárakat. Ha nincs ?v=, fix fallback.
+const VERSION = new URL(self.location.href).searchParams.get('v') || 'pp-dev';
+const APP_SHELL_CACHE = `pp-${VERSION}-shell`;
+const RUNTIME_CACHE = `pp-${VERSION}-runtime`;
 
 const APP_SHELL_URLS = [
   '/',
