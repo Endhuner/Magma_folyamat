@@ -224,16 +224,18 @@ export function validateDeliveryExport(
   }
 
   orders.forEach((order, index) => {
-    if (!order.productName) {
+    // A szállítólevélhez elég, ha a terméket vagy a neve, vagy a megnevezése
+    // (designation) azonosítja — csak akkor hiba, ha mindkettő hiányzik.
+    if (!order.productName && !order.designation) {
       errors.push({
         field: 'productName',
-        message: `Hiányzó termék név`,
+        message: `Hiányzó termék név és megnevezés`,
         severity: 'error',
         orderIndex: index,
         orderId: order.id
       })
     }
-    
+
     if (!order.customer) {
       errors.push({
         field: 'customer',
@@ -243,7 +245,7 @@ export function validateDeliveryExport(
         orderId: order.id
       })
     }
-    
+
     if (!order.orderNumber) {
       warnings.push({
         field: 'orderNumber',
