@@ -4,6 +4,7 @@ import { CmrLayoutSettings } from '@/lib/cmrTemplateBuilder'
 import { kvStore } from '@/lib/kvStore'
 import { esc } from '@/lib/htmlSafe'
 import { toast } from 'sonner'
+import { DEFAULT_DOCUMENT_MARGINS, resolveMargins, type PrintMargins } from '@/lib/printConfig'
 
 const DEFAULT_CMR_SETTINGS: Partial<CmrLayoutSettings> = {
   senderName: 'Magma Kft',
@@ -455,7 +456,8 @@ function applyTemplateData(
   sequenceNumber: string,
   userSettings?: CmrLayoutSettings,
   margins?: { top: string, right: string, bottom: string, left: string },
-  issueDate?: string
+  issueDate?: string,
+  documentMargins: PrintMargins = DEFAULT_DOCUMENT_MARGINS
 ): string {
   const effectiveSettings = { ...DEFAULT_CMR_SETTINGS, ...userSettings }
   const firstCustomer = orders[0]?.customer || ''
@@ -589,19 +591,22 @@ function applyTemplateData(
   console.log('Használt ownOrderNumber (vevő rendelési szám, csak cikluson KÍVÜL):', ownOrderNumber)
 
   let finalCss = cssTemplate || ''
-  
-  if (margins) {
+
+  // A sablon saját margói nyernek; ha nincsenek, a közös „dokumentum margó".
+  // Mindig injektáljuk, hogy minden CMR azonos margóval nyomtasson.
+  {
+    const m = resolveMargins(margins, documentMargins)
     const marginStyle = `
     @page {
-      margin: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm !important;
+      margin: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm !important;
     }
     body {
       margin: 0 !important;
-      padding: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm !important;
+      padding: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm !important;
     }
     .cmr-document, .delivery-document {
       margin: 0 !important;
-      padding: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm !important;
+      padding: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm !important;
     }
     `
     finalCss = marginStyle + '\n' + finalCss

@@ -1,4 +1,5 @@
 import { Order, Customer, Product } from './types'
+import { buildPrintPageCss, DEFAULT_LABEL_MARGINS, type PrintMargins } from './printConfig'
 
 interface PalletLabelData {
   palletIndex: number
@@ -125,7 +126,7 @@ function renderLabel(d: PalletLabelData): string {
   `
 }
 
-function buildHTML(labels: PalletLabelData[]): string {
+function buildHTML(labels: PalletLabelData[], margins: PrintMargins): string {
   const rendered = labels.map(renderLabel).join('\n')
 
   return `<!DOCTYPE html>
@@ -134,7 +135,7 @@ function buildHTML(labels: PalletLabelData[]): string {
   <meta charset="UTF-8">
   <title>Raklap cimke</title>
   <style>
-    @page { size: A4 landscape; margin: 10mm; }
+    ${buildPrintPageCss({ size: 'A4 landscape', margins })}
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -305,7 +306,7 @@ function applyPalletTemplate(templateHtml: string, templateCss: string, d: Palle
   return html
 }
 
-function buildHTMLFromTemplate(labels: PalletLabelData[], templateHtml: string, templateCss: string): string {
+function buildHTMLFromTemplate(labels: PalletLabelData[], templateHtml: string, templateCss: string, margins: PrintMargins): string {
   const rendered = labels.map(d => applyPalletTemplate(templateHtml, templateCss, d)).join('\n')
   return `<!DOCTYPE html>
 <html lang="hu">
@@ -325,8 +326,7 @@ function buildHTMLFromTemplate(labels: PalletLabelData[], templateHtml: string, 
     }
     .pallet-label:last-child { page-break-after: avoid; }
     ${templateCss}
-    @page { size: A4 landscape; margin: 10mm; }
-    @media print { body { margin: 0; } }
+    ${buildPrintPageCss({ size: 'A4 landscape', margins })}
   </style>
 </head>
 <body>
@@ -339,7 +339,8 @@ export function generatePalletLabels(
   orders: Order[],
   customers: Customer[],
   products: Product[],
-  savedTemplatesOverride?: Array<{ id: string; data: { type: string; html: string; css: string; active?: boolean } }>
+  savedTemplatesOverride?: Array<{ id: string; data: { type: string; html: string; css: string; active?: boolean } }>,
+  margins: PrintMargins = DEFAULT_LABEL_MARGINS
 ): void {
   const allLabels: PalletLabelData[] = []
 
@@ -363,8 +364,8 @@ export function generatePalletLabels(
     ?? savedTemplatesOverride?.find(t => t.data?.type === 'pallet')
 
   const html = savedPalletTemplate
-    ? buildHTMLFromTemplate(allLabels, savedPalletTemplate.data.html, savedPalletTemplate.data.css)
-    : buildHTML(allLabels)
+    ? buildHTMLFromTemplate(allLabels, savedPalletTemplate.data.html, savedPalletTemplate.data.css, margins)
+    : buildHTML(allLabels, margins)
 
   const win = window.open('', '_blank')
   if (!win) return
