@@ -37,6 +37,7 @@ import { listUsers, createUser, updateUser, deleteUser } from '@/lib/api/usersAp
 import type { UserRole } from '@produktivpro/shared'
 import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database, SignOut, Gear } from '@phosphor-icons/react'
 import { ACTIVE_WORK_STATUSES } from '@/lib/constants/orderStatus'
+import { suggestStatusChange, sumProducedForOrder } from '@/lib/statusSuggestions'
 import { toast } from 'sonner'
 import { exportCmrAsHtml, generateCmrHtmlTemplate, getCmrHtml } from '@/lib/cmrHtmlTemplate'
 import { exportDeliveryAsHtml, generateDeliveryHtmlTemplate, getDeliveryHtml, TemplateStyles } from '@/lib/deliveryHtmlTemplate'
@@ -56,6 +57,9 @@ import { MaterialsPanel } from '@/components/panels/MaterialsPanel'
 import { AppDialogs } from '@/components/AppDialogs'
 import { IssueDateDialog } from '@/components/IssueDateDialog'
 import { ProductionHistoryView } from '@/components/ProductionHistoryView'
+import { NotificationBell } from '@/components/NotificationBell'
+import { useNotifications } from '@/hooks/useNotifications'
+import type { NotificationTarget } from '@/lib/notifications'
 
 type LastAction =
   | { type: 'delete', orders: Order[] }
@@ -689,6 +693,24 @@ function App() {
         notes: `${shift.shotsCount} lövés · ${shift.producedQuantity} db`,
         userId: shift.userId,
       })
+    }
+
+    // Státusz-JAVASLAT (soha nem vált magától): a frissített legyártott
+    // mennyiség alapján felajánljuk a logikus következő státuszt, és a
+    // felhasználó egy gombbal erősíti meg.
+    if (order) {
+      const newProducedTotal = sumProducedForOrder(order.id, productionShifts || []) + qtyDelta
+      const suggestion = suggestStatusChange(order, newProducedTotal)
+      if (suggestion && suggestion.status !== order.status) {
+        toast(`${order.productName || order.customer}: ${suggestion.reason}`, {
+          description: `Javasolt státusz: ${suggestion.status}`,
+          duration: 10000,
+          action: {
+            label: 'Beállítom',
+            onClick: () => handleStatusChange(order.id, suggestion.status),
+          },
+        })
+      }
     }
   }
 
@@ -1755,6 +1777,25 @@ function App() {
     setHideDelivered(false)
   }
 
+  // Értesítési központ — a már meglévő, valós idejű adatból származtatva.
+  const notificationCenter = useNotifications({ orders, lowStockItems, productionKPIs })
+
+  const handleNotificationNavigate = useCallback((target: NotificationTarget) => {
+    switch (target.kind) {
+      case 'inventory':
+        setCurrentTab('inventory')
+        break
+      case 'orders':
+        setCurrentTab('orders')
+        setStatusFilter(target.status ?? 'all')
+        setHideDelivered(false)
+        break
+      case 'production':
+        setCurrentTab('production')
+        break
+    }
+  }, [])
+
   const activeWorkCount = useMemo(() => {
     return filteredOrders.filter(o => ACTIVE_WORK_STATUSES.includes(o.status)).length
   }, [filteredOrders])
@@ -1779,6 +1820,10 @@ function App() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <NotificationBell
+                {...notificationCenter}
+                onNavigate={handleNotificationNavigate}
+              />
               {auth.user && (
                 <div className="flex items-center gap-2 border-l pl-4">
                   <div className="text-right hidden sm:block">
