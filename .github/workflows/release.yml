@@ -15,6 +15,7 @@ on:
   push:
     branches:
       - main
+      - feature/fejlesztesek-teszt
     tags:
       - 'v*.*.*'
   workflow_dispatch:
@@ -57,9 +58,13 @@ jobs:
             SEMVER="${VERSION#v}"
             MINOR="${SEMVER%.*}"
             TAGS="${IMAGE}:latest,${IMAGE}:${VERSION},${IMAGE}:${SEMVER},${IMAGE}:${MINOR}"
-          else
+          elif [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
             VERSION="dev-${GITHUB_SHA::7}"
             TAGS="${IMAGE}:latest"
+          else
+            # Feature/teszt branch → KÜLÖN :test tag, a :latest-et NEM érinti.
+            VERSION="test-${GITHUB_SHA::7}"
+            TAGS="${IMAGE}:test"
           fi
 
           echo "image=${IMAGE}"     >> $GITHUB_OUTPUT
