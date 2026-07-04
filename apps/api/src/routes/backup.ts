@@ -9,11 +9,20 @@ import type { FastifyInstance } from 'fastify'
 import fs from 'node:fs'
 import path from 'node:path'
 import { requireRole } from '../lib/authGuards.js'
+import { runBackupOnce } from '../lib/scheduledBackup.js'
 
 const DB_FILE = process.env.DATABASE_FILE || '/data/produktivpro.sqlite'
 const BACKUP_DIR = path.join(path.dirname(DB_FILE), 'backups')
 
 export async function backupRoutes(app: FastifyInstance): Promise<void> {
+  // Azonnali szerver-oldali mentés kézzel (a UI "Mentés most" gombjához).
+  app.post('/backup/create', {
+    preHandler: [requireRole('admin')],
+  }, async (_req, reply) => {
+    await runBackupOnce(app.log)
+    return reply.send({ ok: true })
+  })
+
   // Élő adatbázis letöltése
   app.get('/backup/download', {
     preHandler: [requireRole('admin')],

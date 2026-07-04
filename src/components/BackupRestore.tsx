@@ -81,6 +81,21 @@ export function BackupRestore() {
   const [savedBackups, setSavedBackups] = useKV<SavedBackup[]>('backups', [])
   const [isExporting, setIsExporting] = useState(false)
   const [isRestoring, setIsRestoring] = useState(false)
+  const [isServerBackingUp, setIsServerBackingUp] = useState(false)
+
+  const handleServerBackup = async () => {
+    setIsServerBackingUp(true)
+    try {
+      const res = await fetch('/api/v1/backup/create', { method: 'POST', credentials: 'include' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      toast.success('Szerver-oldali mentés elkészült')
+    } catch (err) {
+      console.error('Szerver mentés hiba:', err)
+      toast.error('A szerver-oldali mentés sikertelen')
+    } finally {
+      setIsServerBackingUp(false)
+    }
+  }
 
   const createBackup = () => {
     setIsExporting(true)
@@ -330,17 +345,27 @@ export function BackupRestore() {
         </AlertDescription>
       </Alert>
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 flex-wrap">
         <Button onClick={createBackup} disabled={isExporting || isRestoring || totalRecords === 0} className="gap-2">
           <CloudArrowDown className="w-5 h-5" />
           {isExporting ? 'Exportálás...' : 'Biztonsági mentés létrehozása'}
         </Button>
-        
+
         <Button variant="outline" onClick={handleFileImport} disabled={isRestoring} className="gap-2">
           <Upload className="w-5 h-5" />
           {isRestoring ? 'Visszaállítás...' : 'Importálás fájlból'}
         </Button>
+
+        <Button variant="outline" onClick={handleServerBackup} disabled={isServerBackingUp} className="gap-2">
+          <FloppyDisk className="w-5 h-5" />
+          {isServerBackingUp ? 'Mentés...' : 'Szerver mentés most'}
+        </Button>
       </div>
+
+      <p className="text-xs text-muted-foreground">
+        A szerver naponta automatikusan is menti az adatbázist (30 napos megőrzés).
+        A „Szerver mentés most" azonnali pillanatképet készít.
+      </p>
 
       {(savedBackups || []).length > 0 && (
         <div className="space-y-4">

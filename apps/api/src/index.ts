@@ -33,6 +33,7 @@ import { pdfRoutes } from './routes/pdf.js'
 import { registerRequestLogger } from './lib/requestLogger.js'
 import { registerAuthPlugins } from './lib/authPlugin.js'
 import { bootstrapAdmin } from './lib/bootstrap.js'
+import { startScheduledBackups } from './lib/scheduledBackup.js'
 
 /**
  * Csak akkor használjuk a `pino-pretty` transportot, ha a csomag valóban
@@ -90,6 +91,9 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Bootstrap admin user (idempotens — csak ha nincs admin a DB-ben)
   bootstrapAdmin(app.log)
+
+  // Ütemezett automatikus adatbázis-mentés (naponta, 30 napos megőrzés)
+  startScheduledBackups(app.log)
 
   // ── Statikus frontend kiszolgálása (Docker all-in-one mód) ─────────────
   // Ha a STATIC_DIR env be van állítva, a Fastify kiszolgálja a React SPA-t.
