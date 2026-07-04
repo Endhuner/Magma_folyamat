@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Card } from '@/components/ui/card'
 import { DeliveryNote, Order, Customer, Product, ColumnFilter } from '@/lib/types'
@@ -441,6 +442,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
       </div>
 
       <div className="border rounded-lg">
+        <ScrollArea className="w-full whitespace-nowrap">
         <Table>
           <TableHeader>
             <TableRow>
@@ -521,7 +523,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
                           variant="ghost"
                           size="icon"
                           onClick={() => handleViewDetails(note)}
-                          className="h-8 w-8"
+                          className="h-8 w-8 coarse:h-10 coarse:w-10"
                           title="Részletek megtekintése"
                         >
                           <Eye className="w-4 h-4" />
@@ -531,7 +533,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
                             variant="ghost"
                             size="icon"
                             onClick={() => handleOpenPreview(note)}
-                            className="h-8 w-8"
+                            className="h-8 w-8 coarse:h-10 coarse:w-10"
                             title="Előnézet és szerkesztés"
                           >
                             <PencilSimple className="w-4 h-4" />
@@ -541,7 +543,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
                           variant="ghost"
                           size="icon"
                           onClick={() => handleReExport(note)}
-                          className="h-8 w-8"
+                          className="h-8 w-8 coarse:h-10 coarse:w-10"
                           title="Újra letöltés"
                         >
                           <FileArrowDown className="w-4 h-4" />
@@ -558,7 +560,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
+                              className="h-8 w-8 coarse:h-10 coarse:w-10"
                               title={email ? `Email küldése: ${email}` : 'Az ügyfélnek nincs email-címe'}
                               disabled={!email}
                               asChild={!!email}
@@ -577,7 +579,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
                           variant="ghost"
                           size="icon"
                           onClick={() => onDelete(note.id)}
-                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          className="h-8 w-8 coarse:h-10 coarse:w-10 text-destructive hover:text-destructive hover:bg-destructive/10"
                           title="Törlés"
                         >
                           <Trash className="w-4 h-4" />
@@ -590,6 +592,8 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
             )}
           </TableBody>
         </Table>
+        <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       </div>
 
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>

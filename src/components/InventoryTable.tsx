@@ -45,7 +45,9 @@ function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, o
   return (
     <>
 
-      <div className="border rounded-lg overflow-hidden">
+      {/* overflow-x-auto: telefonon/tableten a sok oszlop + művelet-gomb
+          a táblázaton belül görgethető, nem tolja szét a teljes oldalt. */}
+      <div className="border rounded-lg overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>

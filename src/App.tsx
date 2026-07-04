@@ -1850,7 +1850,7 @@ function App() {
           <OfflineBanner isOnline={isOnline} pendingCount={pendingCount} isSyncing={isSyncing} />
 
           <div className="flex items-center gap-3 flex-wrap">
-            <TabsList className={`grid w-full md:w-auto md:inline-grid ${auth.user?.role === 'operator' ? 'grid-cols-3 md:grid-cols-3' : 'grid-cols-5 md:grid-cols-5'}`}>
+            <TabsList className={`grid w-full md:w-auto md:inline-grid text-xs sm:text-sm ${auth.user?.role === 'operator' ? 'grid-cols-3 md:grid-cols-3' : 'grid-cols-5 md:grid-cols-5'}`}>
               {auth.user?.role !== 'operator' && <TabsTrigger value="dashboard">Áttekintés</TabsTrigger>}
               <TabsTrigger value="production">Gyártás</TabsTrigger>
               <TabsTrigger value="planning">Gy. tervezés</TabsTrigger>
