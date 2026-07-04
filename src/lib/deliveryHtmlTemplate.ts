@@ -1,5 +1,5 @@
 import { Order, Customer, Product, DeliveryNote } from '@/lib/types'
-import { generateDeliveryNoteSequenceNumber } from '@/lib/helpers'
+import { generateDeliveryNoteSequenceNumber, parseFloatSafe } from '@/lib/helpers'
 import { kvStore } from '@/lib/kvStore'
 import { esc } from '@/lib/htmlSafe'
 import { toast } from 'sonner'
@@ -68,7 +68,7 @@ export function generateDeliveryHtmlTemplate(
   const totalQuantity = orders.reduce((sum, order) => sum + (order.amountPc || 0), 0)
   const totalBoxes = orders.reduce((sum, order) => sum + (order.boxesCount || 0), 0)
   const totalPallets = orders.reduce((sum, order) => sum + (order.palletsCount || 0), 0)
-  const totalGrossWeight = orders.reduce((sum, order) => sum + (parseFloat(String(order.grossWeightKg || 0)) || 0), 0)
+  const totalGrossWeight = orders.reduce((sum, order) => sum + parseFloatSafe(order.grossWeightKg), 0)
 
   const html = `
 <!DOCTYPE html>
@@ -393,7 +393,7 @@ function applyDeliveryTemplateData(
   const totalQuantity = orders.reduce((sum, order) => sum + (order.amountPc || 0), 0)
   const totalBoxes = orders.reduce((sum, order) => sum + (order.boxesCount || 0), 0)
   const totalPallets = orders.reduce((sum, order) => sum + (order.palletsCount || 0), 0)
-  const totalGrossWeight = orders.reduce((sum, order) => sum + (parseFloat(String(order.grossWeightKg || 0)) || 0), 0)
+  const totalGrossWeight = orders.reduce((sum, order) => sum + parseFloatSafe(order.grossWeightKg), 0)
   const ownOrderNumber = orders[0]?.ownOrderNumber || ''
   const orderNumber = orders[0]?.orderNumber || ''
 

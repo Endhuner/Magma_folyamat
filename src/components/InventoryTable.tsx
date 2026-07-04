@@ -1,6 +1,6 @@
-import { memo, useState } from 'react'
+import { memo, useMemo } from 'react'
 import { InventoryItem, Product, Order } from '@/lib/types'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Pencil, Trash, Package, Clock, BoxArrowDown } from '@phosphor-icons/react'
@@ -18,6 +18,13 @@ interface InventoryTableProps {
 }
 
 function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, onShowHistory, onWarehouseAdd }: InventoryTableProps) {
+  // Összesítők a láblécbe: teljes darabszám + hány tétel van a küszöb alatt.
+  const totals = useMemo(() => {
+    const totalQty = inventory.reduce((sum, i) => sum + (i.quantity || 0), 0)
+    const lowCount = inventory.filter((i) => i.quantity < 50).length
+    return { totalQty, lowCount }
+  }, [inventory])
+
   const getStockStatus = (quantity: number) => {
     if (quantity === 0) return { label: 'Nincs készleten', variant: 'destructive' as const }
     if (quantity < 50) return { label: 'Alacsony', variant: 'outline' as const }
@@ -124,6 +131,18 @@ function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, o
             )
           })}
         </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TableCell colSpan={3} className="font-semibold">
+              Összesen ({inventory.length} tétel
+              {totals.lowCount > 0 && <span className="text-destructive"> · {totals.lowCount} alacsony</span>})
+            </TableCell>
+            <TableCell className="text-right font-mono font-bold">
+              {totals.totalQty.toLocaleString('hu-HU')} db
+            </TableCell>
+            <TableCell colSpan={5} />
+          </TableRow>
+        </TableFooter>
       </Table>
     </div>
     </>

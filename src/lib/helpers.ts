@@ -22,8 +22,7 @@ export function stripDiacritics(s: string | undefined | null): string {
  * egyenlőség, hanem `includes`.
  */
 export function isDelivered(status: string): boolean {
-  const st = stripDiacritics(status)
-  return st === 'kiszallitva' || st === 'kiszallitva/szamlazva' || st.startsWith('kiszallitva')
+  return stripDiacritics(status).includes('kiszallitva')
 }
 
 export function isInvoiced(status: string): boolean {

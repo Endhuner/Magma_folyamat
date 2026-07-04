@@ -31,6 +31,36 @@ const COOKIE_OPTIONS = {
   maxAge: config.sessionTtlSeconds,
 }
 
+/**
+ * PIN brute-force védelem: IP-nként számoljuk a hibás próbálkozásokat.
+ * 5 hibás próba után 60 mp zárolás. Sikeres belépés nullázza a számlálót.
+ * ponytail: in-memory (restartkor ürül) — több API-példány esetén Redis-alapú
+ * megoldásra kell váltani.
+ */
+const MAX_FAILED_ATTEMPTS = 5
+const LOCKOUT_MS = 60_000
+const failedLogins = new Map<string, { count: number; lockedUntil: number }>()
+
+function loginLocked(key: string): boolean {
+  const entry = failedLogins.get(key)
+  if (!entry) return false
+  if (entry.lockedUntil > Date.now()) return true
+  if (entry.lockedUntil > 0) failedLogins.delete(key) // zárolás lejárt
+  return false
+}
+
+function recordLoginFailure(key: string): void {
+  const entry = failedLogins.get(key) ?? { count: 0, lockedUntil: 0 }
+  entry.count += 1
+  if (entry.count >= MAX_FAILED_ATTEMPTS) {
+    entry.lockedUntil = Date.now() + LOCKOUT_MS
+    entry.count = 0
+  }
+  failedLogins.set(key, entry)
+  // Ne nőjön korlátlanul: régi bejegyzések takarítása
+  if (failedLogins.size > 10_000) failedLogins.clear()
+}
+
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   // ---------- LOGIN ----------
   app.post('/auth/login', async (req: FastifyRequest<{ Body: LoginBody }>, reply: FastifyReply) => {
@@ -43,6 +73,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
     const { userId, pin } = parsed.data
 
+    if (loginLocked(req.ip)) {
+      app.log.warn({ userId, ip: req.ip }, 'login locked (brute-force védelem)')
+      return reply.code(429).send({
+        error: 'Túl sok hibás próbálkozás — várj egy percet, majd próbáld újra',
+      })
+    }
+
     const db = getDb()
     const rows = db.select().from(users).where(eq(users.id, userId)).all()
     const user = rows[0]
@@ -53,9 +90,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       : (verifyPin(pin, '$2a$10$abcdefghijklmnopqrstuv'), false)
 
     if (!ok || !user) {
+      recordLoginFailure(req.ip)
       app.log.warn({ userId, ip: req.ip }, 'login fail')
       return reply.code(401).send({ error: 'Hibás felhasználó vagy PIN' })
     }
+
+    failedLogins.delete(req.ip)
 
     db.update(users)
       .set({ lastLoginAt: new Date().toISOString() })

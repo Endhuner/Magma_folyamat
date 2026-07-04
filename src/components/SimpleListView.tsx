@@ -1,4 +1,5 @@
 import { generateId } from '@/lib/generateId'
+import { stripDiacritics } from '@/lib/helpers'
 import { useState, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -199,12 +200,12 @@ export function SimpleListView<T extends SimpleRecord>({
   )
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
+    const q = stripDiacritics(search)
     if (!q) return items
     return items.filter((item) =>
       tableColumns.some((c) => {
         const v = getCell(item, c.key)
-        return v.toLowerCase().includes(q)
+        return stripDiacritics(v).includes(q)
       })
     )
   }, [items, tableColumns, search])

@@ -18,7 +18,9 @@ import type { Order, OrderStatus, Product, ProductionShift } from './types'
 export function fmtInt(n: number | undefined | null): string {
   const v = Number(n)
   if (!Number.isFinite(v)) return '0'
-  return Math.round(v).toLocaleString('hu-HU')
+  // useGrouping: true = "always" — a hu-HU locale alapból csak 5 számjegytől
+  // csoportosít (minimumGroupingDigits=2), de a táblázatokban az 1 500 forma kell.
+  return Math.round(v).toLocaleString('hu-HU', { useGrouping: true })
 }
 
 /**
@@ -71,18 +73,26 @@ export function findProductForOrder(
         // Rajzszám egyezés (mindkét oldal rajzszám)
         (order.productName && p.drawingNumber === order.productName) ||
         // Terméknév egyezés (mindkét oldal terméknév)
-        (order.designation && p.productName === order.designation)
+        (order.designation && p.productName === order.designation) ||
+        // Régi rendelések: a productName mező terméknevet is tartalmazhat —
+        // azonos vevőn belül a név-név egyezés biztonságos.
+        (order.productName && p.productName === order.productName)
       )
   )
 }
 
-/** A gyártásban "élő" státuszok — a többi (Kiszállítva, Lemondva...) nem jelenik meg. */
+/**
+ * A gyártás-nézetben megjelenő státuszok — a kiszállítottak nem jelennek meg.
+ * Az 'Elkészült' is ide tartozik: a ProductionView / MobileProductionView saját
+ * "Elkészült" szekciója mutatja (a gyártás lezárult, de még nem ment ki).
+ */
 export const ACTIVE_PRODUCTION_STATUSES: ReadonlyArray<OrderStatus> = [
   'Felvéve',
   'Folyamatban',
   'Előkészítve',
   'Javítás alatt',
   'Szünetel',
+  'Elkészült',
 ]
 
 /** Csak az aktív gyártási státuszokat tartalmazza. */

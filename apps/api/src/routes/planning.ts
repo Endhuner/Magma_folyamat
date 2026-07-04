@@ -59,13 +59,7 @@ export async function planningRoutes(app: FastifyInstance): Promise<void> {
       .where(eq(machinePlanningAssignments.orderId, input.orderId))
       .get()
 
-    let fromMachineId = ''
-    if (existing) {
-      fromMachineId = existing.machineId
-      db.delete(machinePlanningAssignments)
-        .where(eq(machinePlanningAssignments.id, existing.id))
-        .run()
-    }
+    const fromMachineId = existing?.machineId ?? ''
 
     const id = typeof input.id === 'string' && input.id.length > 0 ? input.id : uuidv4()
     const row = {
@@ -78,8 +72,6 @@ export async function planningRoutes(app: FastifyInstance): Promise<void> {
       createdAt: now,
       updatedAt: now,
     }
-
-    db.insert(machinePlanningAssignments).values(row).run()
 
     // Gépalap log bejegyzés
     const { userId, userName } = userOf(req)
@@ -99,7 +91,18 @@ export async function planningRoutes(app: FastifyInstance): Promise<void> {
       timestamp: now,
       createdAt: now,
     }
-    db.insert(machinePlanningLog).values(logRow).run()
+
+    // Egy tranzakcióban: régi hozzárendelés törlése + új beszúrása + log.
+    // Ha bármelyik lépés hibázik, a hozzárendelés nem veszhet el félúton.
+    db.transaction((tx) => {
+      if (existing) {
+        tx.delete(machinePlanningAssignments)
+          .where(eq(machinePlanningAssignments.id, existing.id))
+          .run()
+      }
+      tx.insert(machinePlanningAssignments).values(row).run()
+      tx.insert(machinePlanningLog).values(logRow).run()
+    })
 
     broadcast({ type: 'order', action: 'update', id: input.orderId })
     return reply.code(201).send(row)
@@ -114,14 +117,17 @@ export async function planningRoutes(app: FastifyInstance): Promise<void> {
     const { orderedIds } = parsed.data
     const now = nowIso()
 
-    for (let i = 0; i < orderedIds.length; i++) {
-      const rowId = orderedIds[i]
-      if (!rowId) continue
-      db.update(machinePlanningAssignments)
-        .set({ position: i, updatedAt: now })
-        .where(eq(machinePlanningAssignments.id, rowId))
-        .run()
-    }
+    // Tranzakcióban: vagy a teljes új sorrend érvényesül, vagy semmi.
+    db.transaction((tx) => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        const rowId = orderedIds[i]
+        if (!rowId) continue
+        tx.update(machinePlanningAssignments)
+          .set({ position: i, updatedAt: now })
+          .where(eq(machinePlanningAssignments.id, rowId))
+          .run()
+      }
+    })
 
     broadcast({ type: 'order', action: 'update', id: 'planning-reorder' })
     return reply.send({ ok: true })

@@ -411,7 +411,7 @@ export function ProductionView({
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="text-lg px-4 py-2">
             <Factory className="w-5 h-5 mr-2" weight="duotone" />
-            {productionOrders.length} aktív munka
+            {productionOrders.filter((o) => o.status !== 'Elkészült').length} aktív munka
           </Badge>
         </div>
       </div>

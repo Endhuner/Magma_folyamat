@@ -35,8 +35,15 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false)
   const [activeColumnFilter, setActiveColumnFilter] = useState<ColumnFilter | null>(null)
 
+  // orderId → Order térkép egyszer, hogy a getOrderNumbers ne O(n) find-oljon
+  // soronként (100 szállítólevél × 5000 rendelés = milliós keresés helyett O(1)).
+  const orderById = useMemo(
+    () => new Map(orders.map((o) => [o.id, o])),
+    [orders]
+  )
+
   const sortedNotes = useMemo(() => {
-    return [...deliveryNotes].sort((a, b) => 
+    return [...deliveryNotes].sort((a, b) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
   }, [deliveryNotes])
@@ -86,7 +93,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
 
   const getOrderNumbers = (orderIds: string[]) => {
     const orderNumbers = orderIds
-      .map(id => orders.find(o => o.id === id)?.ownOrderNumber)
+      .map(id => orderById.get(id)?.ownOrderNumber)
       .filter(Boolean)
     
     if (orderNumbers.length === 0) return '-'

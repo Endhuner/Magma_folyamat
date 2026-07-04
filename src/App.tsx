@@ -29,7 +29,7 @@ import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { Order, OrderStatus, Customer, Product, DeliveryNote, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
 import { diffObjects, buildAuditEntry, pruneAuditLog, AUDIT_LOG_MAX_ENTRIES } from '@/lib/auditLog'
-import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered, isInvoiced } from '@/lib/helpers'
+import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered, isInvoiced, isOverdue } from '@/lib/helpers'
 import { computeAutoFieldsForOrder } from '@/lib/orderService'
 import { CmrLayoutSettings } from '@/lib/cmrTemplateBuilder'
 import { useAuth } from '@/lib/auth'
@@ -1685,44 +1685,57 @@ function App() {
   // / `ProductsTable` virtualizációja vagy memoizációja sem invalidálódik
   // szükségtelenül.
   const filteredCustomers = useMemo(() => {
-    const query = customerSearchQuery.toLowerCase()
+    const query = stripDiacritics(customerSearchQuery)
     if (!query) return customers || []
     return (customers || []).filter(
       (customer) =>
-        customer.name.toLowerCase().includes(query) ||
-        customer.city.toLowerCase().includes(query) ||
-        customer.country.toLowerCase().includes(query) ||
-        customer.taxNumber.toLowerCase().includes(query) ||
-        customer.postalCode.toLowerCase().includes(query)
+        stripDiacritics(customer.name).includes(query) ||
+        stripDiacritics(customer.city).includes(query) ||
+        stripDiacritics(customer.country).includes(query) ||
+        stripDiacritics(customer.taxNumber).includes(query) ||
+        stripDiacritics(customer.postalCode).includes(query)
     )
   }, [customers, customerSearchQuery])
 
   const filteredProducts = useMemo(() => {
-    const query = productSearchQuery.toLowerCase()
+    const query = stripDiacritics(productSearchQuery)
     if (!query) return products || []
     return (products || []).filter(
       (product) =>
-        product.customer.toLowerCase().includes(query) ||
-        product.productName.toLowerCase().includes(query) ||
-        product.drawingNumber.toLowerCase().includes(query) ||
-        product.articleNumber.toLowerCase().includes(query) ||
-        product.material.toLowerCase().includes(query)
+        stripDiacritics(product.customer).includes(query) ||
+        stripDiacritics(product.productName).includes(query) ||
+        stripDiacritics(product.drawingNumber).includes(query) ||
+        stripDiacritics(product.articleNumber).includes(query) ||
+        stripDiacritics(product.material).includes(query)
     )
   }, [products, productSearchQuery])
 
   const dashboardFilteredOrders = useMemo(() => {
-    if (!dashboardSearchQuery) return orders || []
-    const query = dashboardSearchQuery.toLowerCase()
+    const query = stripDiacritics(dashboardSearchQuery)
+    if (!query) return orders || []
     return (orders || []).filter(
       (order) =>
-        order.productName.toLowerCase().includes(query) ||
-        order.orderNumber.toLowerCase().includes(query) ||
-        order.customer.toLowerCase().includes(query)
+        stripDiacritics(order.productName).includes(query) ||
+        stripDiacritics(order.orderNumber).includes(query) ||
+        stripDiacritics(order.customer).includes(query)
     )
   }, [orders, dashboardSearchQuery])
 
   const metrics = useMemo(
     () => calculateDashboardMetrics(dashboardFilteredOrders),
+    [dashboardFilteredOrders]
+  )
+
+  // Lejárt határidejű, még ki nem szállított rendelések — a legrégebben
+  // lejárt elöl. A dashboard piros sávban jelzi (a leginkább akcióigényes tétel).
+  const overdueOrders = useMemo(
+    () =>
+      (dashboardFilteredOrders || [])
+        .filter((o) => isOverdue(o.requiredDate, o.status))
+        .sort(
+          (a, b) =>
+            new Date(a.requiredDate).getTime() - new Date(b.requiredDate).getTime()
+        ),
     [dashboardFilteredOrders]
   )
 
@@ -1943,8 +1956,10 @@ function App() {
               metrics={metrics}
               productionKPIs={productionKPIs}
               lowStockItems={lowStockItems}
+              overdueOrders={overdueOrders}
               onFilterByStatus={handleFilterByStatus}
               onNavigateToInventory={() => setCurrentTab('inventory')}
+              onShowOverdue={() => { setCurrentTab('orders'); setStatusFilter('all'); setHideDelivered(true) }}
             />
 
             {(orders || []).length === 0 && (

@@ -90,7 +90,7 @@ interface MobileProductionViewProps {
 }
 
 const STATUS_GROUPS: Array<{
-  key: 'inProgress' | 'pending' | 'ready' | 'paused' | 'repair'
+  key: 'inProgress' | 'pending' | 'ready' | 'paused' | 'repair' | 'done'
   title: string
   status: OrderStatus
   icon: React.ReactNode
@@ -131,6 +131,13 @@ const STATUS_GROUPS: Array<{
     icon: <Wrench className="w-5 h-5 text-destructive" weight="duotone" />,
     accent: 'bg-destructive/10',
   },
+  {
+    key: 'done',
+    title: 'Elkészült',
+    status: 'Elkészült',
+    icon: <CheckCircle className="w-5 h-5 text-green-600" weight="fill" />,
+    accent: 'bg-green-700/10',
+  },
 ]
 
 export function MobileProductionView({
@@ -154,6 +161,7 @@ export function MobileProductionView({
     ready: false,
     paused: false,
     repair: false,
+    done: false,
   })
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null)
   const [quickEntry, setQuickEntry] = useState<MissingShift | null>(null)
