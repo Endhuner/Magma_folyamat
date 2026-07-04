@@ -88,7 +88,7 @@ function CustomersTableImpl({ customers, orders, onEdit, onDelete }: CustomersTa
               </TableHeader>
               <TableBody>
                 {customers.map((customer, index) => (
-                  <TableRow key={customer.id} className="even:bg-[oklch(0.94_0.015_250)] hover:bg-[oklch(0.88_0.02_250)]">
+                  <TableRow key={customer.id} className="even:bg-[var(--row-stripe)] hover:bg-[var(--row-hover)]">
                     <TableCell className="font-medium min-w-[200px]">{customer.name}</TableCell>
                     <TableCell className="min-w-[150px]">{customer.language}</TableCell>
                     <TableCell className="min-w-[150px]">{customer.city}</TableCell>

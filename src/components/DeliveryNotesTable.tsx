@@ -465,7 +465,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
               </TableRow>
             ) : (
               filteredNotes.map((note, index) => (
-                <TableRow key={note.id} className="even:bg-[oklch(0.94_0.015_250)] hover:bg-[oklch(0.88_0.02_250)]">
+                <TableRow key={note.id} className="even:bg-[var(--row-stripe)] hover:bg-[var(--row-hover)]">
                   {isColumnVisible('sequenceNumber') && (
                     <TableCell>
                       <Badge variant="outline" className="font-mono">

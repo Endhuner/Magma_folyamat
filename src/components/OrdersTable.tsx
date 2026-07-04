@@ -223,7 +223,7 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
                 return (
                   <TableRow
                     key={order.id}
-                    className="even:bg-[oklch(0.94_0.015_250)] hover:bg-[oklch(0.88_0.02_250)]"
+                    className="even:bg-[var(--row-stripe)] hover:bg-[var(--row-hover)]"
                     style={VIRTUAL_ROW_STYLE}
                   >
                     <TableCell>

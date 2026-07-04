@@ -276,7 +276,7 @@ function ProductsTableImpl({ products, orders, onEdit, onDelete, onBulkDelete, s
                   const rowCls = [
                     isSelected
                       ? 'bg-primary/10 hover:bg-primary/15'
-                      : 'even:bg-[oklch(0.94_0.015_250)] hover:bg-[oklch(0.88_0.02_250)]',
+                      : 'even:bg-[var(--row-stripe)] hover:bg-[var(--row-hover)]',
                   ].join(' ')
                   return (
                     <TableRow key={product.id} className={rowCls} data-state={isSelected ? 'selected' : undefined}>

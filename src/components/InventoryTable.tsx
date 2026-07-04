@@ -66,7 +66,7 @@ function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, o
           {inventory.map((item, index) => {
             const status = getStockStatus(item.quantity)
             return (
-              <TableRow key={item.id} className="even:bg-[oklch(0.94_0.015_250)] hover:bg-[oklch(0.88_0.02_250)]">
+              <TableRow key={item.id} className="even:bg-[var(--row-stripe)] hover:bg-[var(--row-hover)]">
                 <TableCell className="font-mono text-sm">{item.drawingNumber}</TableCell>
                 <TableCell className="font-medium">{item.productName}</TableCell>
                 <TableCell>{item.customer}</TableCell>

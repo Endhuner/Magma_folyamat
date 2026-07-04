@@ -36,6 +36,8 @@ import { useAuth } from '@/lib/auth'
 import { listUsers, createUser, updateUser, deleteUser } from '@/lib/api/usersApi'
 import type { UserRole } from '@produktivpro/shared'
 import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database, SignOut, Gear } from '@phosphor-icons/react'
+import { ThemeToggle } from '@/components/ThemeToggle'
+import { GlobalSearch } from '@/components/GlobalSearch'
 import { ACTIVE_WORK_STATUSES } from '@/lib/constants/orderStatus'
 import { toast } from 'sonner'
 import { exportCmrAsHtml, generateCmrHtmlTemplate, getCmrHtml } from '@/lib/cmrHtmlTemplate'
@@ -221,7 +223,8 @@ function App() {
   const [currentTab, setCurrentTab] = useState(() =>
     auth.user?.role === 'operator' ? 'production' : 'dashboard'
   )
-  
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
+
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
   const [hideDelivered, setHideDelivered] = useState(true)
@@ -1878,6 +1881,18 @@ function App() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 text-muted-foreground hidden sm:flex"
+                onClick={() => setGlobalSearchOpen(true)}
+                title="Gyorskereső (Ctrl+K)"
+              >
+                <MagnifyingGlass className="w-4 h-4" />
+                <span className="hidden md:inline">Keresés</span>
+                <kbd className="hidden md:inline pointer-events-none rounded border bg-muted px-1.5 font-mono text-[10px]">Ctrl K</kbd>
+              </Button>
+              <ThemeToggle />
               {auth.user && (
                 <div className="flex items-center gap-2 border-l pl-4">
                   <div className="text-right hidden sm:block">
@@ -2283,6 +2298,18 @@ function App() {
         type={issueDateDialogType}
         onConfirm={handleIssueDateConfirm}
         onClose={() => setIssueDateDialogOpen(false)}
+      />
+
+      <GlobalSearch
+        open={globalSearchOpen}
+        onOpenChange={setGlobalSearchOpen}
+        orders={orders || []}
+        customers={customers || []}
+        products={products || []}
+        onOpenOrder={handleEditOrder}
+        onOpenCustomer={(id) => { setCurrentTab('customers'); handleEditCustomer(id) }}
+        onOpenProduct={(id) => { setCurrentTab('products'); handleEditProduct(id) }}
+        onNavigate={setCurrentTab}
       />
 
       <AppDialogs

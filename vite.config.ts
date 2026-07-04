@@ -18,7 +18,15 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(projectRoot, 'src')
-    }
+    },
+    // Egyetlen React-példány — különben a dev-szerver a nem-előbundle-elt
+    // függőségeknek (pl. next-themes) külön React-modult adhat, ami
+    // "Invalid hook call" hibát okoz. Prod build (Rollup) eleve dedupál.
+    dedupe: ['react', 'react-dom'],
+  },
+  optimizeDeps: {
+    // next-themes előbundle-elése a közös React-példánnyal.
+    include: ['next-themes'],
   },
   server: {
     proxy: {
