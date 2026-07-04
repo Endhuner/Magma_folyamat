@@ -265,6 +265,26 @@ export interface MachineRepair {
 }
 
 /**
+ * Gép-karbantartási bejegyzés — a MachineRepair (ad-hoc javítás) mellett ez
+ * az ütemezett/esedékes karbantartásokat követi (nextDueAt = következő
+ * esedékesség), külön szerver-táblában, hogy lekérdezhető és riasztható legyen.
+ */
+export interface MachineMaintenance {
+  id: string
+  machineId: string
+  type: 'scheduled' | 'repair' | 'inspection'
+  description: string
+  /** Elvégzés dátuma (ISO YYYY-MM-DD), üres ha még nem történt meg. */
+  performedAt: string
+  /** Következő esedékesség (ISO YYYY-MM-DD), üres ha nem ismétlődő. */
+  nextDueAt: string
+  cost: string
+  performedBy: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
  * Gép — egyszerű lista a műhely gépeiről.
  */
 export interface Machine {

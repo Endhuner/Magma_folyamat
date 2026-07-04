@@ -348,6 +348,23 @@ export const machinePlanningReorderSchema = z.object({
 })
 
 // ----------------------------------------------------------------------
+// Gép-karbantartási napló
+// ----------------------------------------------------------------------
+export const machineMaintenanceCreateSchema = z.object({
+  id: z.string().optional(),
+  machineId: z.string().min(1),
+  type: z.enum(['scheduled', 'repair', 'inspection']).default('scheduled'),
+  description: z.string().default(''),
+  performedAt: z.string().default(''),
+  nextDueAt: z.string().default(''),
+  cost: z.string().default(''),
+  performedBy: z.string().default(''),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+})
+export const machineMaintenanceUpdateSchema = machineMaintenanceCreateSchema.partial()
+
+// ----------------------------------------------------------------------
 // Gépalap log
 // ----------------------------------------------------------------------
 export const machinePlanningLogCreateSchema = z.object({

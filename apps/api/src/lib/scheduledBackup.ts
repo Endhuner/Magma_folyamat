@@ -15,6 +15,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { FastifyBaseLogger } from 'fastify'
 import { getSqlite } from '../db/connection.js'
+import { purgeExpiredTrash } from './trashService.js'
 import { config } from '../config.js'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -37,6 +38,9 @@ export async function runBackupOnce(log: FastifyBaseLogger): Promise<void> {
     await getSqlite().backup(dest)
     log.info(`[backup] automatikus mentés kész: ${path.basename(dest)}`)
     pruneOldBackups(log)
+    // Lejárt lomtár-tételek végleges törlése (30 napos megőrzés).
+    const purged = purgeExpiredTrash(RETENTION_DAYS)
+    if (purged > 0) log.info(`[trash] ${purged} lejárt lomtár-tétel véglegesen törölve`)
   } catch (err) {
     log.error(err, '[backup] automatikus mentés sikertelen')
   }

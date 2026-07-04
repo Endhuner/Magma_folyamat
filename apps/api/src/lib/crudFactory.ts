@@ -29,6 +29,7 @@ import { z, type ZodTypeAny } from 'zod'
 import { getDb } from '../db/connection.js'
 import { broadcast } from './sseBroadcaster.js'
 import { recordAudit } from './auditService.js'
+import { registerTrashable, moveToTrash } from './trashService.js'
 import { tryAuth, requireAuth, requireRole } from './authGuards.js'
 import type { AuditEntityType, UserRole, CurrentUser } from '@produktivpro/shared'
 
@@ -181,6 +182,10 @@ export function registerCrudRoutes<
     redactOutput = (r) => r,
   } = opts
   const base = `/${resource}`
+
+  // Lomtár-regisztráció: a törléskor ide mentett rekord a `trash`-route-tal
+  // visszaállítható az eredeti táblába.
+  registerTrashable(auditEntity, table, auditLabel)
 
   /**
    * preHandler-ek összerakása egy adott művelethez. A sorrend:
@@ -348,7 +353,21 @@ export function registerCrudRoutes<
     if (existingRows.length === 0) return reply.code(404).send({ error: `${auditLabel} nem található` })
     const before = deserializeJsonFields(existingRows[0]!, jsonFields)
 
-    db.delete(table).where(eq(idCol as unknown as never, req.params.id)).run()
+    // Soft delete: a nyers rekord (szerializált JSON-mezőkkel) a lomtárba
+    // kerül, majd a fő táblából törlünk — egy tranzakcióban.
+    const { userId, userName } = userOf(req)
+    db.transaction(() => {
+      moveToTrash({
+        entityType: auditEntity,
+        entityId: req.params.id,
+        entityLabel: auditLabel,
+        entityName: pickName(before, nameField),
+        row: existingRows[0]!,
+        deletedBy: userId,
+        deletedByName: userName,
+      })
+      db.delete(table).where(eq(idCol as unknown as never, req.params.id)).run()
+    })
 
     recordAudit({
       entityType: auditEntity,

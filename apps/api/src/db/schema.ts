@@ -466,6 +466,48 @@ export const machinePlanningLog = sqliteTable('machine_planning_log', {
   createdAt: text('created_at').notNull().default(nowDefault),
 })
 
+// ----------------------------------------------------------------------
+// Lomtár — soft delete. A törölt entitások teljes payloadja ide kerül,
+// hogy 30 napig visszaállítható legyen. A `payload` a törölt rekord JSON-je
+// (a JSON-mezők már szerializált stringként, ahogy a DB-ben tároltuk).
+// ----------------------------------------------------------------------
+export const trash = sqliteTable('trash', {
+  id: text('id').primaryKey(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id').notNull(),
+  entityLabel: text('entity_label').notNull().default(''),
+  entityName: text('entity_name').notNull().default(''),
+  payload: text('payload').notNull(),
+  deletedBy: text('deleted_by').notNull().default(''),
+  deletedByName: text('deleted_by_name').notNull().default(''),
+  deletedAt: text('deleted_at').notNull(),
+}, (t) => ({
+  byDeletedAt: index('trash_deleted_at_idx').on(t.deletedAt),
+  byEntity: index('trash_entity_idx').on(t.entityType, t.entityId),
+}))
+
+// ----------------------------------------------------------------------
+// Gép-karbantartási napló — esedékesség + előzmények gépenként.
+// ----------------------------------------------------------------------
+export const machineMaintenance = sqliteTable('machine_maintenance', {
+  id: text('id').primaryKey(),
+  machineId: text('machine_id').notNull(),
+  /** 'scheduled' (tervezett) | 'repair' (javítás) | 'inspection' (ellenőrzés) */
+  type: text('type').notNull().default('scheduled'),
+  description: text('description').notNull().default(''),
+  /** Elvégzés dátuma (ISO YYYY-MM-DD), ha már megtörtént. */
+  performedAt: text('performed_at').notNull().default(''),
+  /** Következő esedékesség (ISO YYYY-MM-DD), ha ismétlődő. */
+  nextDueAt: text('next_due_at').notNull().default(''),
+  cost: text('cost').notNull().default(''),
+  performedBy: text('performed_by').notNull().default(''),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+}, (t) => ({
+  byMachine: index('machine_maintenance_machine_idx').on(t.machineId),
+  byDue: index('machine_maintenance_due_idx').on(t.nextDueAt),
+}))
+
 // Hagyományos numerikus mezőkhöz, ha valaha kellene `real`-t használni
 // (pl. súlyok), itt egy hint:
 // example: weightKg: real('weight_kg').notNull().default(0),

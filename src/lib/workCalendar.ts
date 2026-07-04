@@ -101,29 +101,5 @@ export function isWorkday(date: Date | string, cal: WorkCalendarSettings = DEFAU
   return true
 }
 
-// ---- önellenőrzés (ponytail: fut node-dal, nincs framework) ----
-// Futtatás: `npx tsx src/lib/workCalendar.ts`
-// pathToFileURL a szóközös könyvtárnév (%20) miatt — ld. apps/api/src/index.ts.
-import { pathToFileURL } from 'node:url'
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const assert = (c: boolean, m: string) => { if (!c) { throw new Error('FAIL: ' + m) } }
-  // 2025 húsvétvasárnap: április 20.
-  assert(isoDate(easterSunday(2025)) === '2025-04-20', 'húsvét 2025')
-  // 2024 húsvétvasárnap: március 31.
-  assert(isoDate(easterSunday(2024)) === '2024-03-31', 'húsvét 2024')
-  const h2025 = hungarianHolidays(2025)
-  assert(h2025.has('2025-04-18'), 'nagypéntek 2025-04-18')
-  assert(h2025.has('2025-04-21'), 'húsvéthétfő 2025-04-21')
-  assert(h2025.has('2025-06-09'), 'pünkösdhétfő 2025-06-09')
-  assert(h2025.has('2025-08-20'), 'államalapítás')
-  // 2025-08-20 szerda, de ünnep → nem munkanap
-  assert(!isWorkday('2025-08-20'), 'ünnep nem munkanap')
-  // 2025-08-19 kedd, munkanap
-  assert(isWorkday('2025-08-19'), 'kedd munkanap')
-  // szombat alapból nem munkanap
-  assert(!isWorkday('2025-08-23'), 'szombat nem munkanap')
-  // de extraWorkdays felülírja
-  assert(isWorkday('2025-08-23', { ...DEFAULT_WORK_CALENDAR, extraWorkdays: ['2025-08-23'] }), 'ledolgozott szombat')
-  // eslint-disable-next-line no-console
-  console.log('workCalendar önellenőrzés OK')
-}
+// Önellenőrzés: ld. workCalendar.test.ts (a Node-specifikus __main__ blokk
+// helyett vitest, mert ez a modul a böngészőbe is bundle-ölődik).

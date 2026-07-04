@@ -1,5 +1,5 @@
 import { generateId } from '@/lib/generateId'
-import { useState, useMemo, useEffect, useRef, Suspense, useCallback } from 'react'
+import { useState, useMemo, useEffect, useRef, Suspense, useCallback, lazy } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { useEntityKV } from '@/hooks/useEntityKV'
 import { auditLogRepo } from '@/lib/db/repos'
@@ -27,7 +27,7 @@ import { ProductionPlanningView } from '@/components/ProductionPlanningView'
 import { useIsTouchLayout } from '@/hooks/useMediaQuery'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { OfflineBanner } from '@/components/OfflineBanner'
-import { Order, OrderStatus, Customer, Product, DeliveryNote, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
+import { Order, OrderStatus, Customer, Product, DeliveryNote, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, MachineMaintenance, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
 import { diffObjects, buildAuditEntry, pruneAuditLog, AUDIT_LOG_MAX_ENTRIES } from '@/lib/auditLog'
 import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered, isInvoiced, isOverdue } from '@/lib/helpers'
 import { computeAutoFieldsForOrder } from '@/lib/orderService'
@@ -39,6 +39,9 @@ import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database, SignOut,
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { GlobalSearch } from '@/components/GlobalSearch'
 import { WorkCalendarDialog } from '@/components/WorkCalendarDialog'
+const TrashView = lazy(() => import('@/components/TrashView').then(m => ({ default: m.TrashView })))
+const ReportsView = lazy(() => import('@/components/ReportsView').then(m => ({ default: m.ReportsView })))
+const MaintenanceView = lazy(() => import('@/components/MaintenanceView').then(m => ({ default: m.MaintenanceView })))
 import { ACTIVE_WORK_STATUSES } from '@/lib/constants/orderStatus'
 import { toast } from 'sonner'
 import { exportCmrAsHtml, generateCmrHtmlTemplate, getCmrHtml } from '@/lib/cmrHtmlTemplate'
@@ -158,6 +161,7 @@ function App() {
   // Változásnapló — minden lényeges adatmódosítás itt is rögzül (Dokumentumok → Változások).
   const [auditLog, setAuditLog] = useEntityKV<AuditLogEntry>(auditLogRepo)
   const machinesApi = useServerCrud<Machine>('machines', ['machine'])
+  const maintenanceApi = useServerCrud<MachineMaintenance>('machine-maintenance', ['maintenance'])
   // Felhasználók: a backend a forrás (auth + bcrypt PIN miatt nem lehet
   // local-only). A "Felhasználók" tab onSave/onDelete a `usersApi`-n
   // keresztül a `/api/v1/users` endpointtal beszél, mentés után
@@ -1990,6 +1994,9 @@ function App() {
                   <DropdownMenuItem onSelect={() => setCurrentTab('machines')}>
                     Gépek
                   </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setCurrentTab('maintenance')}>
+                    Karbantartás
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setCurrentTab('materials')}>
                     Anyaglista
                   </DropdownMenuItem>
@@ -1997,6 +2004,9 @@ function App() {
                     Felhasználók
                   </DropdownMenuItem>}
                   <DropdownMenuSeparator />
+                  {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('reports')}>
+                    Riportok
+                  </DropdownMenuItem>}
                   <DropdownMenuItem onSelect={() => setCurrentTab('production-history')}>
                     Gyártás előzmények
                   </DropdownMenuItem>
@@ -2044,6 +2054,9 @@ function App() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => setWorkCalendarDialogOpen(true)}>
                     Munkanaptár
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setCurrentTab('trash')}>
+                    Lomtár
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>}
@@ -2239,6 +2252,36 @@ function App() {
 
           <TabsContent value="saves" className="space-y-6">
             <BackupRestore />
+          </TabsContent>
+
+          <TabsContent value="trash" className="space-y-6">
+            <Suspense fallback={<div className="text-muted-foreground p-4">Lomtár betöltése…</div>}>
+              <TrashView />
+            </Suspense>
+          </TabsContent>
+
+          <TabsContent value="reports" className="space-y-6">
+            <Suspense fallback={<div className="text-muted-foreground p-4">Riportok betöltése…</div>}>
+              <ReportsView
+                orders={orders || []}
+                shifts={productionShifts || []}
+                defects={productionDefects || []}
+                machines={machinesApi.items || []}
+                products={products || []}
+                inventory={inventory || []}
+              />
+            </Suspense>
+          </TabsContent>
+
+          <TabsContent value="maintenance" className="space-y-6">
+            <Suspense fallback={<div className="text-muted-foreground p-4">Karbantartás betöltése…</div>}>
+              <MaintenanceView
+                machines={machinesApi.items || []}
+                maintenance={maintenanceApi.items || []}
+                onSave={(m) => maintenanceApi.add(m)}
+                onDelete={(id) => maintenanceApi.remove(id)}
+              />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="production-history" className="space-y-6">
