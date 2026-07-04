@@ -508,6 +508,27 @@ export const machineMaintenance = sqliteTable('machine_maintenance', {
   byDue: index('machine_maintenance_due_idx').on(t.nextDueAt),
 }))
 
+// ----------------------------------------------------------------------
+// Üzenetek / feladatok a felhasználók között.
+// toUserId = 'all' → mindenkinek szól. A readAt/doneAt üres string = még nem.
+// ----------------------------------------------------------------------
+export const messages = sqliteTable('messages', {
+  id: text('id').primaryKey(),
+  /** 'uzenet' | 'feladat' */
+  kind: text('kind').notNull().default('uzenet'),
+  body: text('body').notNull(),
+  fromUserId: text('from_user_id').notNull().default(''),
+  fromUserName: text('from_user_name').notNull().default(''),
+  toUserId: text('to_user_id').notNull(),
+  toUserName: text('to_user_name').notNull().default(''),
+  readAt: text('read_at').notNull().default(''),
+  doneAt: text('done_at').notNull().default(''),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+}, (t) => ({
+  byTo: index('messages_to_idx').on(t.toUserId, t.createdAt),
+}))
+
 // Hagyományos numerikus mezőkhöz, ha valaha kellene `real`-t használni
 // (pl. súlyok), itt egy hint:
 // example: weightKg: real('weight_kg').notNull().default(0),

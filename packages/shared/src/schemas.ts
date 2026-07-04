@@ -365,6 +365,25 @@ export const machineMaintenanceCreateSchema = z.object({
 export const machineMaintenanceUpdateSchema = machineMaintenanceCreateSchema.partial()
 
 // ----------------------------------------------------------------------
+// Üzenetek / feladatok
+// ----------------------------------------------------------------------
+export const messageCreateSchema = z.object({
+  id: z.string().optional(),
+  kind: z.enum(['uzenet', 'feladat']).default('uzenet'),
+  body: z.string().min(1, 'Az üzenet nem lehet üres').max(2000),
+  fromUserId: z.string().default(''),
+  fromUserName: z.string().default(''),
+  /** Felhasználó id vagy 'all' (mindenki) */
+  toUserId: z.string().min(1),
+  toUserName: z.string().default(''),
+  readAt: z.string().default(''),
+  doneAt: z.string().default(''),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+})
+export const messageUpdateSchema = messageCreateSchema.partial()
+
+// ----------------------------------------------------------------------
 // Gépalap log
 // ----------------------------------------------------------------------
 export const machinePlanningLogCreateSchema = z.object({

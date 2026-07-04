@@ -27,7 +27,7 @@ import { ProductionPlanningView } from '@/components/ProductionPlanningView'
 import { useIsTouchLayout } from '@/hooks/useMediaQuery'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { OfflineBanner } from '@/components/OfflineBanner'
-import { Order, OrderStatus, Customer, Product, DeliveryNote, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, MachineMaintenance, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
+import { Order, OrderStatus, Customer, Product, DeliveryNote, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, MachineMaintenance, AppMessage, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
 import { diffObjects, buildAuditEntry, pruneAuditLog, AUDIT_LOG_MAX_ENTRIES } from '@/lib/auditLog'
 import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered, isInvoiced, isOverdue } from '@/lib/helpers'
 import { computeAutoFieldsForOrder } from '@/lib/orderService'
@@ -39,6 +39,7 @@ import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database, SignOut,
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { GlobalSearch } from '@/components/GlobalSearch'
 import { WorkCalendarDialog } from '@/components/WorkCalendarDialog'
+import { MessageCenter } from '@/components/MessageCenter'
 const TrashView = lazy(() => import('@/components/TrashView').then(m => ({ default: m.TrashView })))
 const ReportsView = lazy(() => import('@/components/ReportsView').then(m => ({ default: m.ReportsView })))
 const MaintenanceView = lazy(() => import('@/components/MaintenanceView').then(m => ({ default: m.MaintenanceView })))
@@ -162,6 +163,7 @@ function App() {
   const [auditLog, setAuditLog] = useEntityKV<AuditLogEntry>(auditLogRepo)
   const machinesApi = useServerCrud<Machine>('machines', ['machine'])
   const maintenanceApi = useServerCrud<MachineMaintenance>('machine-maintenance', ['maintenance'])
+  const messagesApi = useServerCrud<AppMessage>('messages', ['message'])
   // Felhasználók: a backend a forrás (auth + bcrypt PIN miatt nem lehet
   // local-only). A "Felhasználók" tab onSave/onDelete a `usersApi`-n
   // keresztül a `/api/v1/users` endpointtal beszél, mentés után
@@ -1898,6 +1900,10 @@ function App() {
                 <span className="hidden md:inline">Keresés</span>
                 <kbd className="hidden md:inline pointer-events-none rounded border bg-muted px-1.5 font-mono text-[10px]">Ctrl K</kbd>
               </Button>
+              <MessageCenter
+                messagesApi={messagesApi}
+                currentUser={auth.user ? { id: auth.user.id, name: auth.user.name } : null}
+              />
               <ThemeToggle />
               {auth.user && (
                 <div className="flex items-center gap-2 border-l pl-4">

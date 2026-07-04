@@ -265,6 +265,24 @@ export interface MachineRepair {
 }
 
 /**
+ * Felhasználók közti üzenet vagy feladat.
+ * toUserId = 'all' → mindenkinek szól. readAt/doneAt üres = még nem történt meg.
+ */
+export interface AppMessage {
+  id: string
+  kind: 'uzenet' | 'feladat'
+  body: string
+  fromUserId: string
+  fromUserName: string
+  toUserId: string
+  toUserName: string
+  readAt: string
+  doneAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
  * Gép-karbantartási bejegyzés — a MachineRepair (ad-hoc javítás) mellett ez
  * az ütemezett/esedékes karbantartásokat követi (nextDueAt = következő
  * esedékesség), külön szerver-táblában, hogy lekérdezhető és riasztható legyen.

@@ -32,6 +32,7 @@ import { planningRoutes } from './routes/planning.js'
 import { pdfRoutes } from './routes/pdf.js'
 import { trashRoutes } from './routes/trash.js'
 import { maintenanceRoutes } from './routes/maintenance.js'
+import { messagesRoutes } from './routes/messages.js'
 import { registerRequestLogger } from './lib/requestLogger.js'
 import { registerAuthPlugins } from './lib/authPlugin.js'
 import { bootstrapAdmin } from './lib/bootstrap.js'
@@ -142,6 +143,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     await api.register(pdfRoutes)
     await api.register(trashRoutes)
     await api.register(maintenanceRoutes)
+    await api.register(messagesRoutes)
   }, { prefix: '/api/v1' })
 
   // 404-kezelő:
