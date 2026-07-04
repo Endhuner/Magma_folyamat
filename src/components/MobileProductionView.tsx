@@ -62,6 +62,8 @@ import {
 import { ShiftValidationBanner } from '@/components/ShiftValidationBanner'
 import { ProductionDetailDialog } from '@/components/production/ProductionDetailDialog'
 import { QuickShiftEntryDialog } from '@/components/QuickShiftEntryDialog'
+import { useAppSetting } from '@/hooks/useAppSetting'
+import { DEFAULT_WORK_CALENDAR, type WorkCalendarSettings } from '@/lib/workCalendar'
 import {
   fmtInt,
   findProductForOrder,
@@ -173,7 +175,8 @@ export function MobileProductionView({
 
   const productionOrders = useMemo(() => filterProductionOrders(orders), [orders])
 
-  const missingShifts = useMemo(() => detectMissingShifts(orders, shifts), [orders, shifts])
+  const [workCalendar] = useAppSetting<WorkCalendarSettings>('work-calendar', DEFAULT_WORK_CALENDAR)
+  const missingShifts = useMemo(() => detectMissingShifts(orders, shifts, { calendar: workCalendar }), [orders, shifts, workCalendar])
 
   const shiftsByOrder = useMemo(() => buildShiftsByOrder(shifts), [shifts])
 

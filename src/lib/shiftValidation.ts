@@ -11,6 +11,7 @@
  *   - A mai nap és a jövő (csak múltbeli, lezárt napokra érvényes)
  */
 import type { Order, ProductionShift } from '@/lib/types'
+import { isWorkday, DEFAULT_WORK_CALENDAR, type WorkCalendarSettings } from '@/lib/workCalendar'
 
 export interface MissingShift {
   orderId: string
@@ -64,18 +65,19 @@ function buildProductionStartDates(shifts: ProductionShift[]): Map<string, Date>
 export function detectMissingShifts(
   orders: Order[],
   shifts: ProductionShift[],
-  opts: { includeWeekends?: boolean } = {}
+  opts: { includeWeekends?: boolean; calendar?: WorkCalendarSettings } = {}
 ): MissingShift[] {
-  // ponytail: fix heti munkarend (H–P) — ha hétvégén is megy a gyártás,
-  // állítsd includeWeekends: true-ra; teljes munkanaptár (ünnepnapok) később.
-  const { includeWeekends = false } = opts
+  // Munkanaptár: alapból magyar ünnepnapok + H–P munkarend. Csak munkanapokra
+  // jelzünk hiányt (hétvége/ünnep nem álriasztás). Az includeWeekends visszafelé
+  // kompatibilis kapcsoló: minden napot munkanapnak vesz.
+  const calendar: WorkCalendarSettings = opts.includeWeekends
+    ? { ...DEFAULT_WORK_CALENDAR, workdays: [0, 1, 2, 3, 4, 5, 6], observeHolidays: false }
+    : opts.calendar ?? DEFAULT_WORK_CALENDAR
   const today = atMidnight(new Date())
   const lookback: Date[] = []
   for (let i = 1; i <= LOOKBACK_DAYS; i++) {
     const day = new Date(today.getTime() - i * MS_PER_DAY)
-    // Szombat (6) és vasárnap (0) kihagyása — ezek nem munkanapok,
-    // korábban minden hétfőn álriasztás jött a hétvégi "hiányzó" műszakokról.
-    if (!includeWeekends && (day.getDay() === 0 || day.getDay() === 6)) continue
+    if (!isWorkday(day, calendar)) continue
     lookback.push(day)
   }
 

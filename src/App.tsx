@@ -38,6 +38,7 @@ import type { UserRole } from '@produktivpro/shared'
 import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database, SignOut, Gear } from '@phosphor-icons/react'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { GlobalSearch } from '@/components/GlobalSearch'
+import { WorkCalendarDialog } from '@/components/WorkCalendarDialog'
 import { ACTIVE_WORK_STATUSES } from '@/lib/constants/orderStatus'
 import { toast } from 'sonner'
 import { exportCmrAsHtml, generateCmrHtmlTemplate, getCmrHtml } from '@/lib/cmrHtmlTemplate'
@@ -224,6 +225,7 @@ function App() {
     auth.user?.role === 'operator' ? 'production' : 'dashboard'
   )
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
+  const [workCalendarDialogOpen, setWorkCalendarDialogOpen] = useState(false)
 
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
@@ -2039,6 +2041,10 @@ function App() {
                   <DropdownMenuItem onSelect={() => setCurrentTab('label-templates')}>
                     Címke sablonok
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setWorkCalendarDialogOpen(true)}>
+                    Munkanaptár
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>}
             </div>
@@ -2310,6 +2316,11 @@ function App() {
         onOpenCustomer={(id) => { setCurrentTab('customers'); handleEditCustomer(id) }}
         onOpenProduct={(id) => { setCurrentTab('products'); handleEditProduct(id) }}
         onNavigate={setCurrentTab}
+      />
+
+      <WorkCalendarDialog
+        open={workCalendarDialogOpen}
+        onClose={() => setWorkCalendarDialogOpen(false)}
       />
 
       <AppDialogs

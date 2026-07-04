@@ -35,7 +35,16 @@ describe('detectMissingShifts', () => {
       expect(dow).not.toBe(0) // vasárnap
       expect(dow).not.toBe(6) // szombat
     }
-    expect(missing.length).toBeGreaterThan(0) // munkanapokra viszont jelez
+  })
+
+  it('does not flag Hungarian holidays by default', () => {
+    // A magyar munkaszüneti napok (pl. ünnepek) nem lehetnek a hiánylistán.
+    const missing = detectMissingShifts(orders, shifts)
+    const flaggedDates = new Set(missing.map((m) => m.date))
+    // 2025 fix ünnepek — ha a 7 napos ablak érinti valamelyiket, nem szabad jeleznie.
+    for (const holiday of ['2025-08-20', '2025-03-15', '2025-05-01']) {
+      expect(flaggedDates.has(holiday)).toBe(false)
+    }
   })
 
   it('flags weekends too when includeWeekends is set', () => {
