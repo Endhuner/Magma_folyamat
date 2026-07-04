@@ -169,12 +169,22 @@ export function BackupRestore() {
 
         const data = result.data as unknown as BackupData
 
+        // Verzió-ellenőrzés: eltérő formátumú mentés átmehet a strukturális
+        // validáción, de hiányos adatokat állíthat vissza — kiemelten jelezzük.
+        const versionMismatch = data.version !== '1.0'
+
         toast.warning(
           <div className="flex flex-col gap-1">
             <p className="font-medium">Vissza szeretné állítani az adatokat?</p>
             <p className="text-xs">
               Ez felülírja a jelenlegi adatokat: {data.orders.length} rendelés, {data.customers.length} vevő, {data.products.length} termék
             </p>
+            {versionMismatch && (
+              <p className="text-xs font-semibold text-destructive">
+                Figyelem: a mentés verziója ({data.version}) eltér a jelenlegitől (1.0) —
+                a visszaállítás hiányos adatokat eredményezhet!
+              </p>
+            )}
           </div>,
           {
             duration: 10000,

@@ -899,6 +899,9 @@ export function ProductionDetailDialog({
         editing={editingDefect}
         onSave={(d) => onSaveDefect(d)}
         userId={userId}
+        // Felső korlát: gyártott össz − többi selejt (szerkesztésnél a saját
+        // korábbi mennyisége nem számít bele, hiszen felülíródik).
+        maxQuantity={Math.max(0, totalProduced - totalDefects + (editingDefect?.quantity ?? 0))}
       />
     )}
 

@@ -58,15 +58,20 @@ export async function clearAll(): Promise<void> {
 }
 
 /**
- * Lejátssza a sort sorrendben. Sikeres műveletet törli.
- * Hibás műveletnél megáll és visszaadja a maradék számát.
- * @returns hány műveletet sikerült lejátszani
+ * Lejátssza a sort sorrendben.
+ *  - Siker → a művelet törlődik a sorból.
+ *  - Végleges hiba (4xx — a szerver érvénytelennek ítélte) → a művelet
+ *    törlődik, de `failed`-ként jelentjük; a mögötte állók FOLYTATÓDNAK.
+ *    (Korábban az első hiba `break`-kel az egész sort beragasztotta.)
+ *  - Átmeneti hiba (hálózat / 5xx) → megállunk, a maradék a sorban marad
+ *    a következő próbálkozásig.
  */
 export async function flushQueue(
   apiFetch: (url: string, init: RequestInit) => Promise<unknown>
-): Promise<{ played: number; remaining: number }> {
+): Promise<{ played: number; remaining: number; failed: number }> {
   const ops = await getPendingOps()
   let played = 0
+  let failed = 0
 
   for (const op of ops) {
     const url = `/api/v1/${op.resource}${op.method !== 'POST' ? `/${encodeURIComponent(op.entityId)}` : ''}`
@@ -78,11 +83,20 @@ export async function flushQueue(
       })
       if (op.id !== undefined) await removeOp(op.id)
       played++
-    } catch {
+    } catch (err) {
+      const status = (err as { status?: number }).status
+      const isPermanent = typeof status === 'number' && status >= 400 && status < 500
+      if (isPermanent) {
+        console.error(`[offlineQueue] végleges hiba (${status}) — kihagyva:`, op.method, op.resource, op.entityId, op.body)
+        if (op.id !== undefined) await removeOp(op.id)
+        failed++
+        continue
+      }
+      // Hálózati vagy szerver-oldali (5xx) hiba — később újrapróbáljuk
       break
     }
   }
 
   const remaining = await getPendingCount()
-  return { played, remaining }
+  return { played, remaining, failed }
 }

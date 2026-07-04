@@ -15,6 +15,14 @@ const API_BASE: string =
 
 async function apiFetch(url: string, init: RequestInit): Promise<unknown> {
   const res = await fetch(`${API_BASE}${url}`, { credentials: 'include', ...init })
+  // Fontos: a HTTP-hibát is hibaként kell dobni — enélkül a flushQueue a
+  // szerver által elutasított (4xx) műveletet is "sikeresnek" vette és
+  // törölte a sorból → csendes adatvesztés visszajátszáskor.
+  if (!res.ok && res.status !== 204) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
   if (res.status === 204) return undefined
   return res.json().catch(() => ({}))
 }
@@ -47,14 +55,17 @@ export function useOfflineSync(onSynced?: () => void) {
 
         setIsSyncing(true)
         try {
-          const { played, remaining } = await flushQueue(apiFetch)
+          const { played, remaining, failed } = await flushQueue(apiFetch)
           setPendingCount(remaining)
           if (played > 0) {
             toast.success(`Szinkronizálás kész — ${played} művelet elküldve`)
             onSynced?.()
           }
+          if (failed > 0) {
+            toast.error(`${failed} műveletet a szerver elutasított — részletek a konzolban`, { duration: 10000 })
+          }
           if (remaining > 0) {
-            toast.error(`${remaining} művelet szinkronizálása sikertelen`)
+            toast.warning(`${remaining} művelet a következő szinkronizálásra vár`)
           }
         } finally {
           setIsSyncing(false)

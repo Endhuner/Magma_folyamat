@@ -63,12 +63,20 @@ function buildProductionStartDates(shifts: ProductionShift[]): Map<string, Date>
  */
 export function detectMissingShifts(
   orders: Order[],
-  shifts: ProductionShift[]
+  shifts: ProductionShift[],
+  opts: { includeWeekends?: boolean } = {}
 ): MissingShift[] {
+  // ponytail: fix heti munkarend (H–P) — ha hétvégén is megy a gyártás,
+  // állítsd includeWeekends: true-ra; teljes munkanaptár (ünnepnapok) később.
+  const { includeWeekends = false } = opts
   const today = atMidnight(new Date())
   const lookback: Date[] = []
   for (let i = 1; i <= LOOKBACK_DAYS; i++) {
-    lookback.push(new Date(today.getTime() - i * MS_PER_DAY))
+    const day = new Date(today.getTime() - i * MS_PER_DAY)
+    // Szombat (6) és vasárnap (0) kihagyása — ezek nem munkanapok,
+    // korábban minden hétfőn álriasztás jött a hétvégi "hiányzó" műszakokról.
+    if (!includeWeekends && (day.getDay() === 0 || day.getDay() === 6)) continue
+    lookback.push(day)
   }
 
   // Indexeljük a meglévő műszakokat (orderId|date|shift → ProductionShift)

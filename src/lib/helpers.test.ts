@@ -128,7 +128,7 @@ describe('generateOwnOrderNumber', () => {
   it('returns first sequence with proper prefix on empty list', () => {
     const r = generateOwnOrderNumber([])
     const yy = String(new Date().getFullYear()).slice(-2)
-    expect(r).toBe(`M${yy}11`)
+    expect(r).toBe(`M${yy}1001`)
   })
   it('increments sequence based on existing orders', () => {
     const yy = String(new Date().getFullYear()).slice(-2)
@@ -147,7 +147,7 @@ describe('generateOwnOrderNumber', () => {
       { ownOrderNumber: 'X12345' },
     ]
     const r = generateOwnOrderNumber(orders)
-    expect(r).toBe(`M${yy}11`)
+    expect(r).toBe(`M${yy}1001`)
   })
 })
 

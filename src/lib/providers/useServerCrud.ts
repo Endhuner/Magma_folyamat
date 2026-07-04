@@ -158,6 +158,11 @@ export function useServerCrud<T extends { id: string }>(
 
   const addMany = useCallback((incoming: T[]) => {
     if (incoming.length === 0) return
+    // Ugyanaz a védelem, mint az egyesével add()-nál: pendingIds őrzi az
+    // optimista sorokat egy SSE-reload alatt, az inFlightCount pedig
+    // elhalasztja a reload-ot, amíg a batch úton van.
+    for (const item of incoming) pendingIds.current.add(item.id)
+    inFlightCount.current++
     setItems(cur => [...cur, ...incoming])
     Promise.all(
       incoming.map(item =>
@@ -165,16 +170,39 @@ export function useServerCrud<T extends { id: string }>(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(item),
-        }).catch((err) => {
-          console.error(`[API] POST /${resource} sikertelen:`, err, '\nKüldött adat:', item)
-          return null
         })
+          .then(() => {
+            pendingIds.current.delete(item.id)
+            return { item, err: null as Error | null }
+          })
+          .catch((err: Error) => {
+            pendingIds.current.delete(item.id)
+            return { item, err }
+          })
       )
-    ).then(results => {
-      const failed = results.filter(r => r === null).length
-      if (failed > 0) {
-        console.error(`[API] addMany /${resource}: ${failed}/${incoming.length} tétel sikertelen — újratöltés`)
-        reloadRef.current()
+    ).then(async results => {
+      inFlightCount.current--
+      const netFails = results.filter(r => r.err && isNetworkError(r.err))
+      const hardFails = results.filter(r => r.err && !isNetworkError(r.err))
+
+      // Hálózati hiba → offline sorba (mint az add()-nál) — a sor visszajátssza
+      for (const f of netFails) {
+        await enqueue({ resource, entityId: f.item.id, method: 'POST', body: JSON.stringify(f.item) })
+          .catch(e => console.error('[OfflineQueue] enqueue hiba:', e))
+      }
+      if (netFails.length > 0) {
+        toast.warning(`Offline — ${netFails.length} tétel szinkronizálásra vár (${resource})`, { duration: 6000 })
+      }
+
+      // Szerver által elutasított tételek → kivesszük az UI-ból és jelezzük,
+      // hogy ne maradjon fantom-sor, ami újratöltéskor csendben eltűnne.
+      if (hardFails.length > 0) {
+        const failedIds = new Set(hardFails.map(f => f.item.id))
+        setItems(cur => cur.filter(it => !failedIds.has(it.id)))
+        for (const f of hardFails) {
+          console.error(`[API] POST /${resource} SIKERTELEN:`, f.err, '\nKüldött adat:', f.item)
+        }
+        toast.error(`${hardFails.length}/${incoming.length} tétel mentése sikertelen (${resource})`, { duration: 8000 })
       }
     })
   }, [resource])

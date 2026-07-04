@@ -42,7 +42,7 @@ import { exportCmrAsHtml, generateCmrHtmlTemplate, getCmrHtml } from '@/lib/cmrH
 import { exportDeliveryAsHtml, generateDeliveryHtmlTemplate, getDeliveryHtml, TemplateStyles } from '@/lib/deliveryHtmlTemplate'
 import { validateCmrExport, validateDeliveryExport, ValidationResult } from '@/lib/exportValidation'
 import { LabelTemplate } from '@/lib/labelTemplate'
-import { deductInventoryForOrders, commitInventoryDeduction, InventoryDeductionResult } from '@/lib/inventoryService'
+import { deductInventoryForOrders, commitInventoryDeduction, restoreInventoryForOrders, commitInventoryRestore, InventoryDeductionResult } from '@/lib/inventoryService'
 import { LabelTemplatesPanel } from '@/components/panels/LabelTemplatesPanel'
 import { InventoryPanel } from '@/components/panels/InventoryPanel'
 import { DocumentsPanel } from '@/components/panels/DocumentsPanel'
@@ -471,24 +471,45 @@ function App() {
   const handleBatchStatusChange = (orderIds: string[], status: OrderStatus) => {
     const ordersToUpdate = (orders || []).filter(o => orderIds.includes(o.id))
     const isChangingToDelivered = isDelivered(status)
-    
+
     if (isChangingToDelivered && ordersToUpdate.length > 0) {
-      const deductionResult = deductInventoryForOrders(
-        ordersToUpdate,
-        inventory || [],
-        products || []
+      // Csak azok a rendelések, amelyek MOST váltanak kiszállítottra, és még
+      // nincs szállítói levonásuk. Enélkül a Kiszállítva → Kiszállítva/Számlázva
+      // (számlázás) átmenet másodszor is levonta ugyanazt a készletet.
+      const ordersForDeduction = ordersToUpdate.filter(
+        o => !isDelivered(o.status) && !hasExistingShipmentDeduction(o.id)
       )
-      
-      if (deductionResult.deductedItems.length > 0 || deductionResult.failedItems.length > 0) {
-        setPendingDeductionResult(deductionResult)
-        setPendingStatusChange({ orderIds, status })
-        setPendingPostDeduction(null)
-        setDeductionContext('státuszváltás')
-        setInventoryDeductionDialogOpen(true)
-        return
+      if (ordersForDeduction.length > 0) {
+        const deductionResult = deductInventoryForOrders(
+          ordersForDeduction,
+          inventory || [],
+          products || []
+        )
+
+        if (deductionResult.deductedItems.length > 0 || deductionResult.failedItems.length > 0) {
+          setPendingDeductionResult(deductionResult)
+          setPendingStatusChange({ orderIds, status })
+          setPendingPostDeduction(null)
+          setDeductionContext('státuszváltás')
+          setInventoryDeductionDialogOpen(true)
+          return
+        }
       }
     }
-    
+
+    // Kiszállított → nem-kiszállított váltás: a korábban levont készlet
+    // visszatöltése (tranzakció-alapú, idempotens — ld. inventoryService).
+    if (!isChangingToDelivered) {
+      const revertedOrders = ordersToUpdate.filter(o => isDelivered(o.status))
+      if (revertedOrders.length > 0) {
+        const restore = restoreInventoryForOrders(revertedOrders, inventoryTransactions || [])
+        if (restore.restoredItems.length > 0) {
+          commitInventoryRestore(restore, setInventory, setInventoryTransactions)
+          toast.success(`Készlet visszatöltve: ${restore.restoredItems.length} tétel`)
+        }
+      }
+    }
+
     executeStatusChange(orderIds, status)
   }
 
@@ -1000,19 +1021,34 @@ function App() {
     setOrderDialogOpen(true)
   }
 
+  const orderImportKey = (o: Partial<Order>): string => {
+    // Természetes kulcs: vevő + rendelési szám + termék. Ha nincs rendelési
+    // szám, a saját szám azonosít; e nélkül nem szűrünk (nincs identitás).
+    const num = o.orderNumber || o.ownOrderNumber
+    if (!num) return ''
+    return `${stripDiacritics(o.customer)}|${stripDiacritics(num)}|${stripDiacritics(o.productName)}`
+  }
+
   const handleOrderBulkImport = (importedOrders: Partial<Order>[]) => {
-    setOrders((current) => [...(current || []), ...(importedOrders as Order[])])
-    if (importedOrders.length > 0) {
-      appendAudit(
-        'order',
-        'Rendelés',
-        importedOrders.map((o) => (o as Order).id ?? '').filter(Boolean).join(','),
-        `${importedOrders.length} rendelés`,
-        'bulkImport',
-        { notes: `Tömeges import: ${importedOrders.length} rendelés` }
-      )
-    }
-    toast.success(`${importedOrders.length} rendelés sikeresen importálva`)
+    const existingKeys = new Set((orders || []).map(orderImportKey).filter(Boolean))
+    const fresh = importedOrders.filter((o) => {
+      const key = orderImportKey(o)
+      return !key || !existingKeys.has(key)
+    })
+    const skipped = importedOrders.length - fresh.length
+    if (skipped > 0) toast.warning(`${skipped} rendelés már létezik — kihagyva`)
+    if (fresh.length === 0) return
+
+    setOrders((current) => [...(current || []), ...(fresh as Order[])])
+    appendAudit(
+      'order',
+      'Rendelés',
+      fresh.map((o) => (o as Order).id ?? '').filter(Boolean).join(','),
+      `${fresh.length} rendelés`,
+      'bulkImport',
+      { notes: `Tömeges import: ${fresh.length} rendelés` }
+    )
+    toast.success(`${fresh.length} rendelés sikeresen importálva`)
   }
 
   const handleUndoLastAction = () => {
@@ -1023,6 +1059,33 @@ function App() {
       toast.success('Visszavonva')
       setLastAction(null)
     } else if (lastAction.type === 'edit') {
+      // Készlet-kompenzáció: ha a visszavont művelet státuszt váltott a
+      // kiszállított állapotba/állapotból, a készletet is vissza kell igazítani.
+      const current = (orders || []).find(o => o.id === lastAction.orderId)
+      const before = lastAction.before
+      if (current) {
+        if (isDelivered(current.status) && !isDelivered(before.status)) {
+          // A visszavont váltás levont készletet → visszatöltés
+          const restore = restoreInventoryForOrders([current], inventoryTransactions || [])
+          if (restore.restoredItems.length > 0) {
+            commitInventoryRestore(restore, setInventory, setInventoryTransactions)
+            toast.success(`Készlet visszatöltve: ${restore.restoredItems.length} tétel`)
+          }
+        } else if (
+          !isDelivered(current.status) &&
+          isDelivered(before.status) &&
+          !hasExistingShipmentDeduction(before.id)
+        ) {
+          // Visszavonás egy kiszállított állapotra → az eredetileg már
+          // megerősített levonás újra-alkalmazása (dialógus nélkül).
+          const d = deductInventoryForOrders([before], inventory || [], products || [])
+          if (d.deductedItems.length > 0) {
+            commitInventoryDeduction(d, setInventory, setInventoryTransactions)
+            toast.success(`Készlet levonva: ${d.deductedItems.length} tétel`)
+          }
+        }
+      }
+
       setOrders((current) =>
         (current || []).map(o => o.id === lastAction.orderId ? lastAction.before : o)
       )
@@ -1088,13 +1151,21 @@ function App() {
   }
 
   const handleBulkImport = (importedCustomers: Partial<Customer>[]) => {
-    setCustomers((current) => [...(current || []), ...(importedCustomers as Customer[])])
-    if (importedCustomers.length > 0) {
-      appendAudit('customer', 'Vevő', '-', `${importedCustomers.length} vevő`, 'bulkImport', {
-        notes: `Tömeges import: ${importedCustomers.length} vevő`,
-      })
-    }
-    toast.success(`${importedCustomers.length} vevő sikeresen importálva`)
+    // Duplikátum-szűrés név alapján — ugyanaz a fájl kétszer importálva
+    // korábban minden vevőt megduplázott (új ID-kkal).
+    const existingNames = new Set((customers || []).map((c) => stripDiacritics(c.name)))
+    const fresh = importedCustomers.filter(
+      (c) => !c.name || !existingNames.has(stripDiacritics(c.name))
+    )
+    const skipped = importedCustomers.length - fresh.length
+    if (skipped > 0) toast.warning(`${skipped} vevő már létezik — kihagyva`)
+    if (fresh.length === 0) return
+
+    setCustomers((current) => [...(current || []), ...(fresh as Customer[])])
+    appendAudit('customer', 'Vevő', '-', `${fresh.length} vevő`, 'bulkImport', {
+      notes: `Tömeges import: ${fresh.length} vevő`,
+    })
+    toast.success(`${fresh.length} vevő sikeresen importálva`)
   }
 
   const handleSaveProduct = (productData: Partial<Product>) => {
@@ -1344,8 +1415,23 @@ function App() {
   }
 
   const handleProductBulkImport = (importedProducts: Partial<Product>[]) => {
-    setProducts((current) => [...(current || []), ...(importedProducts as Product[])])
-    toast.success(`${importedProducts.length} termék sikeresen importálva`)
+    // Duplikátum-szűrés: vevő + rajzszám (ha nincs rajzszám, vevő + terméknév)
+    const productKey = (p: Partial<Product>): string => {
+      const ident = p.drawingNumber || p.productName
+      if (!ident) return ''
+      return `${stripDiacritics(p.customer)}|${stripDiacritics(ident)}`
+    }
+    const existingKeys = new Set((products || []).map(productKey).filter(Boolean))
+    const fresh = importedProducts.filter((p) => {
+      const key = productKey(p)
+      return !key || !existingKeys.has(key)
+    })
+    const skipped = importedProducts.length - fresh.length
+    if (skipped > 0) toast.warning(`${skipped} termék már létezik — kihagyva`)
+    if (fresh.length === 0) return
+
+    setProducts((current) => [...(current || []), ...(fresh as Product[])])
+    toast.success(`${fresh.length} termék sikeresen importálva`)
   }
 
   const handleDeleteDeliveryNote = (id: string) => {

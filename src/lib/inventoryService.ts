@@ -1,4 +1,5 @@
 import { generateId } from './generateId'
+import { findProductForOrder } from './productionHelpers'
 import { Order, Product, InventoryItem, InventoryTransaction } from './types'
 
 export interface InventoryDeductionResult {
@@ -37,15 +38,13 @@ export interface InventoryDeductionResult {
   transactions: InventoryTransaction[]
 }
 
+/**
+ * Termék-párosítás a közös `findProductForOrder`-rel: először a productId
+ * (erős hivatkozás), csak utána a mező-egyezés. A korábbi helyi heurisztika
+ * kereszt-mezős egyezést is engedett, ami rossz termék készletét vonhatta le.
+ */
 function findMatchingProduct(order: Order, products: Product[]): Product | undefined {
-  return products.find(
-    (p) =>
-      p.customer === order.customer &&
-      (p.productName === order.productName ||
-        p.drawingNumber === order.productName ||
-        p.productName === order.designation ||
-        p.drawingNumber === order.designation)
-  )
+  return findProductForOrder(order, products)
 }
 
 function findMatchingInventoryItem(
@@ -210,4 +209,85 @@ export function commitInventoryDeduction(
   if (deductionResult.deductedItems.length === 0) return
   setInventory((prev) => applyInventoryDeduction(prev || [], deductionResult))
   setInventoryTransactions((prev) => [...(prev || []), ...deductionResult.transactions])
+}
+
+// ─── Készlet-visszatöltés (kiszállított → nem-kiszállított státuszváltásnál) ──
+
+export interface InventoryRestoreResult {
+  restoredItems: Array<{
+    inventoryItemId: string
+    orderId: string
+    quantity: number
+  }>
+  transactions: InventoryTransaction[]
+}
+
+/**
+ * Kiszámolja, mennyi készletet kell visszatölteni a megadott rendelésekhez.
+ *
+ * A "kint lévő" mennyiség tranzakció-alapú: a rendeléshez kötött szállítói
+ * `out` mozgások összege mínusz a korábbi visszatöltő `in` mozgások összege
+ * (a műszakból származó bevétek — `shiftId` — nem számítanak ide). Így a
+ * művelet idempotens: kétszer visszavonva sem tölt vissza duplán, és részleges
+ * levonásnál is pontosan a ténylegesen levont mennyiség kerül vissza.
+ */
+export function restoreInventoryForOrders(
+  orders: Order[],
+  transactions: InventoryTransaction[]
+): InventoryRestoreResult {
+  const restoredItems: InventoryRestoreResult['restoredItems'] = []
+  const restoreTxs: InventoryTransaction[] = []
+  const now = new Date().toISOString()
+
+  for (const order of orders) {
+    // Nettó kint lévő levonás készlettételenként ehhez a rendeléshez
+    const net = new Map<string, number>()
+    for (const t of transactions) {
+      if (t.orderId !== order.id || t.shiftId) continue
+      if (t.type === 'out') {
+        net.set(t.inventoryItemId, (net.get(t.inventoryItemId) ?? 0) + t.quantity)
+      } else if (t.type === 'in') {
+        net.set(t.inventoryItemId, (net.get(t.inventoryItemId) ?? 0) - t.quantity)
+      }
+    }
+
+    for (const [inventoryItemId, qty] of net) {
+      if (qty <= 0) continue
+      restoredItems.push({ inventoryItemId, orderId: order.id, quantity: qty })
+      restoreTxs.push({
+        id: generateId(),
+        inventoryItemId,
+        type: 'in',
+        quantity: qty,
+        orderId: order.id,
+        notes: `Készlet visszatöltés — ${order.ownOrderNumber || order.orderNumber} státusz visszavonva`,
+        createdAt: now,
+      })
+    }
+  }
+
+  return { restoredItems, transactions: restoreTxs }
+}
+
+/** A visszatöltés átvezetése — a `commitInventoryDeduction` tükörképe. */
+export function commitInventoryRestore(
+  result: InventoryRestoreResult,
+  setInventory: SetState<InventoryItem[]>,
+  setInventoryTransactions: SetState<InventoryTransaction[]>
+): void {
+  if (result.restoredItems.length === 0) return
+  const totals = new Map<string, number>()
+  for (const r of result.restoredItems) {
+    totals.set(r.inventoryItemId, (totals.get(r.inventoryItemId) ?? 0) + r.quantity)
+  }
+  const now = new Date().toISOString()
+  setInventory((prev) =>
+    (prev || []).map((item) => {
+      const add = totals.get(item.id)
+      return add && add > 0
+        ? { ...item, quantity: item.quantity + add, lastUpdated: now }
+        : item
+    })
+  )
+  setInventoryTransactions((prev) => [...(prev || []), ...result.transactions])
 }

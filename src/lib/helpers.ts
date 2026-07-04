@@ -179,12 +179,10 @@ export function generateOwnOrderNumber(existingOrders: { ownOrderNumber: string 
   }, 0)
   
   const nextSequence = maxSequence + 1
-  
-  if (nextSequence === 1) {
-    return `${prefix}${nextSequence}`
-  } else {
-    return `${prefix}${String(nextSequence).padStart(3, '0')}`
-  }
+
+  // Mindig 3 jegyre töltve — korábban az év első száma kivétel volt (M2611),
+  // ami nem illett a mintába (M261002, …) és a rendezést is elrontotta.
+  return `${prefix}${String(nextSequence).padStart(3, '0')}`
 }
 
 

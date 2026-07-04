@@ -98,13 +98,18 @@ let quotaWarningEmitted = false
 
 function maybeEmitQuotaWarning(): void {
   if (!isBrowser()) return
-  if (quotaWarningEmitted) return
   const usage = getQuotaUsage()
   if (usage.ratio >= QUOTA_WARNING_THRESHOLD) {
-    quotaWarningEmitted = true
-    window.dispatchEvent(
-      new CustomEvent('kv:quota-warning', { detail: usage })
-    )
+    if (!quotaWarningEmitted) {
+      quotaWarningEmitted = true
+      window.dispatchEvent(
+        new CustomEvent('kv:quota-warning', { detail: usage })
+      )
+    }
+  } else if (usage.ratio < QUOTA_WARNING_THRESHOLD * 0.85) {
+    // Ha takarítás után a használat érdemben a küszöb alá esett, a következő
+    // átlépésnél újra szólni kell — korábban session-önként csak egyszer szólt.
+    quotaWarningEmitted = false
   }
 }
 
