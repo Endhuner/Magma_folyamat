@@ -293,6 +293,21 @@ export function registerCrudRoutes<
     if (existingRows.length === 0) return reply.code(404).send({ error: `${auditLabel} nem található` })
     const before = deserializeJsonFields(existingRows[0]!, jsonFields)
 
+    // Optimista konkurencia-ellenőrzés: ha a kliens elküldi az általa ismert
+    // verziót (x-if-unmodified-since = a szerkesztés alapjául vett updatedAt),
+    // és az időközben megváltozott, 409-cel jelezzük az ütközést + visszaadjuk
+    // az aktuális szerver-verziót, hogy a kliens ne írja felül a más módosítását.
+    const baseVersion = req.headers['x-if-unmodified-since']
+    if (typeof baseVersion === 'string' && baseVersion.length > 0) {
+      const currentVersion = before.updatedAt
+      if (typeof currentVersion === 'string' && currentVersion !== baseVersion) {
+        return reply.code(409).send({
+          error: 'A rekordot időközben más módosította',
+          current: redactOutput(before),
+        })
+      }
+    }
+
     const updateRaw = parsed.data as Record<string, unknown>
     const transformed: Record<string, unknown> = transformInput
       ? transformInput(updateRaw, { op: 'update', id: req.params.id })
