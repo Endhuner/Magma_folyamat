@@ -28,7 +28,8 @@ function MetricCard({ title, value, icon: Icon, iconColor = 'text-primary', onVi
   // Számokat ezres tagolással jelenítünk meg (hu-HU), a string értéket változatlanul.
   const displayValue = typeof value === 'number' ? value.toLocaleString('hu-HU') : value
   return (
-    <Card className="p-6 hover:shadow-lg transition-shadow">
+    // stat-tile: a Prime skin csempe-stílusa célozza (skins.css)
+    <Card className="stat-tile p-6 hover:shadow-lg transition-shadow">
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">{title}</p>

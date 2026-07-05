@@ -58,18 +58,44 @@ html.dark[data-skin='prime'] {
   --row-stripe: #16213404;
 }
 
-/* ── Kialakítás: kártyák — lágy PrimeNG-árnyék, nagyobb lekerekítés ── */
+/* ── Kártyák — lágy PrimeNG-árnyék, nagyobb lekerekítés, hover-emelkedés ── */
 html[data-skin='prime'] [data-slot='card'] {
   border-radius: var(--radius);
   box-shadow:
     0 1px 2px rgb(15 23 42 / 0.06),
     0 4px 12px rgb(15 23 42 / 0.06);
+  transition: box-shadow 150ms ease, transform 150ms ease;
 }
 html.dark[data-skin='prime'] [data-slot='card'] {
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
 }
 
-/* ── Kialakítás: fülek — aláhúzásos stílus a kitöltött helyett ── */
+/* ── Csempék (dashboard statisztika-kártyák) — Sakai-stílus ── */
+html[data-skin='prime'] .stat-tile {
+  border-radius: 14px;
+}
+html[data-skin='prime'] .stat-tile:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 2px 4px rgb(15 23 42 / 0.06),
+    0 10px 24px rgb(15 23 42 / 0.10);
+}
+/* az ikon kap egy smaragd-tónusú, lekerekített "dobozt" */
+html[data-skin='prime'] .stat-tile svg {
+  background: var(--accent);
+  color: var(--accent-foreground);
+  border-radius: 10px;
+  padding: 8px;
+  width: 42px !important;
+  height: 42px !important;
+  box-sizing: border-box;
+}
+html.dark[data-skin='prime'] .stat-tile svg {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+/* ── Fülek — aláhúzásos stílus a kitöltött helyett ── */
 html[data-skin='prime'] [data-slot='tabs-list'] {
   background: transparent;
   border-bottom: 1px solid var(--border);
@@ -85,6 +111,10 @@ html[data-skin='prime'] [data-slot='tabs-trigger'] {
   color: var(--muted-foreground);
   padding-bottom: 0.55rem;
   position: relative;
+  transition: color 150ms ease;
+}
+html[data-skin='prime'] [data-slot='tabs-trigger']:hover {
+  color: var(--foreground);
 }
 html[data-skin='prime'] [data-slot='tabs-trigger'][data-state='active'] {
   color: var(--foreground);
@@ -101,34 +131,146 @@ html[data-skin='prime'] [data-slot='tabs-trigger'][data-state='active']::after {
   background: var(--primary);
 }
 
-/* ── Kialakítás: táblázat — nagybetűs halvány fejléc, sor-hover ── */
+/* ── Adattábla — PrimeNG DataTable: félkövér fejléc, tágas cellák, hover ── */
 html[data-skin='prime'] [data-slot='table-head'],
 html[data-skin='prime'] thead th {
-  text-transform: uppercase;
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
-  color: var(--muted-foreground);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #475569;
   background: var(--muted);
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+  text-transform: none;
+  letter-spacing: normal;
+}
+html.dark[data-skin='prime'] [data-slot='table-head'],
+html.dark[data-skin='prime'] thead th {
+  color: #94a3b8;
+}
+html[data-skin='prime'] [data-slot='table-cell'],
+html[data-skin='prime'] tbody td {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+html[data-skin='prime'] [data-slot='table-row'],
+html[data-skin='prime'] tbody tr {
+  transition: background-color 120ms ease;
 }
 html[data-skin='prime'] [data-slot='table-row']:hover,
 html[data-skin='prime'] tbody tr:hover {
-  background: color-mix(in srgb, var(--primary) 6%, transparent);
+  background: color-mix(in srgb, var(--primary) 7%, transparent);
 }
 
-/* ── Kialakítás: gombok — smaragd árnyék az elsődlegesen ── */
-html[data-skin='prime'] [data-slot='button'] {
-  border-radius: 0.5rem;
+/* ── Gombok — Aura: 500-as súly, kerekítés, hover-árnyalat, átmenet ── */
+html[data-skin='prime'] [data-slot='button'],
+html[data-skin='prime'] button[class*='bg-primary'] {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: background-color 150ms ease, box-shadow 150ms ease, transform 100ms ease;
 }
-html[data-skin='prime'] [data-slot='button'].bg-primary {
-  box-shadow: 0 1px 2px rgb(16 185 129 / 0.35);
+html[data-skin='prime'] [data-slot='button'].bg-primary,
+html[data-skin='prime'] button.bg-primary {
+  box-shadow: 0 1px 2px rgb(16 185 129 / 0.4);
+}
+html[data-skin='prime'] [data-slot='button'].bg-primary:hover,
+html[data-skin='prime'] button.bg-primary:hover {
+  background: #059669; /* emerald-600 */
+}
+html.dark[data-skin='prime'] [data-slot='button'].bg-primary:hover,
+html.dark[data-skin='prime'] button.bg-primary:hover {
+  background: #6ee7b7;
+}
+html[data-skin='prime'] [data-slot='button']:active {
+  transform: scale(0.98);
 }
 
-/* ── Kialakítás: beviteli mezők, dialógusok ── */
-html[data-skin='prime'] [data-slot='dialog-content'] {
-  border-radius: var(--radius);
-  box-shadow: 0 10px 40px rgb(15 23 42 / 0.18);
-}
-html[data-skin='prime'] input,
+/* ── Beviteli mezők / select / autocomplete — Aura fókuszgyűrű ── */
+html[data-skin='prime'] [data-slot='input'],
+html[data-skin='prime'] input:not([type='checkbox']):not([type='radio']),
+html[data-skin='prime'] textarea,
 html[data-skin='prime'] [data-slot='select-trigger'] {
-  border-radius: 0.5rem;
+  border-radius: 8px;
+  border-color: #cbd5e1; /* slate-300 */
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+html.dark[data-skin='prime'] [data-slot='input'],
+html.dark[data-skin='prime'] input:not([type='checkbox']):not([type='radio']),
+html.dark[data-skin='prime'] textarea,
+html.dark[data-skin='prime'] [data-slot='select-trigger'] {
+  border-color: #475569;
+}
+html[data-skin='prime'] [data-slot='input']:focus-visible,
+html[data-skin='prime'] input:focus-visible,
+html[data-skin='prime'] textarea:focus-visible,
+html[data-skin='prime'] [data-slot='select-trigger']:focus-visible,
+html[data-skin='prime'] [data-slot='select-trigger'][data-state='open'] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--primary) 25%, transparent);
+  outline: none;
+}
+
+/* ── Lenyíló panelek (select / dropdown / popover / kereső) — Aura overlay ── */
+html[data-skin='prime'] [data-slot='select-content'],
+html[data-skin='prime'] [data-slot='dropdown-menu-content'],
+html[data-skin='prime'] [data-slot='popover-content'],
+html[data-skin='prime'] [data-slot='command'] {
+  border-radius: 10px;
+  box-shadow:
+    0 4px 6px -1px rgb(15 23 42 / 0.1),
+    0 10px 24px -2px rgb(15 23 42 / 0.12);
+  border-color: var(--border);
+}
+html[data-skin='prime'] [data-slot='select-item'],
+html[data-skin='prime'] [data-slot='dropdown-menu-item'],
+html[data-skin='prime'] [data-slot='command-item'] {
+  border-radius: 6px;
+  transition: background-color 120ms ease;
+}
+html[data-skin='prime'] [data-slot='select-item'][data-state='checked'] {
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-weight: 600;
+}
+
+/* ── Dialógusok (ablakok) — tágasabb, kerekebb, nagy Aura-árnyék ── */
+html[data-skin='prime'] [data-slot='dialog-content'] {
+  border-radius: 14px;
+  padding: 1.5rem;
+  gap: 1.1rem;
+  box-shadow: 0 20px 60px rgb(15 23 42 / 0.22);
+}
+html[data-skin='prime'] [data-slot='dialog-title'] {
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+html[data-skin='prime'] [data-slot='dialog-header'] {
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.25rem;
+}
+html[data-skin='prime'] [data-slot='dialog-footer'] {
+  padding-top: 0.5rem;
+}
+
+/* ── Jelvények / státusz-pillek ── */
+html[data-skin='prime'] [data-slot='badge'] {
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+/* ── Vékony, slate görgetősáv (PrimeNG-es finomság) ── */
+html[data-skin='prime'] ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+html[data-skin='prime'] ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+  border: 2px solid var(--background);
+}
+html.dark[data-skin='prime'] ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+html[data-skin='prime'] ::-webkit-scrollbar-track {
+  background: transparent;
 }
