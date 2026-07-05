@@ -161,27 +161,78 @@ html[data-skin='prime'] tbody tr:hover {
   background: color-mix(in srgb, var(--primary) 7%, transparent);
 }
 
-/* ── Gombok — Aura: 500-as súly, kerekítés, hover-árnyalat, átmenet ── */
-html[data-skin='prime'] [data-slot='button'],
-html[data-skin='prime'] button[class*='bg-primary'] {
+/* ── Gombok — PrimeNG "outlined": átlátszó háttér, színes keret + szöveg,
+      halvány szín-kitöltés hoverre. A szegély színe a gomb szerepe szerint. ── */
+html[data-skin='prime'] [data-slot='button'] {
   border-radius: 8px;
   font-weight: 500;
-  transition: background-color 150ms ease, box-shadow 150ms ease, transform 100ms ease;
+  border-width: 1px;
+  border-style: solid;
+  box-shadow: none !important;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 90ms ease;
 }
-html[data-skin='prime'] [data-slot='button'].bg-primary,
-html[data-skin='prime'] button.bg-primary {
-  box-shadow: 0 1px 2px rgb(16 185 129 / 0.4);
+html[data-skin='prime'] [data-slot='button']:active { transform: scale(0.98); }
+
+/* Elsődleges (Primary) — smaragd kontúr */
+html[data-skin='prime'] [data-slot='button'][data-variant='default'] {
+  background: transparent !important;
+  color: #059669 !important;
+  border-color: #10b981 !important;
 }
-html[data-skin='prime'] [data-slot='button'].bg-primary:hover,
-html[data-skin='prime'] button.bg-primary:hover {
-  background: #059669; /* emerald-600 */
+html[data-skin='prime'] [data-slot='button'][data-variant='default']:hover {
+  background: color-mix(in srgb, #10b981 10%, transparent) !important;
 }
-html.dark[data-skin='prime'] [data-slot='button'].bg-primary:hover,
-html.dark[data-skin='prime'] button.bg-primary:hover {
-  background: #6ee7b7;
+
+/* Másodlagos (Secondary) — slate kontúr */
+html[data-skin='prime'] [data-slot='button'][data-variant='secondary'] {
+  background: transparent !important;
+  color: #475569 !important;
+  border-color: #94a3b8 !important;
 }
-html[data-skin='prime'] [data-slot='button']:active {
-  transform: scale(0.98);
+html[data-skin='prime'] [data-slot='button'][data-variant='secondary']:hover {
+  background: color-mix(in srgb, #64748b 12%, transparent) !important;
+}
+
+/* Törlés / veszély (Danger) — piros kontúr */
+html[data-skin='prime'] [data-slot='button'][data-variant='destructive'] {
+  background: transparent !important;
+  color: #dc2626 !important;
+  border-color: #ef4444 !important;
+}
+html[data-skin='prime'] [data-slot='button'][data-variant='destructive']:hover {
+  background: color-mix(in srgb, #ef4444 10%, transparent) !important;
+}
+
+/* Semleges körvonal (outline variáns) */
+html[data-skin='prime'] [data-slot='button'][data-variant='outline'] {
+  color: var(--foreground);
+  border-color: #cbd5e1;
+}
+html[data-skin='prime'] [data-slot='button'][data-variant='outline']:hover {
+  background: color-mix(in srgb, var(--primary) 8%, transparent) !important;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Ghost / link — keret nélkül, halvány hover-kiemeléssel */
+html[data-skin='prime'] [data-slot='button'][data-variant='ghost'],
+html[data-skin='prime'] [data-slot='button'][data-variant='link'] {
+  border-color: transparent;
+}
+html[data-skin='prime'] [data-slot='button'][data-variant='ghost']:hover {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--primary);
+}
+
+/* Sötét mód — világosabb kontúr-színek */
+html.dark[data-skin='prime'] [data-slot='button'][data-variant='default'] {
+  color: #34d399 !important; border-color: #34d399 !important;
+}
+html.dark[data-skin='prime'] [data-slot='button'][data-variant='destructive'] {
+  color: #f87171 !important; border-color: #f87171 !important;
+}
+html.dark[data-skin='prime'] [data-slot='button'][data-variant='secondary'] {
+  color: #cbd5e1 !important; border-color: #475569 !important;
 }
 
 /* ── Beviteli mezők / select / autocomplete — Aura fókuszgyűrű ── */
