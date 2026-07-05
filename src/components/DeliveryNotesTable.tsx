@@ -8,7 +8,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Card } from '@/components/ui/card'
 import { DeliveryNote, Order, Customer, Product, ColumnFilter } from '@/lib/types'
-import { Trash, FileText, FileCsv, Eye, FileArrowDown, MagnifyingGlass, X, PencilSimple, Funnel, CalendarBlank, TrendUp, Envelope } from '@phosphor-icons/react'
+import { Trash, FileText, FileCsv, Eye, FileArrowDown, MagnifyingGlass, X, PencilSimple, Funnel, CalendarBlank, TrendUp, Envelope, Package } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 import { hu } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -24,10 +24,12 @@ interface DeliveryNotesTableProps {
   products: Product[]
   onDelete: (id: string) => void
   onUpdate?: (id: string, updatedData: Record<string, string | number | null | undefined>[]) => void
+  /** Kiegészítő tételek szerkesztése (szerszám/anyag/szabad sor a nyomtatványra). */
+  onEditExtraItems?: (note: DeliveryNote) => void
   visibleColumns?: string[]
 }
 
-function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, onDelete, onUpdate, visibleColumns }: DeliveryNotesTableProps) {
+function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, onDelete, onUpdate, onEditExtraItems, visibleColumns }: DeliveryNotesTableProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'delivery' | 'cmr'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all')
@@ -537,6 +539,22 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
                             title="Előnézet és szerkesztés"
                           >
                             <PencilSimple className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {onEditExtraItems && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onEditExtraItems(note)}
+                            className="h-8 w-8 coarse:h-10 coarse:w-10 relative"
+                            title="Kiegészítő tételek (szerszám / anyag / szabad sor)"
+                          >
+                            <Package className="w-4 h-4" />
+                            {(note.extraItems?.length ?? 0) > 0 && (
+                              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-0.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold leading-4">
+                                {note.extraItems!.length}
+                              </span>
+                            )}
                           </Button>
                         )}
                         <Button

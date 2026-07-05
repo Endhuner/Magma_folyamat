@@ -179,6 +179,8 @@ export const deliveryNotes = sqliteTable('delivery_notes', {
   issueDate: text('issue_date'),
   // JSON: Record<string, string|number|null|undefined>[]
   exportData: text('export_data'),
+  // JSON: ExtraDeliveryItem[] — kiegészítő tételek (szerszám/anyag/szabad sor)
+  extraItems: text('extra_items').notNull().default('[]'),
   createdAt: text('created_at').notNull().default(nowDefault),
   updatedAt: text('updated_at').notNull().default(nowDefault),
 }, (t) => ({

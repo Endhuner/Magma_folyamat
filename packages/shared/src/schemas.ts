@@ -128,6 +128,16 @@ export const deliveryNoteCreateSchema = z.object({
   exportDate: z.string().default(''),
   issueDate: z.string().optional(),
   exportData: z.array(z.record(z.unknown())).optional(),
+  extraItems: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        quantity: z.number(),
+        unit: z.enum(['db', 'kg']).default('db'),
+        notes: z.string().optional(),
+      })
+    )
+    .optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 })

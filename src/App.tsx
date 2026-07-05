@@ -27,7 +27,7 @@ import { ProductionPlanningView } from '@/components/ProductionPlanningView'
 import { useIsTouchLayout } from '@/hooks/useMediaQuery'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { OfflineBanner } from '@/components/OfflineBanner'
-import { Order, OrderStatus, Customer, Product, DeliveryNote, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, MachineMaintenance, AppMessage, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
+import { Order, OrderStatus, Customer, Product, DeliveryNote, ExtraDeliveryItem, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, MachineMaintenance, AppMessage, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
 import { diffObjects, buildAuditEntry, pruneAuditLog, AUDIT_LOG_MAX_ENTRIES } from '@/lib/auditLog'
 import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered, isInvoiced, isOverdue } from '@/lib/helpers'
 import { computeAutoFieldsForOrder } from '@/lib/orderService'
@@ -41,6 +41,7 @@ import { GlobalSearch } from '@/components/GlobalSearch'
 import { WorkCalendarDialog } from '@/components/WorkCalendarDialog'
 import { MessageCenter } from '@/components/MessageCenter'
 import { MaterialPanel } from '@/components/MaterialPanel'
+import { ExtraItemsDialog } from '@/components/ExtraItemsDialog'
 import {
   computeMaterialStatuses,
   totalEstimatedMaterialKg,
@@ -1453,6 +1454,14 @@ function App() {
     toast.success(`${fresh.length} termék sikeresen importálva`)
   }
 
+  // Kiegészítő tételek a szállítólevélen (szerszám / anyag / szabad sor)
+  const [extraItemsNote, setExtraItemsNote] = useState<DeliveryNote | null>(null)
+  const handleSaveExtraItems = (note: DeliveryNote, extraItems: ExtraDeliveryItem[]) => {
+    const existing = deliveryNotesApi.items.find((dn) => dn.id === note.id)
+    if (!existing) return
+    deliveryNotesApi.replace({ ...existing, extraItems, updatedAt: new Date().toISOString() })
+  }
+
   const handleDeleteDeliveryNote = (id: string) => {
     deliveryNotesApi.remove(id)
     toast.success('Szállítólevél sikeresen törölve')
@@ -1478,7 +1487,7 @@ function App() {
       await exportDeliveryAsHtml(
         noteOrders, customers || [], products || [], deliveryNotes || [],
         undefined, undefined, savedTemplates, activeTemplates,
-        note.issueDate, note.sequenceNumber
+        note.issueDate, note.sequenceNumber, note.extraItems
       )
     }
   }
@@ -1498,7 +1507,7 @@ function App() {
       html = getDeliveryHtml(
         noteOrders, customers || [], products || [], deliveryNotes || [],
         undefined, note.sequenceNumber,
-        savedTemplates, activeTemplates, note.issueDate
+        savedTemplates, activeTemplates, note.issueDate, note.extraItems
       )
     }
 
@@ -2311,6 +2320,7 @@ function App() {
             handleUpdateDeliveryNote={handleUpdateDeliveryNote}
             handlePreviewNote={handlePreviewNote}
             handleDownloadPdf={handleDownloadPdf}
+            onEditExtraItems={setExtraItemsNote}
             handleEmailNote={handleEmailNote}
             emailTemplate={emailTemplate}
             setEmailTemplate={setEmailTemplate}
@@ -2372,6 +2382,7 @@ function App() {
               products={products || []}
               onDelete={handleDeleteDeliveryNote}
               onUpdate={handleUpdateDeliveryNote}
+              onEditExtraItems={setExtraItemsNote}
             />
           </TabsContent>
 
@@ -2433,6 +2444,13 @@ function App() {
       <WorkCalendarDialog
         open={workCalendarDialogOpen}
         onClose={() => setWorkCalendarDialogOpen(false)}
+      />
+
+      <ExtraItemsDialog
+        note={extraItemsNote}
+        inventory={inventory || []}
+        onClose={() => setExtraItemsNote(null)}
+        onSave={handleSaveExtraItems}
       />
 
       <AppDialogs

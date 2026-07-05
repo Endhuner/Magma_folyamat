@@ -117,6 +117,17 @@ export interface Product {
   updatedAt: string
 }
 
+/**
+ * Kiegészítő tétel a szállítólevélen — rendszerben nem lévő szabad sor,
+ * vagy készletből (szerszám / alapanyag / termék) felvett tétel.
+ */
+export interface ExtraDeliveryItem {
+  name: string
+  quantity: number
+  unit: 'db' | 'kg'
+  notes?: string
+}
+
 export interface DeliveryNote {
   id: string
   type: 'delivery' | 'cmr'
@@ -127,6 +138,8 @@ export interface DeliveryNote {
   exportDate: string
   issueDate?: string
   exportData?: Record<string, string | number | null | undefined>[]
+  /** Kiegészítő tételek — a nyomtatott dokumentumon a rendelés-sorok után. */
+  extraItems?: ExtraDeliveryItem[]
   createdAt: string
   updatedAt: string
 }
