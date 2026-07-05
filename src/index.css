@@ -135,3 +135,21 @@
   font-family: 'JetBrains Mono', monospace;
   font-variant-numeric: tabular-nums;
 }
+/* ── Olvasatlan üzenet jelzés: villogó piros márkanév a fejlécben ──
+   (1-es variáció — a felhasználó választása). A destructive szín és az
+   eredeti szöveg-szín közt vált; reduced-motion esetén álló piros. */
+@keyframes pp-brand-blink {
+  0%, 100% { color: inherit; }
+  50% { color: var(--destructive); }
+}
+
+.pp-brand-alert {
+  animation: pp-brand-blink 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-brand-alert {
+    animation: none;
+    color: var(--destructive);
+  }
+}

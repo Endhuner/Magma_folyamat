@@ -32,6 +32,17 @@ interface MessageCenterProps {
 }
 
 /**
+ * A bejelentkezett felhasználó OLVASATLAN beérkezett üzenetei.
+ * Közös helper — a fejléc villogó márkaneve (App) és a panel ugyanazt számolja.
+ */
+export function unreadMessagesFor(messages: AppMessage[], meId: string): AppMessage[] {
+  if (!meId) return []
+  return messages.filter(
+    (m) => (m.toUserId === meId || m.toUserId === 'all') && m.fromUserId !== meId && !m.readAt
+  )
+}
+
+/**
  * Üzenet- és feladatküldő központ a fejlécben.
  *
  * - Ha olvasatlan üzenet érkezik (SSE-n azonnal), a gombon villogó piros
@@ -96,7 +107,7 @@ export function MessageCenter({ messagesApi, currentUser, orders = [] }: Message
     [messagesApi.items, me]
   )
 
-  const unread = useMemo(() => received.filter((m) => !m.readAt), [received])
+  const unread = useMemo(() => unreadMessagesFor(messagesApi.items, me), [messagesApi.items, me])
   const openTasks = useMemo(
     () => received.filter((m) => m.kind === 'feladat' && !m.doneAt).length,
     [received]

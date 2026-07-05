@@ -39,7 +39,7 @@ import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database, SignOut,
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { GlobalSearch } from '@/components/GlobalSearch'
 import { WorkCalendarDialog } from '@/components/WorkCalendarDialog'
-import { MessageCenter } from '@/components/MessageCenter'
+import { MessageCenter, unreadMessagesFor } from '@/components/MessageCenter'
 import { MaterialPanel } from '@/components/MaterialPanel'
 import { ExtraItemsDialog } from '@/components/ExtraItemsDialog'
 import { CreateDeliveryNoteDialog } from '@/components/CreateDeliveryNoteDialog'
@@ -181,6 +181,13 @@ function App() {
   const [users, setUsers] = useState<User[]>([])
   const [usersLoading, setUsersLoading] = useState(false)
   const auth = useAuth()
+
+  // Olvasatlan üzenetek száma — a fejléc márkaneve villog tőle (1-es variáció).
+  // FONTOS: az auth deklarációja UTÁN kell állnia (TDZ).
+  const unreadMessageCount = useMemo(
+    () => unreadMessagesFor(messagesApi.items, auth.user?.id ?? '').length,
+    [messagesApi.items, auth.user?.id]
+  )
   const refreshUsers = async (): Promise<void> => {
     try {
       setUsersLoading(true)
@@ -1947,7 +1954,14 @@ function App() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">
-                  ProduktívPro
+                  {/* Olvasatlan üzenetnél a márkanév pirosan villog (a kis "!"
+                      jelvény az üzenet-gombon emellett megmarad). */}
+                  <span
+                    className={unreadMessageCount > 0 ? 'pp-brand-alert' : undefined}
+                    title={unreadMessageCount > 0 ? `${unreadMessageCount} olvasatlan üzenet` : undefined}
+                  >
+                    ProduktívPro
+                  </span>
                   <span className="ml-2 align-middle text-xs font-mono font-normal text-muted-foreground">
                     {import.meta.env.VITE_APP_VERSION || 'dev'}
                   </span>
