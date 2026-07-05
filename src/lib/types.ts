@@ -291,6 +291,9 @@ export interface AppMessage {
   fromUserName: string
   toUserId: string
   toUserName: string
+  /** Opcionális rendelés-hivatkozás (feladat egy aktív munkához). */
+  orderId?: string
+  orderLabel?: string
   readAt: string
   doneAt: string
   createdAt: string

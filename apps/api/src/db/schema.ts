@@ -525,6 +525,9 @@ export const messages = sqliteTable('messages', {
   fromUserName: text('from_user_name').notNull().default(''),
   toUserId: text('to_user_id').notNull(),
   toUserName: text('to_user_name').notNull().default(''),
+  /** Opcionális rendelés-hivatkozás (feladat egy aktív munkához). */
+  orderId: text('order_id').notNull().default(''),
+  orderLabel: text('order_label').notNull().default(''),
   readAt: text('read_at').notNull().default(''),
   doneAt: text('done_at').notNull().default(''),
   createdAt: text('created_at').notNull().default(nowDefault),

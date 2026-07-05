@@ -8,7 +8,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Card } from '@/components/ui/card'
 import { DeliveryNote, Order, Customer, Product, ColumnFilter } from '@/lib/types'
-import { Trash, FileText, FileCsv, Eye, FileArrowDown, MagnifyingGlass, X, PencilSimple, Funnel, CalendarBlank, TrendUp, Envelope, Package } from '@phosphor-icons/react'
+import { Trash, FileText, FileCsv, Eye, FileArrowDown, MagnifyingGlass, X, PencilSimple, Funnel, CalendarBlank, TrendUp, Envelope, Package, Plus } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 import { hu } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -26,10 +26,12 @@ interface DeliveryNotesTableProps {
   onUpdate?: (id: string, updatedData: Record<string, string | number | null | undefined>[]) => void
   /** Kiegészítő tételek szerkesztése (szerszám/anyag/szabad sor a nyomtatványra). */
   onEditExtraItems?: (note: DeliveryNote) => void
+  /** Új szállítólevél/CMR készítése rendelés-kiválasztással. */
+  onCreateNew?: () => void
   visibleColumns?: string[]
 }
 
-function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, onDelete, onUpdate, onEditExtraItems, visibleColumns }: DeliveryNotesTableProps) {
+function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, onDelete, onUpdate, onEditExtraItems, onCreateNew, visibleColumns }: DeliveryNotesTableProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'delivery' | 'cmr'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all')
@@ -370,6 +372,12 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
 
       <div className="mb-4 space-y-3">
         <div className="flex flex-col md:flex-row gap-3">
+          {onCreateNew && (
+            <Button onClick={onCreateNew} className="gap-1.5 shrink-0">
+              <Plus className="w-4 h-4" />
+              Új szállítólevél / CMR
+            </Button>
+          )}
           <div className="relative flex-1">
             <MagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input

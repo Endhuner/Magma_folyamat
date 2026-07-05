@@ -387,6 +387,8 @@ export const messageCreateSchema = z.object({
   /** Felhasználó id vagy 'all' (mindenki) */
   toUserId: z.string().min(1),
   toUserName: z.string().default(''),
+  orderId: z.string().default(''),
+  orderLabel: z.string().default(''),
   readAt: z.string().default(''),
   doneAt: z.string().default(''),
   createdAt: z.string().optional(),

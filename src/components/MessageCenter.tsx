@@ -9,12 +9,13 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { ChatCircleDots, PaperPlaneRight, CheckCircle, ClipboardText } from '@phosphor-icons/react'
+import { ChatCircleDots, PaperPlaneRight, CheckCircle, ClipboardText, MagnifyingGlass, X, Wrench } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { hu } from 'date-fns/locale'
 import { generateId } from '@/lib/generateId'
-import type { AppMessage } from '@/lib/types'
+import { stripDiacritics, isDelivered } from '@/lib/helpers'
+import type { AppMessage, Order } from '@/lib/types'
 import type { ServerCrudApi } from '@/lib/providers/useServerCrud'
 
 interface PublicUser {
@@ -26,6 +27,8 @@ interface PublicUser {
 interface MessageCenterProps {
   messagesApi: ServerCrudApi<AppMessage>
   currentUser: { id: string; name: string } | null
+  /** Rendelések a feladat-csatoláshoz (aktív munkára hivatkozás). */
+  orders?: Order[]
 }
 
 /**
@@ -36,14 +39,45 @@ interface MessageCenterProps {
  * - A panel megnyitásakor a beérkezett olvasatlanok olvasottá válnak.
  * - Feladat típusú üzenetet a címzett „Kész"-re állíthat.
  */
-export function MessageCenter({ messagesApi, currentUser }: MessageCenterProps) {
+export function MessageCenter({ messagesApi, currentUser, orders = [] }: MessageCenterProps) {
   const [open, setOpen] = useState(false)
   const [users, setUsers] = useState<PublicUser[]>([])
-  const [toUserId, setToUserId] = useState<string>('all')
+  // Több címzett: 'all' (mindenki) | 'operators' (összes operátor) | userId-k
+  const [recipients, setRecipients] = useState<Set<string>>(new Set(['all']))
   const [kind, setKind] = useState<'uzenet' | 'feladat'>('uzenet')
   const [body, setBody] = useState('')
+  // Rendelés-csatolás (feladat aktív munkához)
+  const [orderSearch, setOrderSearch] = useState('')
+  const [linkedOrder, setLinkedOrder] = useState<{ id: string; label: string } | null>(null)
 
   const me = currentUser?.id ?? ''
+
+  const toggleRecipient = (key: string) => {
+    setRecipients((prev) => {
+      const next = new Set(prev)
+      if (key === 'all') return new Set(['all']) // a Mindenki kizárólagos
+      next.delete('all')
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      if (next.size === 0) next.add('all')
+      return next
+    })
+  }
+
+  const orderHits = useMemo(() => {
+    const q = stripDiacritics(orderSearch)
+    if (!q) return []
+    return orders
+      .filter((o) => !isDelivered(o.status))
+      .filter(
+        (o) =>
+          stripDiacritics(o.ownOrderNumber).includes(q) ||
+          stripDiacritics(o.orderNumber).includes(q) ||
+          stripDiacritics(o.productName).includes(q) ||
+          stripDiacritics(o.customer).includes(q)
+      )
+      .slice(0, 6)
+  }, [orders, orderSearch])
 
   // Címzett-lista a login-képernyő publikus user-végpontjáról.
   useEffect(() => {
@@ -85,23 +119,52 @@ export function MessageCenter({ messagesApi, currentUser }: MessageCenterProps) 
       toast.error('Írj üzenetet')
       return
     }
-    const target = users.find((u) => u.id === toUserId)
     const now = new Date().toISOString()
-    messagesApi.add({
-      id: generateId(),
+    const base = {
       kind,
       body: text,
       fromUserId: currentUser.id,
       fromUserName: currentUser.name,
-      toUserId,
-      toUserName: toUserId === 'all' ? 'Mindenki' : target?.name ?? '',
+      orderId: linkedOrder?.id ?? '',
+      orderLabel: linkedOrder?.label ?? '',
       readAt: '',
       doneAt: '',
       createdAt: now,
       updatedAt: now,
-    })
+    }
+
+    if (recipients.has('all')) {
+      messagesApi.add({ ...base, id: generateId(), toUserId: 'all', toUserName: 'Mindenki' })
+      toast.success(kind === 'feladat' ? 'Feladat kiküldve mindenkinek' : 'Üzenet elküldve mindenkinek')
+    } else {
+      // Címzett-lista kibontása: 'operators' → az összes operátor; duplikátum-
+      // és önküldés-szűrés. Mindenki SAJÁT példányt kap (külön kész-jelöléshez).
+      const targetIds = new Set<string>()
+      for (const key of recipients) {
+        if (key === 'operators') {
+          users.filter((u) => u.role === 'operator').forEach((u) => targetIds.add(u.id))
+        } else {
+          targetIds.add(key)
+        }
+      }
+      targetIds.delete(me)
+      if (targetIds.size === 0) {
+        toast.error('Nincs érvényes címzett')
+        return
+      }
+      for (const id of targetIds) {
+        const u = users.find((x) => x.id === id)
+        messagesApi.add({ ...base, id: generateId(), toUserId: id, toUserName: u?.name ?? '' })
+      }
+      toast.success(
+        kind === 'feladat'
+          ? `Feladat kiküldve ${targetIds.size} személynek`
+          : `Üzenet elküldve ${targetIds.size} személynek`
+      )
+    }
     setBody('')
-    toast.success(kind === 'feladat' ? 'Feladat kiküldve' : 'Üzenet elküldve')
+    setLinkedOrder(null)
+    setOrderSearch('')
   }
 
   const markDone = (m: AppMessage) => {
@@ -156,19 +219,37 @@ export function MessageCenter({ messagesApi, currentUser }: MessageCenterProps) 
 
         {/* Küldés */}
         <div className="border-b p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label>Címzett</Label>
-              <Select value={toUserId} onValueChange={setToUserId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Mindenki</SelectItem>
-                  {users.filter((u) => u.id !== me).map((u) => (
-                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="grid gap-1.5">
+            <Label>Címzettek (többet is választhatsz)</Label>
+            <div className="flex flex-wrap gap-1.5">
+              <Badge
+                variant={recipients.has('all') ? 'default' : 'outline'}
+                className="cursor-pointer select-none coarse:py-1.5"
+                onClick={() => toggleRecipient('all')}
+              >
+                Mindenki
+              </Badge>
+              <Badge
+                variant={recipients.has('operators') ? 'default' : 'outline'}
+                className="cursor-pointer select-none coarse:py-1.5"
+                onClick={() => toggleRecipient('operators')}
+              >
+                Összes operátor
+              </Badge>
+              {users.filter((u) => u.id !== me).map((u) => (
+                <Badge
+                  key={u.id}
+                  variant={recipients.has(u.id) ? 'default' : 'outline'}
+                  className="cursor-pointer select-none coarse:py-1.5"
+                  onClick={() => toggleRecipient(u.id)}
+                >
+                  {u.name}
+                </Badge>
+              ))}
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>Típus</Label>
               <Select value={kind} onValueChange={(v) => setKind(v as 'uzenet' | 'feladat')}>
@@ -178,6 +259,52 @@ export function MessageCenter({ messagesApi, currentUser }: MessageCenterProps) 
                   <SelectItem value="feladat">Feladat</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Rendelés csatolása</Label>
+              {linkedOrder ? (
+                <div className="flex items-center gap-1 rounded-md border px-2 h-9 text-sm">
+                  <Wrench className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="truncate font-medium">{linkedOrder.label}</span>
+                  <Button
+                    variant="ghost" size="sm" className="ml-auto h-6 w-6 p-0 shrink-0"
+                    onClick={() => setLinkedOrder(null)}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <input
+                    className="w-full h-9 rounded-md border bg-transparent pl-8 pr-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                    placeholder="Keresés: M26…, termék…"
+                    value={orderSearch}
+                    onChange={(e) => setOrderSearch(e.target.value)}
+                  />
+                  {orderHits.length > 0 && (
+                    <div className="absolute z-50 top-10 left-0 right-0 rounded-md border bg-popover shadow-md overflow-hidden">
+                      {orderHits.map((o) => (
+                        <button
+                          key={o.id}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex gap-2 items-baseline"
+                          onClick={() => {
+                            setLinkedOrder({
+                              id: o.id,
+                              label: `${o.ownOrderNumber || o.orderNumber} · ${o.productName}`,
+                            })
+                            setOrderSearch('')
+                          }}
+                        >
+                          <span className="font-mono font-semibold shrink-0">{o.ownOrderNumber || o.orderNumber}</span>
+                          <span className="truncate">{o.productName}</span>
+                          <span className="text-muted-foreground text-xs truncate ml-auto">{o.customer}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <Textarea
@@ -215,6 +342,11 @@ export function MessageCenter({ messagesApi, currentUser }: MessageCenterProps) 
                       <Badge variant={m.doneAt ? 'secondary' : 'default'} className="gap-1 text-[10px]">
                         <ClipboardText className="w-3 h-3" />
                         {m.doneAt ? 'Kész' : 'Feladat'}
+                      </Badge>
+                    )}
+                    {m.orderLabel && (
+                      <Badge variant="outline" className="text-[10px] font-mono max-w-[180px] truncate" title={m.orderLabel}>
+                        {m.orderLabel}
                       </Badge>
                     )}
                   </div>

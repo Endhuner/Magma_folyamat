@@ -42,6 +42,7 @@ import { WorkCalendarDialog } from '@/components/WorkCalendarDialog'
 import { MessageCenter } from '@/components/MessageCenter'
 import { MaterialPanel } from '@/components/MaterialPanel'
 import { ExtraItemsDialog } from '@/components/ExtraItemsDialog'
+import { CreateDeliveryNoteDialog } from '@/components/CreateDeliveryNoteDialog'
 import {
   computeMaterialStatuses,
   totalEstimatedMaterialKg,
@@ -1454,6 +1455,15 @@ function App() {
     toast.success(`${fresh.length} termék sikeresen importálva`)
   }
 
+  // Szállítólevél/CMR készítése a Dokumentumok fülről — a kiválasztott
+  // rendeléseket a meglévő kiállítás-láncba adja (dátum → validáció → export).
+  const [createNoteDialogOpen, setCreateNoteDialogOpen] = useState(false)
+  const handleCreateNoteFromDocuments = (type: 'delivery' | 'cmr', orderIds: string[]) => {
+    setSelectedOrderIds(orderIds)
+    setIssueDateDialogType(type)
+    setIssueDateDialogOpen(true)
+  }
+
   // Kiegészítő tételek a szállítólevélen (szerszám / anyag / szabad sor)
   const [extraItemsNote, setExtraItemsNote] = useState<DeliveryNote | null>(null)
   const handleSaveExtraItems = (note: DeliveryNote, extraItems: ExtraDeliveryItem[]) => {
@@ -1960,6 +1970,7 @@ function App() {
               <MessageCenter
                 messagesApi={messagesApi}
                 currentUser={auth.user ? { id: auth.user.id, name: auth.user.name } : null}
+                orders={orders || []}
               />
               <ThemeToggle />
               {auth.user && (
@@ -2321,6 +2332,7 @@ function App() {
             handlePreviewNote={handlePreviewNote}
             handleDownloadPdf={handleDownloadPdf}
             onEditExtraItems={setExtraItemsNote}
+            onCreateNew={() => setCreateNoteDialogOpen(true)}
             handleEmailNote={handleEmailNote}
             emailTemplate={emailTemplate}
             setEmailTemplate={setEmailTemplate}
@@ -2383,6 +2395,7 @@ function App() {
               onDelete={handleDeleteDeliveryNote}
               onUpdate={handleUpdateDeliveryNote}
               onEditExtraItems={setExtraItemsNote}
+              onCreateNew={() => setCreateNoteDialogOpen(true)}
             />
           </TabsContent>
 
@@ -2451,6 +2464,13 @@ function App() {
         inventory={inventory || []}
         onClose={() => setExtraItemsNote(null)}
         onSave={handleSaveExtraItems}
+      />
+
+      <CreateDeliveryNoteDialog
+        open={createNoteDialogOpen}
+        onClose={() => setCreateNoteDialogOpen(false)}
+        orders={orders || []}
+        onCreate={handleCreateNoteFromDocuments}
       />
 
       <AppDialogs
