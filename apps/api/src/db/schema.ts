@@ -198,6 +198,8 @@ export const inventoryItems = sqliteTable('inventory_items', {
   quantity: integer('quantity').notNull().default(0),
   totalShots: integer('total_shots'),
   nestCount: text('nest_count'),
+  /** 'termek' (kész termék) | 'szerszam' | 'alapanyag' — a polc-nézet színkódjához. */
+  itemType: text('item_type').notNull().default('termek'),
   location: text('location').notNull().default(''),
   notes: text('notes').notNull().default(''),
   lastUpdated: text('last_updated').notNull().default(nowDefault),

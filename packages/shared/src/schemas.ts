@@ -145,6 +145,7 @@ export const inventoryItemCreateSchema = z.object({
   quantity: z.number().int().default(0),
   totalShots: z.number().int().min(0).optional(),
   nestCount: z.string().optional(),
+  itemType: z.enum(['termek', 'szerszam', 'alapanyag']).default('termek'),
   location: z.string().default(''),
   notes: z.string().default(''),
   lastUpdated: z.string().optional(),

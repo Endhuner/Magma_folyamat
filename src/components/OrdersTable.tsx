@@ -326,6 +326,11 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
         )}
       </div>
 
+      {/* Térköz, hogy a táblázat utolsó sorai a lebegő összesítő SÁV FÖLÉ
+          görgethetők legyenek — enélkül a sáv takarta és kattinthatatlanná
+          tette őket. (A sáv végleges kinézete külön döntés.) */}
+      <div aria-hidden className="h-64 md:h-44" />
+
       <div className="fixed bottom-0 left-0 right-0 bg-accent/30 border-t-2 border-accent/50 backdrop-blur-sm z-10">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-2">

@@ -153,6 +153,8 @@ export interface InventoryItem {
   totalShots?: number
   /** Termékhez tartozó fészekszám, cache-elve. Üres ha a termékről nem érkezett adat. */
   nestCount?: string
+  /** 'termek' (kész termék) | 'szerszam' | 'alapanyag' — a polc-nézet színkódjához. */
+  itemType?: 'termek' | 'szerszam' | 'alapanyag'
   location: string
   notes: string
   lastUpdated: string

@@ -68,7 +68,15 @@ function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, o
             return (
               <TableRow key={item.id} className="even:bg-[var(--row-stripe)] hover:bg-[var(--row-hover)]">
                 <TableCell className="font-mono text-sm">{item.drawingNumber}</TableCell>
-                <TableCell className="font-medium">{item.productName}</TableCell>
+                <TableCell className="font-medium">
+                  {item.productName}
+                  {item.itemType === 'szerszam' && (
+                    <Badge variant="outline" className="ml-2 text-[10px] text-amber-700 dark:text-amber-300 border-amber-400">szerszám</Badge>
+                  )}
+                  {item.itemType === 'alapanyag' && (
+                    <Badge variant="outline" className="ml-2 text-[10px] text-emerald-700 dark:text-emerald-300 border-emerald-400">alapanyag</Badge>
+                  )}
+                </TableCell>
                 <TableCell>{item.customer}</TableCell>
                 <TableCell className="text-right font-mono font-semibold">{item.quantity}</TableCell>
                 <TableCell>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { InventoryItem, Product } from '@/lib/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -6,7 +6,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { parseIntSafe } from '@/lib/helpers'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { CaretUpDown, Check } from '@phosphor-icons/react'
+import { parseIntSafe, stripDiacritics } from '@/lib/helpers'
 
 interface InventoryDialogProps {
   open: boolean
@@ -23,6 +26,7 @@ export function InventoryDialog({ open, onClose, onSave, item, products }: Inven
     drawingNumber: '',
     customer: '',
     quantity: 0,
+    itemType: 'termek',
     location: '',
     notes: '',
   })
@@ -37,6 +41,7 @@ export function InventoryDialog({ open, onClose, onSave, item, products }: Inven
         drawingNumber: '',
         customer: '',
         quantity: 0,
+        itemType: 'termek',
         location: '',
         notes: '',
       })
@@ -56,6 +61,26 @@ export function InventoryDialog({ open, onClose, onSave, item, products }: Inven
     }
   }
 
+  // ── Kereshető termékválasztó ──
+  // Sok termék esetén a sima legördülő használhatatlan — itt ékezet-független
+  // keresés megy rajzszámra, névre és vevőre; max. 50 találat jelenik meg.
+  const [productPickerOpen, setProductPickerOpen] = useState(false)
+  const [productQuery, setProductQuery] = useState('')
+  const selectedProduct = products.find(p => p.id === formData.productId)
+
+  const filteredProducts = useMemo(() => {
+    const q = stripDiacritics(productQuery)
+    if (!q) return products.slice(0, 50)
+    return products
+      .filter(
+        p =>
+          stripDiacritics(p.drawingNumber).includes(q) ||
+          stripDiacritics(p.productName).includes(q) ||
+          stripDiacritics(p.customer).includes(q)
+      )
+      .slice(0, 50)
+  }, [products, productQuery])
+
   const handleSubmit = () => {
     onSave({
       ...formData,
@@ -74,21 +99,57 @@ export function InventoryDialog({ open, onClose, onSave, item, products }: Inven
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="product-select">Termék kiválasztása</Label>
-            <Select
-              value={formData.productId}
-              onValueChange={handleProductSelect}
-            >
-              <SelectTrigger id="product-select">
-                <SelectValue placeholder="Válassz terméket..." />
-              </SelectTrigger>
-              <SelectContent>
-                {products.map(product => (
-                  <SelectItem key={product.id} value={product.id}>
-                    {product.drawingNumber} - {product.productName} ({product.customer})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={productPickerOpen} onOpenChange={setProductPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  id="product-select"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={productPickerOpen}
+                  className="justify-between font-normal"
+                >
+                  <span className="truncate">
+                    {selectedProduct
+                      ? `${selectedProduct.drawingNumber} – ${selectedProduct.productName} (${selectedProduct.customer})`
+                      : 'Válassz terméket… (szerszámnál/alapanyagnál nem kötelező)'}
+                  </span>
+                  <CaretUpDown className="w-4 h-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="Keresés: rajzszám, név, vevő…"
+                    value={productQuery}
+                    onValueChange={setProductQuery}
+                  />
+                  <CommandList>
+                    <CommandEmpty>Nincs találat.</CommandEmpty>
+                    {filteredProducts.map(product => (
+                      <CommandItem
+                        key={product.id}
+                        value={product.id}
+                        onSelect={() => {
+                          handleProductSelect(product.id)
+                          setProductPickerOpen(false)
+                          setProductQuery('')
+                        }}
+                      >
+                        <Check className={`w-4 h-4 ${formData.productId === product.id ? 'opacity-100' : 'opacity-0'}`} />
+                        <span className="font-mono text-xs">{product.drawingNumber || '—'}</span>
+                        <span className="truncate">{product.productName}</span>
+                        <span className="text-muted-foreground text-xs truncate ml-auto">{product.customer}</span>
+                      </CommandItem>
+                    ))}
+                    {filteredProducts.length === 50 && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        Az első 50 találat látszik — szűkítsd a keresést.
+                      </div>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -134,14 +195,36 @@ export function InventoryDialog({ open, onClose, onSave, item, products }: Inven
             </div>
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="location">Raktár hely</Label>
-            <Input
-              id="location"
-              value={formData.location || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-              placeholder="pl. A1-polc-3"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="item-type">Típus</Label>
+              <Select
+                value={formData.itemType || 'termek'}
+                onValueChange={(v) => setFormData(prev => ({ ...prev, itemType: v as InventoryItem['itemType'] }))}
+              >
+                <SelectTrigger id="item-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="termek">Kész termék</SelectItem>
+                  <SelectItem value="szerszam">Szerszám</SelectItem>
+                  <SelectItem value="alapanyag">Alapanyag</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="location">Raktár hely</Label>
+              <Input
+                id="location"
+                value={formData.location || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                placeholder="pl. A-2-3 (állvány-szint-rekesz)"
+              />
+              <p className="text-xs text-muted-foreground">
+                Az „állvány-szint-rekesz" formátumú kód (pl. A-2-3) a Polc nézetben vizuálisan is megjelenik.
+              </p>
+            </div>
           </div>
 
           <div className="grid gap-2">
