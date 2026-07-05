@@ -326,44 +326,23 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
         )}
       </div>
 
-      {/* Térköz, hogy a táblázat utolsó sorai a lebegő összesítő SÁV FÖLÉ
-          görgethetők legyenek — enélkül a sáv takarta és kattinthatatlanná
-          tette őket. (A sáv végleges kinézete külön döntés.) */}
-      <div aria-hidden className="h-64 md:h-44" />
+      {/* Térköz, hogy a táblázat utolsó sorai a lebegő összesítő sáv fölé
+          görgethetők legyenek (telefonon a sáv 2 sorba törhet → nagyobb). */}
+      <div aria-hidden className="h-20 md:h-12" />
 
-      <div className="fixed bottom-0 left-0 right-0 bg-accent/30 border-t-2 border-accent/50 backdrop-blur-sm z-10">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-base font-semibold">
-              Összesítés - {selectedIds.length > 0 ? `${summary.count} kijelölt rendelés` : `${summary.count} szűrt rendelés`}
-            </h3>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Összes darab</p>
-              <p className="text-xl font-bold font-mono">{summary.totalAmount}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Dobozok száma</p>
-              <p className="text-xl font-bold font-mono">{summary.totalBoxes}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Raklapok száma</p>
-              <p className="text-xl font-bold font-mono">{summary.totalPallets}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Bruttó súly</p>
-              <p className="text-xl font-bold font-mono">{summary.totalGrossWeight}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Szükséges anyag</p>
-              <p className="text-xl font-bold font-mono">{summary.totalRequiredMaterial}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Gyártási idő</p>
-              <p className="text-xl font-bold font-mono">{summary.totalPlannedHours}</p>
-            </div>
-          </div>
+      {/* Kompakt, egysoros összesítő sáv ("A" variáció) — mindig látszik,
+          de csak ~40px magas, így nem takarja el a táblázat alját. */}
+      <div className="fixed bottom-0 left-0 right-0 bg-card/95 border-t border-accent/50 backdrop-blur-sm z-10">
+        <div className="container mx-auto px-3 md:px-6 py-1.5 flex items-center gap-x-4 gap-y-0.5 flex-wrap text-sm leading-tight">
+          <span className="font-semibold whitespace-nowrap">
+            {selectedIds.length > 0 ? `${summary.count} kijelölt` : `${summary.count} szűrt`}:
+          </span>
+          <span className="whitespace-nowrap"><b className="font-mono">{summary.totalAmount}</b> <span className="text-muted-foreground">db</span></span>
+          <span className="whitespace-nowrap"><b className="font-mono">{summary.totalBoxes}</b> <span className="text-muted-foreground">doboz</span></span>
+          <span className="whitespace-nowrap"><b className="font-mono">{summary.totalPallets}</b> <span className="text-muted-foreground">raklap</span></span>
+          <span className="whitespace-nowrap"><b className="font-mono">{summary.totalGrossWeight}</b> <span className="text-muted-foreground">bruttó</span></span>
+          <span className="whitespace-nowrap"><b className="font-mono">{summary.totalRequiredMaterial}</b> <span className="text-muted-foreground">anyag</span></span>
+          <span className="whitespace-nowrap"><b className="font-mono">{summary.totalPlannedHours}</b> <span className="text-muted-foreground">gyártás</span></span>
         </div>
       </div>
     </>
