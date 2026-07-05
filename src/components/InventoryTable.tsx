@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react'
+import { unitOf } from '@/lib/materialService'
 import { InventoryItem, Product, Order } from '@/lib/types'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
@@ -18,11 +19,17 @@ interface InventoryTableProps {
 }
 
 function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, onShowHistory, onWarehouseAdd }: InventoryTableProps) {
-  // Összesítők a láblécbe: teljes darabszám + hány tétel van a küszöb alatt.
+  // Összesítők a láblécbe: db és kg külön (alapanyag kg-ban, a többi db-ban),
+  // + hány tétel van a küszöb alatt.
   const totals = useMemo(() => {
-    const totalQty = inventory.reduce((sum, i) => sum + (i.quantity || 0), 0)
-    const lowCount = inventory.filter((i) => i.quantity < 50).length
-    return { totalQty, lowCount }
+    let totalDb = 0
+    let totalKg = 0
+    for (const i of inventory) {
+      if (unitOf(i) === 'kg') totalKg += i.quantity || 0
+      else totalDb += i.quantity || 0
+    }
+    const lowCount = inventory.filter((i) => unitOf(i) === 'db' && i.quantity < 50).length
+    return { totalDb, totalKg: Math.round(totalKg * 10) / 10, lowCount }
   }, [inventory])
 
   const getStockStatus = (quantity: number) => {
@@ -54,7 +61,7 @@ function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, o
               <TableHead>Rajzszám</TableHead>
               <TableHead>Termék neve</TableHead>
               <TableHead>Vevő</TableHead>
-              <TableHead className="text-right">Mennyiség (db)</TableHead>
+              <TableHead className="text-right">Mennyiség</TableHead>
               <TableHead>Státusz</TableHead>
               <TableHead>Raktár hely</TableHead>
               <TableHead>Megjegyzés</TableHead>
@@ -78,7 +85,9 @@ function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, o
                   )}
                 </TableCell>
                 <TableCell>{item.customer}</TableCell>
-                <TableCell className="text-right font-mono font-semibold">{item.quantity}</TableCell>
+                <TableCell className="text-right font-mono font-semibold">
+                  {item.quantity.toLocaleString('hu-HU')} <span className="text-muted-foreground font-sans text-xs">{unitOf(item)}</span>
+                </TableCell>
                 <TableCell>
                   <Badge variant={status.variant}>{status.label}</Badge>
                 </TableCell>
@@ -147,8 +156,9 @@ function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, o
               Összesen ({inventory.length} tétel
               {totals.lowCount > 0 && <span className="text-destructive"> · {totals.lowCount} alacsony</span>})
             </TableCell>
-            <TableCell className="text-right font-mono font-bold">
-              {totals.totalQty.toLocaleString('hu-HU')} db
+            <TableCell className="text-right font-mono font-bold whitespace-nowrap">
+              {totals.totalDb.toLocaleString('hu-HU')} db
+              {totals.totalKg > 0 && <> · {totals.totalKg.toLocaleString('hu-HU')} kg</>}
             </TableCell>
             <TableCell colSpan={5} />
           </TableRow>

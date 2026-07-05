@@ -19,10 +19,14 @@ import { Plus, MagnifyingGlass, Warning, ListBullets, SquaresFour } from '@phosp
 import { toast } from 'sonner'
 import { InventoryTable } from '@/components/InventoryTable'
 import { WarehouseShelfView } from '@/components/WarehouseShelfView'
+import { MaterialPanel } from '@/components/MaterialPanel'
+import type { MaterialActionKind } from '@/lib/materialService'
 import type {
   Order,
   Product,
   InventoryItem,
+  InventoryTransaction,
+  ProductionShift,
   AuditEntityType,
   AuditAction,
   AuditFieldChange,
@@ -36,6 +40,15 @@ export interface InventoryPanelProps {
   ) => void
   products: Product[] | null | undefined
   orders: Order[] | null | undefined
+
+  // Az alapanyag-blokkhoz (élő fogyás-becslés + bevét/visszaolvasztás/leltár)
+  inventoryTransactions: InventoryTransaction[] | null | undefined
+  productionShifts: ProductionShift[] | null | undefined
+  onMaterialAction: (result: {
+    updatedItem: InventoryItem
+    transaction: InventoryTransaction
+    kind: MaterialActionKind
+  }) => void
 
   inventorySearchQuery: string
   setInventorySearchQuery: (q: string) => void
@@ -64,6 +77,9 @@ export function InventoryPanel({
   setInventory,
   products,
   orders,
+  inventoryTransactions,
+  productionShifts,
+  onMaterialAction,
   lowStockItems = [],
   inventorySearchQuery,
   setInventorySearchQuery,
@@ -254,6 +270,18 @@ export function InventoryPanel({
         }}
       />
       )}
+
+      {/* Alapanyag-tároló — külön kijelölt hely, nem a polcrendszeren.
+          Élő fogyás-becslés + bevét / visszaolvasztás / leltár. */}
+      <MaterialPanel
+        title="Alapanyag-tároló"
+        inventory={inventory || []}
+        shifts={productionShifts || []}
+        orders={orders || []}
+        products={products || []}
+        transactions={inventoryTransactions || []}
+        onApply={onMaterialAction}
+      />
     </TabsContent>
   )
 }

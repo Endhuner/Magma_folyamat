@@ -19,6 +19,8 @@ interface OrdersTableProps {
   selectedIds: string[]
   onSelectionChange: (ids: string[]) => void
   visibleColumns?: string[]
+  /** Becsült alapanyag-készlet (kg) — az összesítő sáv fedezet-jelzéséhez. */
+  materialEstimateKg?: number | null
 }
 
 const STATUS_OPTIONS: OrderStatus[] = [
@@ -45,7 +47,7 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
   'Elkészült': 'oklch(0.88 0.10 145)',
 }
 
-function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onStatusChange, selectedIds, onSelectionChange, visibleColumns }: OrdersTableProps) {
+function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onStatusChange, selectedIds, onSelectionChange, visibleColumns, materialEstimateKg }: OrdersTableProps) {
   const [sortField, setSortField] = useState<keyof Order | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   /**
@@ -341,7 +343,18 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
           <span className="whitespace-nowrap"><b className="font-mono">{summary.totalBoxes}</b> <span className="text-muted-foreground">doboz</span></span>
           <span className="whitespace-nowrap"><b className="font-mono">{summary.totalPallets}</b> <span className="text-muted-foreground">raklap</span></span>
           <span className="whitespace-nowrap"><b className="font-mono">{summary.totalGrossWeight}</b> <span className="text-muted-foreground">bruttó</span></span>
-          <span className="whitespace-nowrap"><b className="font-mono">{summary.totalRequiredMaterial}</b> <span className="text-muted-foreground">anyag</span></span>
+          <span className="whitespace-nowrap">
+            <b className="font-mono">{summary.totalRequiredMaterial}</b>{' '}
+            <span className="text-muted-foreground">anyag</span>
+            {typeof materialEstimateKg === 'number' && (
+              // Anyag-fedezet: a szűrt/kijelölt rendelések igénye vs. a becsült
+              // alapanyag-készlet (a MaterialPanel élő becslése alapján).
+              <span className={parseFloat(summary.totalRequiredMaterial) <= materialEstimateKg ? 'text-success' : 'text-destructive font-semibold'}>
+                {' '}/ ~{materialEstimateKg.toLocaleString('hu-HU', { maximumFractionDigits: 1 })} kg készleten{' '}
+                {parseFloat(summary.totalRequiredMaterial) <= materialEstimateKg ? '✓' : '✗'}
+              </span>
+            )}
+          </span>
           <span className="whitespace-nowrap"><b className="font-mono">{summary.totalPlannedHours}</b> <span className="text-muted-foreground">gyártás</span></span>
         </div>
       </div>

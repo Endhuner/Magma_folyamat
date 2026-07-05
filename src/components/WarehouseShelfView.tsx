@@ -28,6 +28,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/lib/auth'
 import { useAppSetting } from '@/hooks/useAppSetting'
 import { stripDiacritics } from '@/lib/helpers'
+import { unitOf } from '@/lib/materialService'
 import {
   DEFAULT_RACKS,
   buildWarehouseIndex,
@@ -248,7 +249,7 @@ export function WarehouseShelfView({
                       {item.productName || item.drawingNumber || '—'}
                     </span>
                     <span className="block truncate opacity-80">
-                      {item.quantity.toLocaleString('hu-HU')} db · {formatLocationCode(loc.rackId, loc.level, loc.bin)}
+                      {item.quantity.toLocaleString('hu-HU')} {unitOf(item)} · {formatLocationCode(loc.rackId, loc.level, loc.bin)}
                     </span>
                   </button>
                 )
@@ -273,7 +274,7 @@ export function WarehouseShelfView({
             <span className="text-muted-foreground"> · {selectedItem.customer || '—'}</span>
             <span className="ml-2 font-mono text-sm bg-muted rounded px-2 py-0.5">{selectedItem.location || 'nincs hely'}</span>
           </div>
-          <b className="font-mono">{selectedItem.quantity.toLocaleString('hu-HU')} db</b>
+          <b className="font-mono">{selectedItem.quantity.toLocaleString('hu-HU')} {unitOf(selectedItem)}</b>
           <div className="ml-auto flex gap-2 flex-wrap">
             <Button size="sm" variant="outline" className="gap-1" onClick={() => setMoveItem(selectedItem)}>
               <ArrowsLeftRight className="w-4 h-4" /> Áthelyezés
@@ -300,7 +301,7 @@ export function WarehouseShelfView({
               <div key={item.id} className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
                 <TypeIcon itemType={item.itemType} className="w-4 h-4 shrink-0" />
                 <span className="font-medium truncate">{item.productName || item.drawingNumber || item.id}</span>
-                <span className="text-muted-foreground shrink-0">{item.quantity.toLocaleString('hu-HU')} db</span>
+                <span className="text-muted-foreground shrink-0">{item.quantity.toLocaleString('hu-HU')} {unitOf(item)}</span>
                 {item.location && (
                   <span className="text-xs text-muted-foreground italic truncate">„{item.location}"</span>
                 )}

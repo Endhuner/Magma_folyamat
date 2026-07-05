@@ -37,6 +37,7 @@ import { registerRequestLogger } from './lib/requestLogger.js'
 import { registerAuthPlugins } from './lib/authPlugin.js'
 import { bootstrapAdmin } from './lib/bootstrap.js'
 import { startScheduledBackups } from './lib/scheduledBackup.js'
+import { startMaterialConsolidation } from './lib/materialConsolidation.js'
 
 /**
  * Csak akkor használjuk a `pino-pretty` transportot, ha a csomag valóban
@@ -97,6 +98,9 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Ütemezett automatikus adatbázis-mentés (naponta, 30 napos megőrzés)
   startScheduledBackups(app.log)
+
+  // Napi anyagfogyás-könyvelés (A3 hibrid modell — ld. materialConsolidation)
+  startMaterialConsolidation(app.log)
 
   // ── Statikus frontend kiszolgálása (Docker all-in-one mód) ─────────────
   // Ha a STATIC_DIR env be van állítva, a Fastify kiszolgálja a React SPA-t.

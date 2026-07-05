@@ -183,7 +183,7 @@ export function InventoryDialog({ open, onClose, onSave, item, products }: Inven
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="quantity">Mennyiség (db)</Label>
+              <Label htmlFor="quantity">Mennyiség ({formData.itemType === 'alapanyag' ? 'kg' : 'db'})</Label>
               <Input
                 id="quantity"
                 type="number"

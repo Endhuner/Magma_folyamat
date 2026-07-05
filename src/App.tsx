@@ -40,6 +40,14 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { GlobalSearch } from '@/components/GlobalSearch'
 import { WorkCalendarDialog } from '@/components/WorkCalendarDialog'
 import { MessageCenter } from '@/components/MessageCenter'
+import { MaterialPanel } from '@/components/MaterialPanel'
+import {
+  computeMaterialStatuses,
+  totalEstimatedMaterialKg,
+  MATERIAL_BOOKED_THROUGH_KEY,
+  type MaterialActionKind,
+  type MaterialBookedThroughMap,
+} from '@/lib/materialService'
 const TrashView = lazy(() => import('@/components/TrashView').then(m => ({ default: m.TrashView })))
 const ReportsView = lazy(() => import('@/components/ReportsView').then(m => ({ default: m.ReportsView })))
 const MaintenanceView = lazy(() => import('@/components/MaintenanceView').then(m => ({ default: m.MaintenanceView })))
@@ -1823,6 +1831,46 @@ function App() {
     [dashboardFilteredOrders]
   )
 
+  // ── Alapanyag-gazdálkodás (A3 hibrid modell) ──
+  // Élő becslés a Rendelések összesítő sávjához; a részletes kártyák a
+  // MaterialPanel-ben élnek (Gyártás + Készlet fül).
+  const [materialBookedThrough] = useAppSetting<MaterialBookedThroughMap>(MATERIAL_BOOKED_THROUGH_KEY, {})
+  const materialEstimateKg = useMemo(() => {
+    const statuses = computeMaterialStatuses(
+      inventory || [],
+      productionShifts || [],
+      orders || [],
+      products || [],
+      inventoryTransactions || [],
+      materialBookedThrough
+    )
+    return statuses.length > 0 ? totalEstimatedMaterialKg(statuses) : null
+  }, [inventory, productionShifts, orders, products, inventoryTransactions, materialBookedThrough])
+
+  /** Anyag-művelet (bevét/visszaolvasztás/leltár) átvezetése + audit. */
+  const handleMaterialAction = useCallback(
+    ({ updatedItem, transaction, kind }: {
+      updatedItem: InventoryItem
+      transaction: InventoryTransaction
+      kind: MaterialActionKind
+    }) => {
+      setInventory((current) =>
+        (current || []).map((i) => (i.id === updatedItem.id ? updatedItem : i))
+      )
+      setInventoryTransactions((current) => [...(current || []), transaction])
+      appendAudit(
+        'inventory',
+        'Készlet',
+        updatedItem.id,
+        updatedItem.productName || updatedItem.id,
+        transaction.type as AuditAction,
+        { notes: transaction.notes, userId: auth.user?.id, userName: auth.user?.name }
+      )
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [auth.user?.id, auth.user?.name]
+  )
+
   // Lejárt határidejű, még ki nem szállított rendelések — a legrégebben
   // lejárt elöl. A dashboard piros sávban jelzi (a leginkább akcióigényes tétel).
   const overdueOrders = useMemo(
@@ -2112,6 +2160,17 @@ function App() {
             productionShifts={productionShifts}
             productionDefects={productionDefects}
             machines={machinesApi.items || []}
+            materialSlot={
+              <MaterialPanel
+                compact
+                inventory={inventory || []}
+                shifts={productionShifts || []}
+                orders={orders || []}
+                products={products || []}
+                transactions={inventoryTransactions || []}
+                onApply={handleMaterialAction}
+              />
+            }
             handleStatusChange={handleStatusChange}
             handleEditOrder={handleEditOrder}
             handleSaveShift={handleSaveShift}
@@ -2133,6 +2192,7 @@ function App() {
             orders={orders}
             customers={customers}
             products={products}
+            materialEstimateKg={materialEstimateKg}
             labelTemplates={labelTemplates}
             savedDeliveryTemplates={savedTemplates}
             activeTemplates={activeTemplates}
@@ -2333,6 +2393,9 @@ function App() {
             setInventory={setInventory}
             products={products}
             orders={orders}
+            inventoryTransactions={inventoryTransactions}
+            productionShifts={productionShifts}
+            onMaterialAction={handleMaterialAction}
             lowStockItems={lowStockItems}
             inventorySearchQuery={inventorySearchQuery}
             setInventorySearchQuery={setInventorySearchQuery}

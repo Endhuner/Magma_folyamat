@@ -96,6 +96,8 @@ export interface OrdersPanelProps {
   customers: Customer[] | null | undefined
   products: Product[] | null | undefined
   labelTemplates: LabelTemplate[] | null | undefined
+  /** Becsült alapanyag-készlet (kg) az összesítő sáv fedezet-jelzéséhez. */
+  materialEstimateKg?: number | null
   activeLabelTemplateId: string | null | undefined
   savedDeliveryTemplates?: Array<{ id: string; data: { type: string; html: string; css: string; active?: boolean } }> | null
   activeTemplates?: { cmr?: string; delivery?: string; pallet?: string; 'box-label'?: string }
@@ -151,6 +153,7 @@ export function OrdersPanel({
   customers,
   products,
   labelTemplates,
+  materialEstimateKg,
   activeLabelTemplateId,
   savedDeliveryTemplates,
   activeTemplates,
@@ -748,6 +751,7 @@ export function OrdersPanel({
       <OrdersTable
         orders={filteredOrders}
         products={products || []}
+        materialEstimateKg={materialEstimateKg}
         onEdit={handleEditOrder}
         onDelete={handleDeleteOrder}
         onDuplicate={handleDuplicateOrder}
