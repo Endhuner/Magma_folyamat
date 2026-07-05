@@ -1,0 +1,134 @@
+/**
+ * Skin-rendszer — a <html data-skin="…"> attribútum kapcsolja.
+ *
+ * A skin két rétegből áll:
+ *  1) SZÍN-tokenek: az index.css :root / .dark változóinak felülírása
+ *  2) KIALAKÍTÁS: strukturális felülírások a shadcn data-slot attribútumain
+ *     (fülek, kártyák, táblák, gombok) — a Prime skin a primeng.dev teljes
+ *     formavilágát hozza, nem csak a színeit.
+ *
+ * A skin a sötét móddal kombinálható: [data-skin] + .dark[data-skin] blokkok.
+ */
+
+/* ═══════════════════ PRIME (primeng.dev ihletésű) ═══════════════════ */
+
+/* ── Szín-tokenek · világos ── */
+html[data-skin='prime'] {
+  --background: #f8fafc;        /* slate-50 */
+  --foreground: #334155;        /* slate-700 */
+  --card: #ffffff;
+  --card-foreground: #334155;
+  --popover: #ffffff;
+  --popover-foreground: #334155;
+  --primary: #10b981;           /* emerald-500 */
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;         /* slate-100 */
+  --secondary-foreground: #334155;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;  /* slate-500 */
+  --accent: #d1fae5;            /* emerald-100 */
+  --accent-foreground: #047857; /* emerald-700 */
+  --border: #e2e8f0;            /* slate-200 */
+  --input: #e2e8f0;
+  --ring: #10b981;
+  --radius: 0.75rem;            /* kerekebb, PrimeNG-es */
+  /* táblázat csíkozás (virtualRow / even sorok) */
+  --row-stripe: #f8fafc;
+}
+
+/* ── Szín-tokenek · sötét (PrimeNG dark: slate-900 felületek) ── */
+html.dark[data-skin='prime'] {
+  --background: #0f172a;        /* slate-900 */
+  --foreground: #cbd5e1;        /* slate-300 */
+  --card: #1e293b;              /* slate-800 */
+  --card-foreground: #cbd5e1;
+  --popover: #1e293b;
+  --popover-foreground: #cbd5e1;
+  --primary: #34d399;           /* emerald-400 — sötéten világosabb */
+  --primary-foreground: #052e1b;
+  --secondary: #334155;
+  --secondary-foreground: #cbd5e1;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #064e3b;            /* emerald-900 */
+  --accent-foreground: #6ee7b7;
+  --border: #334155;            /* slate-700 */
+  --input: #334155;
+  --ring: #34d399;
+  --row-stripe: #16213404;
+}
+
+/* ── Kialakítás: kártyák — lágy PrimeNG-árnyék, nagyobb lekerekítés ── */
+html[data-skin='prime'] [data-slot='card'] {
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.06),
+    0 4px 12px rgb(15 23 42 / 0.06);
+}
+html.dark[data-skin='prime'] [data-slot='card'] {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+}
+
+/* ── Kialakítás: fülek — aláhúzásos stílus a kitöltött helyett ── */
+html[data-skin='prime'] [data-slot='tabs-list'] {
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0;
+  gap: 0.25rem;
+}
+html[data-skin='prime'] [data-slot='tabs-trigger'] {
+  background: transparent !important;
+  border-radius: 0;
+  border: none;
+  box-shadow: none !important;
+  color: var(--muted-foreground);
+  padding-bottom: 0.55rem;
+  position: relative;
+}
+html[data-skin='prime'] [data-slot='tabs-trigger'][data-state='active'] {
+  color: var(--foreground);
+  font-weight: 600;
+}
+html[data-skin='prime'] [data-slot='tabs-trigger'][data-state='active']::after {
+  content: '';
+  position: absolute;
+  left: 0.4rem;
+  right: 0.4rem;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--primary);
+}
+
+/* ── Kialakítás: táblázat — nagybetűs halvány fejléc, sor-hover ── */
+html[data-skin='prime'] [data-slot='table-head'],
+html[data-skin='prime'] thead th {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+  background: var(--muted);
+}
+html[data-skin='prime'] [data-slot='table-row']:hover,
+html[data-skin='prime'] tbody tr:hover {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+/* ── Kialakítás: gombok — smaragd árnyék az elsődlegesen ── */
+html[data-skin='prime'] [data-slot='button'] {
+  border-radius: 0.5rem;
+}
+html[data-skin='prime'] [data-slot='button'].bg-primary {
+  box-shadow: 0 1px 2px rgb(16 185 129 / 0.35);
+}
+
+/* ── Kialakítás: beviteli mezők, dialógusok ── */
+html[data-skin='prime'] [data-slot='dialog-content'] {
+  border-radius: var(--radius);
+  box-shadow: 0 10px 40px rgb(15 23 42 / 0.18);
+}
+html[data-skin='prime'] input,
+html[data-skin='prime'] [data-slot='select-trigger'] {
+  border-radius: 0.5rem;
+}

@@ -10,6 +10,11 @@ import { AuthGate } from './components/AuthGate'
 import "./main.css"
 import "./styles/theme.css"
 import "./index.css"
+import "./styles/skins.css"
+
+import { applySavedSkin } from './components/SkinSelect'
+// A mentett skin még az első render ELŐTT felkerül a <html>-re (nincs villanás)
+applySavedSkin()
 
 createRoot(document.getElementById('root')!).render(
   <ErrorBoundary FallbackComponent={ErrorFallback}>

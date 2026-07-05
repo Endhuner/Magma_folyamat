@@ -37,6 +37,7 @@ import { listUsers, createUser, updateUser, deleteUser } from '@/lib/api/usersAp
 import type { UserRole } from '@produktivpro/shared'
 import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database, SignOut, Gear } from '@phosphor-icons/react'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { SkinSelect } from '@/components/SkinSelect'
 import { GlobalSearch } from '@/components/GlobalSearch'
 import { WorkCalendarDialog } from '@/components/WorkCalendarDialog'
 import { MessageCenter, unreadMessagesFor } from '@/components/MessageCenter'
@@ -1986,6 +1987,7 @@ function App() {
                 currentUser={auth.user ? { id: auth.user.id, name: auth.user.name } : null}
                 orders={orders || []}
               />
+              <SkinSelect />
               <ThemeToggle />
               {auth.user && (
                 <div className="flex items-center gap-2 border-l pl-4">
