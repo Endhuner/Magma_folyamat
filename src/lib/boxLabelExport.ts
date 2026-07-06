@@ -46,7 +46,11 @@ function buildLabelData(order: Order, product: Product | undefined): BoxLabelDat
   const boxWeight = boxWeightKg > 0 ? boxWeightKg.toFixed(1) + ' kg' : ''
 
   return {
-    designation:   order.designation || order.productName || '',
+    // Megnevezés az ÉLŐ termékből (product.productName) — így a termék
+    // szerkesztése azonnal helyesen jelenik meg a címkén, akkor is, ha a
+    // rendelés eltárolt másolata (order.designation) még a régit tartalmazza.
+    // Ugyanezt a sorrendet használja a labelTemplate és a labelExportFormats is.
+    designation:   product?.productName || order.designation || order.productName || '',
     drawingNumber: product?.drawingNumber || order.productName || '',
     piecesPerBox:  product?.piecesPerBox || '',
     material:      order.material || product?.material || '',
