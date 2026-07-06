@@ -30,7 +30,14 @@ import { OfflineBanner } from '@/components/OfflineBanner'
 import { Order, OrderStatus, Customer, Product, DeliveryNote, ExtraDeliveryItem, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, MachineMaintenance, AppMessage, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
 import { diffObjects, buildAuditEntry, pruneAuditLog, AUDIT_LOG_MAX_ENTRIES } from '@/lib/auditLog'
 import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered, isInvoiced, isOverdue } from '@/lib/helpers'
-import { computeAutoFieldsForOrder } from '@/lib/orderService'
+import {
+  computeAutoFieldsForOrder,
+  computeBoxesCount,
+  computePalletsCount,
+  computeRequiredMaterialKg,
+  computeGrossWeightKg,
+  computePlannedProductionHours,
+} from '@/lib/orderService'
 import { CmrLayoutSettings } from '@/lib/cmrTemplateBuilder'
 import { useAuth } from '@/lib/auth'
 import { listUsers, createUser, updateUser, deleteUser } from '@/lib/api/usersApi'
@@ -1244,19 +1251,44 @@ function App() {
       //   order.designation ← product.productName   (terméknév)
       //   order.material    ← product.material
       if (before && after) {
+        // 1) Azonos-mezős átmásolás (csak a változott mezőket)
         const orderPatch: Partial<Order> = {}
         if (before.drawingNumber !== after.drawingNumber) orderPatch.productName = after.drawingNumber || ''
         if (before.productName !== after.productName) orderPatch.designation = after.productName || ''
         if (before.material !== after.material) orderPatch.material = after.material || ''
 
-        if (Object.keys(orderPatch).length > 0) {
+        // 2) SZÁMÍTOTT mezők: ha a doboz/raklap/súly/idő forrás-mezők
+        //    változtak a terméken, a rendelés kiszámolt értékeit (doboz,
+        //    raklap, anyagigény, bruttó súly, gyártási idő) újra kell számolni
+        //    a rendelt darabszámmal. Ez az, ami eddig hiányzott.
+        const calcChanged =
+          before.piecesPerBox !== after.piecesPerBox ||
+          before.boxesPerPallet !== after.boxesPerPallet ||
+          before.weightPerPiece !== after.weightPerPiece ||
+          before.cycleTime !== after.cycleTime ||
+          before.nestCount !== after.nestCount ||
+          before.surfaceTreatment !== after.surfaceTreatment
+
+        if (Object.keys(orderPatch).length > 0 || calcChanged) {
           const now = new Date().toISOString()
           let touched = 0
           setOrders((current) =>
             (current || []).map((o) => {
               if (o.productId !== selectedProduct.id) return o
               touched++
-              return { ...o, ...orderPatch, updatedAt: now }
+              const updated: Order = { ...o, ...orderPatch, updatedAt: now }
+              if (calcChanged) {
+                const amount = o.amountPc || 0
+                const boxes = computeBoxesCount(amount, after.piecesPerBox)
+                const pallets = computePalletsCount(boxes, after.boxesPerPallet)
+                updated.boxesCount = boxes
+                updated.palletsCount = pallets
+                updated.requiredMaterialKg = computeRequiredMaterialKg(amount, after.weightPerPiece)
+                updated.grossWeightKg = computeGrossWeightKg(amount, after.weightPerPiece, pallets)
+                updated.plannedProductionHours = computePlannedProductionHours(amount, undefined, after.cycleTime, after.nestCount)
+                updated.surfaceTreatment = after.surfaceTreatment || ''
+              }
+              return updated
             })
           )
           // Készlet: a termékhez kötött tételek neve/rajzszáma is kövesse
