@@ -1,4 +1,5 @@
 import { generateId } from '@/lib/generateId'
+import { APP_VERSION } from '@/version'
 import { useState, useMemo, useEffect, useRef, Suspense, useCallback, lazy } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { useEntityKV } from '@/hooks/useEntityKV'
@@ -2065,7 +2066,7 @@ function App() {
                     ProduktívPro
                   </span>
                   <span className="ml-2 align-middle text-xs font-mono font-normal text-muted-foreground">
-                    {import.meta.env.VITE_APP_VERSION || 'dev'}
+                    {import.meta.env.VITE_APP_VERSION || APP_VERSION}
                   </span>
                 </h1>
                 <p className="text-sm text-muted-foreground">Termelés Irányítási Rendszer</p>
