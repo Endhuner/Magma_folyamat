@@ -1132,6 +1132,34 @@ function App() {
           c.id === selectedCustomer.id ? { ...c, ...customerData } : c
         )
       )
+
+      // ── Cégnév átgyűrűztetése ──
+      // A rendelés / termék / készlet NÉV szerint kapcsolódik a vevőhöz, ezért
+      // átnevezéskor el kell vinni az új nevet minden hivatkozó rekordra,
+      // különben elszakad a kapcsolat (a rendelés "árván" marad a régi néven).
+      const oldName = before?.name?.trim()
+      const newName = customerData.name?.trim()
+      if (oldName && newName && oldName !== newName) {
+        const now = new Date().toISOString()
+        let touched = 0
+        setOrders((current) =>
+          (current || []).map((o) => {
+            if (o.customer?.trim() !== oldName) return o
+            touched++
+            return { ...o, customer: newName, updatedAt: now }
+          })
+        )
+        setProducts((current) =>
+          (current || []).map((p) => (p.customer?.trim() === oldName ? { ...p, customer: newName } : p))
+        )
+        setInventory((current) =>
+          (current || []).map((i) => (i.customer?.trim() === oldName ? { ...i, customer: newName, lastUpdated: now } : i))
+        )
+        if (touched > 0) {
+          toast.info(`A névváltozás átvezetve ${touched} rendelésre (+ termékek, készlet)`)
+        }
+      }
+
       if (before && after) {
         const changes = diffObjects(
           before as unknown as Record<string, unknown>,
@@ -1206,6 +1234,47 @@ function App() {
           p.id === selectedProduct.id ? { ...p, ...productData } : p
         )
       )
+
+      // ── Termékadat átgyűrűztetése a kötött rendelésekre / készletre ──
+      // A rendelés a termékből átmásolt mezőkkel dolgozik (a gyártás az élő
+      // findProductForOrder-t használja, de a rendelés-táblában eltárolt
+      // másolat különben elavulna). Csak a VALÓBAN megváltozott mezőket
+      // visszük át, hogy a rendelésen kézzel felülírt értékeket ne töröljük.
+      //   order.productName ← product.drawingNumber (rajzszám)
+      //   order.designation ← product.productName   (terméknév)
+      //   order.material    ← product.material
+      if (before && after) {
+        const orderPatch: Partial<Order> = {}
+        if (before.drawingNumber !== after.drawingNumber) orderPatch.productName = after.drawingNumber || ''
+        if (before.productName !== after.productName) orderPatch.designation = after.productName || ''
+        if (before.material !== after.material) orderPatch.material = after.material || ''
+
+        if (Object.keys(orderPatch).length > 0) {
+          const now = new Date().toISOString()
+          let touched = 0
+          setOrders((current) =>
+            (current || []).map((o) => {
+              if (o.productId !== selectedProduct.id) return o
+              touched++
+              return { ...o, ...orderPatch, updatedAt: now }
+            })
+          )
+          // Készlet: a termékhez kötött tételek neve/rajzszáma is kövesse
+          if (before.productName !== after.productName || before.drawingNumber !== after.drawingNumber) {
+            setInventory((current) =>
+              (current || []).map((i) =>
+                i.productId === selectedProduct.id
+                  ? { ...i, productName: after.productName || '', drawingNumber: after.drawingNumber || '', lastUpdated: now }
+                  : i
+              )
+            )
+          }
+          if (touched > 0) {
+            toast.info(`A termékmódosítás átvezetve ${touched} rendelésre`)
+          }
+        }
+      }
+
       if (before && after) {
         const changes = diffObjects(
           before as unknown as Record<string, unknown>,
