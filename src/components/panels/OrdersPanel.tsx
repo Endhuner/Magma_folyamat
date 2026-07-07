@@ -53,7 +53,6 @@ import {
   Funnel,
   Truck,
   FileText,
-  FilePdf,
   Tag,
   CaretDown,
   CaretUp,
@@ -525,71 +524,17 @@ export function OrdersPanel({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={handleExportDelivery}
-                    className="pl-6 gap-2 text-accent-foreground bg-accent/10 hover:bg-accent/20 focus:bg-accent/20"
+                    className="pl-6 gap-2 text-foreground bg-accent/10 hover:bg-accent/20 focus:bg-accent/20"
                   >
                     <Truck className="w-4 h-4" />
-                    Szállító (HTML)
+                    Szállítólevél készítés
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={handleExportCmr}
-                    className="pl-6 gap-2 text-secondary-foreground bg-secondary/10 hover:bg-secondary/20 focus:bg-secondary/20"
+                    className="pl-6 gap-2 text-foreground bg-secondary/10 hover:bg-secondary/20 focus:bg-secondary/20"
                   >
                     <FileText className="w-4 h-4" />
                     CMR (HTML)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={async () => {
-                      const { exportLabelsAsPDF } = await import('@/lib/labelExportFormats')
-                      await exportLabelsAsPDF(
-                        selectedOrders,
-                        customers || [],
-                        products || [],
-                        activeTemplate,
-                        labelTemplates || []
-                      )
-                    }}
-                    className="pl-6 gap-2 text-orange-700 bg-orange-50 hover:bg-orange-100 focus:bg-orange-100 dark:text-orange-300 dark:bg-orange-950/30 dark:hover:bg-orange-950/50"
-                  >
-                    <FilePdf className="w-4 h-4" />
-                    Címke export PDF-be
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled
-                    className="font-semibold text-foreground opacity-100 mt-1"
-                  >
-                    Címke készítés
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => setLabelPrintSettingsDialogOpen(true)}
-                    className="pl-6"
-                  >
-                    Címkék nyomtatása (beállítások)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      generateLabels(
-                        selectedOrders,
-                        customers || [],
-                        products || [],
-                        activeTemplate
-                      )
-                    }}
-                    className="pl-6"
-                  >
-                    Címkék generálása (HTML)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={async () => {
-                      await generateLabelsByCustomer(
-                        selectedOrders,
-                        customers || [],
-                        products || [],
-                        labelTemplates || []
-                      )
-                    }}
-                    className="pl-6"
-                  >
-                    Címkék vevőnként (külön fájlok)
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled
