@@ -2297,18 +2297,15 @@ function App() {
                   {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('users')}>
                     Felhasználók
                   </DropdownMenuItem>}
-                  <DropdownMenuSeparator />
+                  {auth.user?.role === 'admin' && <DropdownMenuSeparator />}
                   {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('reports')}>
                     Riportok
                   </DropdownMenuItem>}
-                  <DropdownMenuItem onSelect={() => setCurrentTab('production-history')}>
-                    Gyártás előzmények
-                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>}
 
-              {/* Dokumentumok — kimenő iratok és mentett fájlok */}
-              {auth.user?.role === 'admin' && <DropdownMenu>
+              {/* Dokumentumok — kimenő iratok, mentett fájlok, gyártás előzmények */}
+              {(auth.user?.role === 'admin' || auth.user?.role === 'operator') && <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2">
                     <FileText className="w-4 h-4" />
@@ -2317,11 +2314,15 @@ function App() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => setCurrentTab('documents')}>
+                  {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('documents')}>
                     Szállítólevelek / CMR
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setCurrentTab('saves')}>
+                  </DropdownMenuItem>}
+                  {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('saves')}>
                     Mentett fájlok
+                  </DropdownMenuItem>}
+                  {auth.user?.role === 'admin' && <DropdownMenuSeparator />}
+                  <DropdownMenuItem onSelect={() => setCurrentTab('production-history')}>
+                    Gyártás előzmények
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>}
