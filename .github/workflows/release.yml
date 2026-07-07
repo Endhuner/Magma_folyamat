@@ -58,7 +58,10 @@ jobs:
             MINOR="${SEMVER%.*}"
             TAGS="${IMAGE}:latest,${IMAGE}:${VERSION},${IMAGE}:${SEMVER},${IMAGE}:${MINOR}"
           else
-            VERSION="dev-${GITHUB_SHA::7}"
+            # main-ág: a kódban tárolt verziószámot (src/version.ts) használjuk,
+            # hogy a fejlécben tiszta v1.x.x látsszon (ne dev-<sha>).
+            VERSION=$(grep -oE "APP_VERSION *= *'[^']+'" src/version.ts | grep -oE "v[0-9]+\.[0-9]+\.[0-9]+")
+            [ -z "$VERSION" ] && VERSION="dev-${GITHUB_SHA::7}"
             TAGS="${IMAGE}:latest"
           fi
 
