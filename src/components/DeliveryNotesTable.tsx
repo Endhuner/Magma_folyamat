@@ -8,7 +8,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Card } from '@/components/ui/card'
 import { DeliveryNote, Order, Customer, Product, ColumnFilter } from '@/lib/types'
-import { Trash, FileText, FileCsv, Eye, FileArrowDown, MagnifyingGlass, X, PencilSimple, Funnel, CalendarBlank, TrendUp, Envelope, Package, Plus } from '@phosphor-icons/react'
+import { Trash, FileText, FileCsv, Eye, FileArrowDown, MagnifyingGlass, X, PencilSimple, Funnel, CalendarBlank, TrendUp, Envelope, Package, Plus, FilePdf } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 import { hu } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -28,10 +28,12 @@ interface DeliveryNotesTableProps {
   onEditExtraItems?: (note: DeliveryNote) => void
   /** Új szállítólevél/CMR készítése rendelés-kiválasztással. */
   onCreateNew?: () => void
+  /** PDF letöltés (szerver-oldali generálás + mentés a PDF-mappába). */
+  onDownloadPdf?: (note: DeliveryNote) => void
   visibleColumns?: string[]
 }
 
-function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, onDelete, onUpdate, onEditExtraItems, onCreateNew, visibleColumns }: DeliveryNotesTableProps) {
+function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, onDelete, onUpdate, onEditExtraItems, onCreateNew, onDownloadPdf, visibleColumns }: DeliveryNotesTableProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'delivery' | 'cmr'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all')
@@ -565,12 +567,23 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
                             )}
                           </Button>
                         )}
+                        {onDownloadPdf && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onDownloadPdf(note)}
+                            className="h-8 w-8 coarse:h-10 coarse:w-10 text-red-600"
+                            title="PDF letöltés (a szerver PDF-mappájába is menti)"
+                          >
+                            <FilePdf className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleReExport(note)}
                           className="h-8 w-8 coarse:h-10 coarse:w-10"
-                          title="Újra letöltés"
+                          title="Excel újra letöltés"
                         >
                           <FileArrowDown className="w-4 h-4" />
                         </Button>

@@ -30,7 +30,7 @@ import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { Order, OrderStatus, Customer, Product, DeliveryNote, ExtraDeliveryItem, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, MachineMaintenance, AppMessage, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
 import { diffObjects, buildAuditEntry, pruneAuditLog, AUDIT_LOG_MAX_ENTRIES } from '@/lib/auditLog'
-import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered, isInvoiced, isOverdue } from '@/lib/helpers'
+import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered, isInvoiced, isOverdue, generateDeliveryNoteSequenceNumber } from '@/lib/helpers'
 import {
   computeAutoFieldsForOrder,
   computeBoxesCount,
@@ -1634,39 +1634,31 @@ function App() {
     const type = note.type === 'cmr' ? 'CMR' : 'Szallitolevel'
     const filename = `${type}_${note.sequenceNumber}_${note.customer.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
 
-    try {
-      const token = document.cookie
-        .split(';')
-        .map(c => c.trim())
-        .find(c => c.startsWith('pp_session='))
-        ?.split('=')[1] ?? ''
-
-      const res = await fetch('/api/v1/generate-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: 'include',
-        body: JSON.stringify({ html, filename }),
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        toast.error(`PDF generálás sikertelen: ${(err as any).detail || res.statusText}`)
-        return
-      }
-
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.click()
-      URL.revokeObjectURL(url)
+    // 1) Frissen generált PDF (a szerver a /pdf-output mappába is menti)
+    const ok = await generateAndSavePdf(html, filename, true)
+    if (ok) {
       toast.success(`PDF letöltve: ${filename}`)
-    } catch (err) {
-      toast.error(`PDF generálás sikertelen: ${String(err)}`)
+      return
+    }
+
+    // 2) Tartalék: ha az újragenerálás nem ment, a KORÁBBAN mentett fájlt
+    //    töltjük le ugyanarról a helyről (PDF_OUTPUT_DIR).
+    try {
+      const res = await fetch(`/api/v1/pdf-file/${encodeURIComponent(filename)}`, { credentials: 'include' })
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        a.click()
+        URL.revokeObjectURL(url)
+        toast.success(`PDF letöltve a mentett fájlból: ${filename}`)
+      } else {
+        toast.error('A PDF újragenerálása nem sikerült, és mentett fájl sincs a szerver PDF-mappájában.')
+      }
+    } catch {
+      toast.error('A PDF letöltése nem sikerült.')
     }
   }
 
@@ -1820,40 +1812,150 @@ function App() {
     setIssueDateDialogOpen(true)
   }
   
+  /**
+   * PDF generálás + szerver-oldali mentés (a /pdf-output mappába). Ha `download`,
+   * a böngészőbe is letölti. Visszaadja, sikerült-e.
+   */
+  const generateAndSavePdf = async (html: string, filename: string, download: boolean): Promise<boolean> => {
+    try {
+      const token = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('pp_session='))?.split('=')[1] ?? ''
+      const res = await fetch('/api/v1/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        credentials: 'include',
+        body: JSON.stringify({ html, filename }),
+      })
+      if (!res.ok) return false
+      if (download) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url)
+      }
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * A CMR-hez automatikusan létrehozza a szállítólevél REKORDOT is (saját
+   * sorszámmal) + PDF-et ment a szerverre. NEM állítja az order mezőket —
+   * azt a hívó teszi (a cmr + deliveryNote EGY setOrders-ben, hogy ne
+   * versenyezzenek). Visszaadja a szállítólevél sorszámát.
+   */
+  const autoCreateDeliveryNoteRecord = async (selectedOrders: Order[], issueDate: string): Promise<string> => {
+    const seq = generateDeliveryNoteSequenceNumber(deliveryNotes || [], 'delivery')
+    const firstCustomer = selectedOrders[0]?.customer || 'export'
+    const fileName = `Szallitolevel_${seq}_${firstCustomer.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
+    const now = new Date().toISOString()
+
+    deliveryNotesApi.add({
+      id: generateId(),
+      type: 'delivery',
+      sequenceNumber: seq,
+      customer: firstCustomer,
+      orderIds: selectedOrders.map(o => o.id),
+      fileName,
+      exportDate: now,
+      issueDate,
+      createdAt: now,
+      updatedAt: now,
+    } as DeliveryNote)
+
+    const html = getDeliveryHtml(
+      selectedOrders, customers || [], products || [], deliveryNotes || [],
+      undefined, seq, savedTemplates, activeTemplates, issueDate
+    )
+    const ok = await generateAndSavePdf(html, fileName, false)
+    toast.success(ok ? `Szállítólevél is elkészült: ${seq}` : `Szállítólevél létrehozva (${seq}) — PDF mentése kihagyva`)
+    return seq
+  }
+
   const executeCmrExport = async (issueDate?: string) => {
     const selectedOrders = (orders || []).filter(o => selectedOrderIds.includes(o.id))
+    const orderIds = selectedOrders.map(o => o.id)
+    const iso = issueDate ?? new Date().toISOString().slice(0, 10)
 
+    // 1) Automatikus szállítólevél-rekord + PDF (a sorszám előre kell a közös
+    //    order-frissítéshez)
+    const deliveryNoteSeq = await autoCreateDeliveryNoteRecord(selectedOrders, iso)
+
+    // 2) CMR generálás (nyomtatás-ablak + rekord). Az order-mezőket NEM itt
+    //    állítjuk — lásd lent az EGYETLEN setOrders-t (különben a több
+    //    párhuzamos PATCH last-write-wins alapon felülírná egymást).
+    let cmrSeq = ''
     await exportCmrAsHtml(
       selectedOrders,
       customers || [],
       products || [],
       deliveryNotes || [],
       (deliveryNote, sequenceNumber) => {
-        const newNote = {
+        const now = new Date().toISOString()
+        deliveryNotesApi.add({
           ...deliveryNote,
           id: generateId(),
           sequenceNumber: sequenceNumber || '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-        deliveryNotesApi.add(newNote as DeliveryNote)
-
-        if (sequenceNumber) {
-          const orderIdsToUpdate = selectedOrders.map(o => o.id)
-          setOrders((current) =>
-            (current || []).map(o =>
-              orderIdsToUpdate.includes(o.id)
-                ? { ...o, cmr: sequenceNumber, updatedAt: new Date().toISOString() }
-                : o
-            )
-          )
-        }
+          createdAt: now,
+          updatedAt: now,
+        } as DeliveryNote)
+        cmrSeq = sequenceNumber || ''
       },
       cmrSettings,
       savedTemplates,
       activeTemplates,
       issueDate ?? undefined
     )
+
+    // Az order-mezők commit-ja: cmr + deliveryNote + status EGY setOrders-ben,
+    // + audit a státuszváltásról. A készletlevonás UTÁN fut (a dialógus
+    // megerősítésekor vagy csendes levonásnál közvetlenül), így pontosan egy
+    // PATCH megy az egyes rendelésekre — nincs versenyhelyzet.
+    const commitOrderFields = () => {
+      const now = new Date().toISOString()
+      selectedOrders.forEach((o) => {
+        if (o.status !== 'Kiszállítva') {
+          appendAudit('order', 'Rendelés', o.id, o.orderNumber || o.productName || o.id, 'status', {
+            changes: [{ field: 'status', label: 'Státusz', before: o.status, after: 'Kiszállítva' }],
+            notes: `${o.customer} · ${o.productName}${cmrSeq ? ` · CMR ${cmrSeq}` : ''}`,
+          })
+        }
+      })
+      setOrders((current) =>
+        (current || []).map(o =>
+          orderIds.includes(o.id)
+            ? { ...o, cmr: cmrSeq || o.cmr, deliveryNote: deliveryNoteSeq, status: 'Kiszállítva' as OrderStatus, updatedAt: now }
+            : o
+        )
+      )
+    }
+
+    // 3) Készletlevonás a szállítólevéllel AZONOS módon: teljes fedezetnél
+    //    csendben levonunk, hiánynál megerősítő dialógus (a
+    //    hasExistingShipmentDeduction őrzi, hogy ne vonjon le kétszer).
+    if (orderIds.length > 0) {
+      const ordersForDeduction = selectedOrders.filter(
+        (o) => !hasExistingShipmentDeduction(o.id) && !isDelivered(o.status)
+      )
+      if (ordersForDeduction.length > 0) {
+        const deductionResult = deductInventoryForOrders(ordersForDeduction, inventory || [], products || [])
+        const needsConfirmation =
+          deductionResult.failedItems.length > 0 ||
+          deductionResult.deductedItems.some((d) => d.shortage > 0)
+        if (needsConfirmation) {
+          setPendingDeductionResult(deductionResult)
+          setDeductionContext('CMR + szállítólevél')
+          setPendingStatusChange(null)
+          // A levonás megerősítése UTÁN egyetlen setOrders-ben commitoljuk a mezőket.
+          setPendingPostDeduction(() => commitOrderFields)
+          setInventoryDeductionDialogOpen(true)
+          return // a dialógus megerősítése végzi a levonást + a commit-ot
+        }
+        if (deductionResult.deductedItems.length > 0) {
+          commitInventoryDeduction(deductionResult, setInventory, setInventoryTransactions)
+        }
+      }
+      commitOrderFields()
+    }
   }
 
   const handleValidationContinue = async () => {
@@ -2195,18 +2297,15 @@ function App() {
                   {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('users')}>
                     Felhasználók
                   </DropdownMenuItem>}
-                  <DropdownMenuSeparator />
+                  {auth.user?.role === 'admin' && <DropdownMenuSeparator />}
                   {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('reports')}>
                     Riportok
                   </DropdownMenuItem>}
-                  <DropdownMenuItem onSelect={() => setCurrentTab('production-history')}>
-                    Gyártás előzmények
-                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>}
 
-              {/* Dokumentumok — kimenő iratok és mentett fájlok */}
-              {auth.user?.role === 'admin' && <DropdownMenu>
+              {/* Dokumentumok — kimenő iratok, mentett fájlok, gyártás előzmények */}
+              {(auth.user?.role === 'admin' || auth.user?.role === 'operator') && <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2">
                     <FileText className="w-4 h-4" />
@@ -2215,11 +2314,15 @@ function App() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => setCurrentTab('documents')}>
+                  {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('documents')}>
                     Szállítólevelek / CMR
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setCurrentTab('saves')}>
+                  </DropdownMenuItem>}
+                  {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('saves')}>
                     Mentett fájlok
+                  </DropdownMenuItem>}
+                  {auth.user?.role === 'admin' && <DropdownMenuSeparator />}
+                  <DropdownMenuItem onSelect={() => setCurrentTab('production-history')}>
+                    Gyártás előzmények
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>}
@@ -2514,6 +2617,7 @@ function App() {
               onUpdate={handleUpdateDeliveryNote}
               onEditExtraItems={setExtraItemsNote}
               onCreateNew={() => setCreateNoteDialogOpen(true)}
+              onDownloadPdf={handleDownloadPdf}
             />
           </TabsContent>
 

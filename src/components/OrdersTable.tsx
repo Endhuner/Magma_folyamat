@@ -65,6 +65,14 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
     return visibleColumns.includes(columnId)
   }
 
+  // Termék-térkép id szerint — a megnevezést/rajzszámot az ÉLŐ termékből
+  // olvassuk (mint a címke), nem a rendelésbe régen bemásolt értékből, így a
+  // termék szerkesztése azonnal helyesen látszik a táblázatban is.
+  const productById = useMemo(
+    () => new Map((products ?? []).map((p) => [p.id, p])),
+    [products]
+  )
+
   const sortedOrders = useMemo(() => {
     if (!sortField) return orders
 
@@ -222,6 +230,8 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
             </TableHeader>
             <TableBody>
               {visibleOrders.map((order) => {
+                // Élő termék a megnevezés/rajzszám kijelzéséhez (fallback: tárolt érték)
+                const liveProduct = order.productId ? productById.get(order.productId) : undefined
                 return (
                   <TableRow
                     key={order.id}
@@ -235,8 +245,8 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
                       />
                     </TableCell>
                     {isColumnVisible('customer') && <TableCell className="font-medium">{order.customer}</TableCell>}
-                    {isColumnVisible('productName') && <TableCell>{order.productName}</TableCell>}
-                    {isColumnVisible('designation') && <TableCell>{order.designation}</TableCell>}
+                    {isColumnVisible('productName') && <TableCell>{liveProduct?.drawingNumber || order.productName}</TableCell>}
+                    {isColumnVisible('designation') && <TableCell>{liveProduct?.productName || order.designation}</TableCell>}
                   {isColumnVisible('notes') && <TableCell className="max-w-[200px]">
                     <div className="truncate" title={order.notes}>{order.notes}</div>
                   </TableCell>}
