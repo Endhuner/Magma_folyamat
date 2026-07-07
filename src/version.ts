@@ -7,4 +7,4 @@
  * (pl. sima :latest deploy), akkor ez a szám látszik — tehát tag nélkül is
  * mindig van értelmes verzió a fejlécben.
  */
-export const APP_VERSION = 'v1.44.1'
+export const APP_VERSION = 'v1.44.2'

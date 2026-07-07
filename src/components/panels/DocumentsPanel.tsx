@@ -175,6 +175,7 @@ export function DocumentsPanel({
             onUpdate={handleUpdateDeliveryNote}
             onEditExtraItems={onEditExtraItems}
             onCreateNew={onCreateNew}
+            onDownloadPdf={handleDownloadPdf}
             visibleColumns={
               activeFilterId
                 ? documentFilters?.find((f) => f.id === activeFilterId)?.columns
