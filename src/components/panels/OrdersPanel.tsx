@@ -63,7 +63,9 @@ import {
   Export,
   Package,
   ChartBar,
+  Pencil,
 } from '@phosphor-icons/react'
+import { OrderColumnFilterDialog } from '@/components/OrderColumnFilterDialog'
 import { toast } from 'sonner'
 import { OrdersTable } from '@/components/OrdersTable'
 import {
@@ -193,6 +195,8 @@ export function OrdersPanel({
 }: OrdersPanelProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
+  /** Épp szerkesztés alatt álló mentett oszlopszűrő (null = a dialógus zárva). */
+  const [editingFilter, setEditingFilter] = useState<OrderColumnFilter | null>(null)
   const activeTemplate = labelTemplates?.find((t) => t.id === activeLabelTemplateId)
   const selectedOrders = (orders || []).filter((o) => selectedOrderIds.includes(o.id))
 
@@ -488,18 +492,30 @@ export function OrdersPanel({
           </Button>
 
           {activeOrderFilterId && (
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setOrderColumnFilters((current) =>
-                  (current || []).filter((f) => f.id !== activeOrderFilterId)
-                )
-                setActiveOrderFilterId(null)
-                toast.success('Szűrő törölve')
-              }}
-            >
-              Szűrő törlése
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const filter = orderColumnFilters?.find((f) => f.id === activeOrderFilterId)
+                  if (filter) setEditingFilter(filter)
+                }}
+              >
+                <Pencil className="w-4 h-4 mr-2" />
+                Szűrő szerkesztése
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setOrderColumnFilters((current) =>
+                    (current || []).filter((f) => f.id !== activeOrderFilterId)
+                  )
+                  setActiveOrderFilterId(null)
+                  toast.success('Szűrő törölve')
+                }}
+              >
+                Szűrő törlése
+              </Button>
+            </>
           )}
         </div>
 
@@ -692,6 +708,22 @@ export function OrdersPanel({
           )}
         </div>
       </div>
+
+      {/* Mentett oszlopszűrő szerkesztése — ugyanaz a dialógus, mint az "Új szűrő",
+          csak a meglévő szűrő értékeivel előtöltve, és mentéskor felülír. */}
+      <OrderColumnFilterDialog
+        open={editingFilter !== null}
+        initialFilter={editingFilter}
+        onClose={() => setEditingFilter(null)}
+        onSave={({ name, columns }) => {
+          setOrderColumnFilters((current) =>
+            (current || []).map((f) =>
+              f.id === editingFilter?.id ? { ...f, name, columns } : f
+            )
+          )
+          toast.success(`Szűrő módosítva: ${name}`)
+        }}
+      />
 
       <OrdersTable
         orders={filteredOrders}

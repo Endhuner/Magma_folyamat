@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,8 @@ interface OrderColumnFilterDialogProps {
   open: boolean
   onClose: () => void
   onSave: (filter: { name: string; columns: string[] }) => void
+  /** Ha meg van adva, a dialógus szerkesztő módban nyílik ennek az értékeivel. */
+  initialFilter?: { name: string; columns: string[] } | null
 }
 
 const AVAILABLE_COLUMNS = [
@@ -38,9 +40,18 @@ const AVAILABLE_COLUMNS = [
   { id: 'status', label: 'Státusz' },
 ]
 
-export function OrderColumnFilterDialog({ open, onClose, onSave }: OrderColumnFilterDialogProps) {
+export function OrderColumnFilterDialog({ open, onClose, onSave, initialFilter }: OrderColumnFilterDialogProps) {
   const [filterName, setFilterName] = useState('')
   const [selectedColumns, setSelectedColumns] = useState<string[]>(AVAILABLE_COLUMNS.map(c => c.id))
+  const isEditing = !!initialFilter
+
+  // Nyitáskor töltsük be a szerkesztendő szűrő értékeit (vagy az alapállapotot).
+  useEffect(() => {
+    if (open) {
+      setFilterName(initialFilter?.name ?? '')
+      setSelectedColumns(initialFilter?.columns ?? AVAILABLE_COLUMNS.map(c => c.id))
+    }
+  }, [open, initialFilter])
 
   const toggleColumn = (columnId: string) => {
     if (selectedColumns.includes(columnId)) {
@@ -83,7 +94,7 @@ export function OrderColumnFilterDialog({ open, onClose, onSave }: OrderColumnFi
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Új Oszlop Szűrő Létrehozása</DialogTitle>
+          <DialogTitle>{isEditing ? 'Oszlop szűrő szerkesztése' : 'Új Oszlop Szűrő Létrehozása'}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
@@ -141,7 +152,7 @@ export function OrderColumnFilterDialog({ open, onClose, onSave }: OrderColumnFi
             Mégse
           </Button>
           <Button onClick={handleSave} disabled={!filterName.trim() || selectedColumns.length === 0}>
-            Szűrő mentése
+            {isEditing ? 'Módosítások mentése' : 'Szűrő mentése'}
           </Button>
         </DialogFooter>
       </DialogContent>

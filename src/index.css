@@ -153,3 +153,30 @@
     color: var(--destructive);
   }
 }
+
+/* ── Rögzített (sticky) oszlop — Rendelések tábla "Termék neve" ──
+   Vízszintes görgetésnél a bal szélre tapad; a cella saját hátteret kap,
+   hogy az alá csúszó oszlopok ne látsszanak át. A csíkozás/hover színek a
+   sor Tailwind-osztályaival azonos CSS-változókból jönnek (dark-safe). */
+th.pinned-col,
+td.pinned-col {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: var(--background);
+  box-shadow: 4px 0 6px -4px oklch(0 0 0 / 0.25);
+}
+tr:nth-child(even) > td.pinned-col {
+  background: var(--row-stripe);
+}
+tr:hover > td.pinned-col {
+  background: var(--row-hover);
+}
+
+/* A rendelések táblánál a shadcn <Table> belső wrappere (overflow-x-auto)
+   külön scroll-konténer lenne, így a sticky oszlop hozzá képest tapadna —
+   ami sosem görget, mert a tényleges görgetés a külső ScrollArea-ban
+   történik. Ezért itt kikapcsoljuk, a sticky a ScrollArea-hoz igazodik. */
+.pin-scroll-host [data-slot="table-container"] {
+  overflow: visible;
+}
