@@ -154,16 +154,20 @@
   }
 }
 
-/* ── Rögzített (sticky) oszlop — Rendelések tábla "Termék neve" ──
-   Vízszintes görgetésnél a bal szélre tapad; a cella saját hátteret kap,
-   hogy az alá csúszó oszlopok ne látsszanak át. A csíkozás/hover színek a
-   sor Tailwind-osztályaival azonos CSS-változókból jönnek (dark-safe). */
+/* ── Rögzített (sticky) oszlopok — Rendelések tábla ──
+   Vízszintes görgetésnél a bal szélre tapadnak; több rögzített oszlop
+   egymás mellé áll (a `left` offszetet a komponens méri és inline adja).
+   A cella saját hátteret kap, hogy az alá csúszó oszlopok ne látsszanak át;
+   a csíkozás/hover színek a sor Tailwind-osztályaival azonos
+   CSS-változókból jönnek (dark-safe). Árnyék csak az utolsón. */
 th.pinned-col,
 td.pinned-col {
   position: sticky;
-  left: 0;
   z-index: 5;
   background: var(--background);
+}
+th.pinned-col-last,
+td.pinned-col-last {
   box-shadow: 4px 0 6px -4px oklch(0 0 0 / 0.25);
 }
 tr:nth-child(even) > td.pinned-col {
