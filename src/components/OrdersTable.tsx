@@ -4,10 +4,11 @@ import { getPlannedHoursForOrder } from '@/lib/orderService'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Pencil, Trash, Package, CopySimple } from '@phosphor-icons/react'
+import { Pencil, Trash, Package, CopySimple, PushPin } from '@phosphor-icons/react'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ORDERS_TABLE_PAGE_SIZE, VIRTUAL_ROW_STYLE } from '@/lib/virtualRow'
+import { useKV } from '@/hooks/useKV'
 
 interface OrdersTableProps {
   orders: Order[]
@@ -59,6 +60,12 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
    * megvédi a felhasználót.
    */
   const [showAll, setShowAll] = useState(false)
+
+  /**
+   * "Termék neve" oszlop rögzítése: vízszintes görgetésnél a bal szélre
+   * tapad (CSS: .pinned-col az index.css-ben). Perzisztens, gépenként.
+   */
+  const [pinnedProductCol, setPinnedProductCol] = useKV<boolean>('orders-pinned-product-column', false)
 
   const isColumnVisible = (columnId: string) => {
     if (!visibleColumns || visibleColumns.length === 0) return true
@@ -192,7 +199,7 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
 
 
       <div className="border rounded-lg mb-4">
-        <ScrollArea className="w-full whitespace-nowrap">
+        <ScrollArea className="w-full whitespace-nowrap pin-scroll-host">
           <Table>
             <TableHeader>
               <TableRow>
@@ -203,7 +210,31 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
                   />
                 </TableHead>
                 {isColumnVisible('customer') && <TableHead className="cursor-pointer" onClick={() => handleSort('customer')}>Vevő</TableHead>}
-                {isColumnVisible('productName') && <TableHead className="cursor-pointer" onClick={() => handleSort('productName')}>Termék neve</TableHead>}
+                {isColumnVisible('productName') && (
+                  <TableHead
+                    className={pinnedProductCol ? 'cursor-pointer pinned-col' : 'cursor-pointer'}
+                    onClick={() => handleSort('productName')}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      Termék neve
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        title={pinnedProductCol ? 'Oszlop rögzítésének feloldása' : 'Oszlop rögzítése görgetéskor'}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setPinnedProductCol((v) => !v)
+                        }}
+                      >
+                        <PushPin
+                          className={pinnedProductCol ? 'w-4 h-4 text-accent' : 'w-4 h-4 text-muted-foreground'}
+                          weight={pinnedProductCol ? 'fill' : 'regular'}
+                        />
+                      </Button>
+                    </span>
+                  </TableHead>
+                )}
                 {isColumnVisible('designation') && <TableHead className="cursor-pointer" onClick={() => handleSort('designation')}>Megnevezése</TableHead>}
                 {isColumnVisible('notes') && <TableHead>Megjegyzés</TableHead>}
                 {isColumnVisible('pos') && <TableHead className="cursor-pointer" onClick={() => handleSort('pos')}>Pos</TableHead>}
@@ -245,7 +276,7 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
                       />
                     </TableCell>
                     {isColumnVisible('customer') && <TableCell className="font-medium">{order.customer}</TableCell>}
-                    {isColumnVisible('productName') && <TableCell>{liveProduct?.drawingNumber || order.productName}</TableCell>}
+                    {isColumnVisible('productName') && <TableCell className={pinnedProductCol ? 'pinned-col' : undefined}>{liveProduct?.drawingNumber || order.productName}</TableCell>}
                     {isColumnVisible('designation') && <TableCell>{liveProduct?.productName || order.designation}</TableCell>}
                   {isColumnVisible('notes') && <TableCell className="max-w-[200px]">
                     <div className="truncate" title={order.notes}>{order.notes}</div>
