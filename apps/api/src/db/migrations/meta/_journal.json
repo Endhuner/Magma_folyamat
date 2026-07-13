@@ -127,6 +127,62 @@
       "when": 1748700000000,
       "tag": "0017_message_order_link",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1783900000000,
+      "tag": "0018_quotes",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1783990000000,
+      "tag": "0019_price_lists",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1784000000000,
+      "tag": "0020_attendance",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1784010000000,
+      "tag": "0021_product_datasheets",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1784020000000,
+      "tag": "0022_filled_forms",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1784030000000,
+      "tag": "0023_order_label_flags",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1784040000000,
+      "tag": "0024_delivery_recipient",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1784050000000,
+      "tag": "0025_user_skin",
+      "breakpoints": true
     }
   ]
 }

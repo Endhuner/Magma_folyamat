@@ -74,6 +74,10 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
   const [productSearchQuery, setProductSearchQuery] = useState('')
   const [showCustomerList, setShowCustomerList] = useState(false)
   const [showProductList, setShowProductList] = useState(false)
+  // Mező melletti hibaüzenetek a kötelező vevő/termék mezőkhöz + piszkos-űrlap
+  // védelem: félrekoppintásra/Esc-re ne vesszen el szó nélkül a kitöltött űrlap.
+  const [fieldErrors, setFieldErrors] = useState<{ customer?: string; product?: string }>({})
+  const initialFormRef = useRef('')
 
   // A két kereső-legördülő dobozának külső kerete — ehhez mérjük, hogy a
   // kattintás/koppintás kívülre esett-e (akkor zárjuk a listát).
@@ -147,38 +151,44 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
   }, [formData.customer, products, productSearchQuery])
 
   useEffect(() => {
-    if (order) {
-      setFormData(order)
-    } else {
-      setFormData({
-        customer: '',
-        productName: '',
-        designation: '',
-        notes: '',
-        pos: null,
-        ownOrderNumber: generateOwnOrderNumber(orders),
-        material: '',
-        orderNumber: '',
-        amountPc: 0,
-        orderDate: dateToYMD(new Date()),
-        requiredDate: dateToYMD(new Date()),
-        pickupDate: '',
-        surfaceTreatment: '',
-        boxesCount: null,
-        palletsCount: null,
-        grossWeightKg: '',
-        requiredMaterialKg: '',
-        plannedProductionHours: '',
-        deliveryNote: '',
-        cmr: '',
-        status: 'Felvéve',
-      })
+    const next: Partial<Order> = order ?? {
+      customer: '',
+      productName: '',
+      designation: '',
+      notes: '',
+      pos: null,
+      ownOrderNumber: generateOwnOrderNumber(orders),
+      material: '',
+      orderNumber: '',
+      amountPc: 0,
+      orderDate: dateToYMD(new Date()),
+      requiredDate: dateToYMD(new Date()),
+      pickupDate: '',
+      surfaceTreatment: '',
+      boxesCount: null,
+      palletsCount: null,
+      grossWeightKg: '',
+      requiredMaterialKg: '',
+      plannedProductionHours: '',
+      deliveryNote: '',
+      cmr: '',
+      status: 'Felvéve',
     }
+    setFormData(next)
+    initialFormRef.current = JSON.stringify(next)
+    setFieldErrors({})
     setCustomerSearchQuery('')
     setProductSearchQuery('')
     setShowCustomerList(false)
     setShowProductList(false)
   }, [order, open, orders])
+
+  /** Bezárás-kérés: kitöltött (piszkos) űrlapnál megerősítést kér. */
+  const requestClose = () => {
+    const dirty = JSON.stringify(formData) !== initialFormRef.current
+    if (dirty && !window.confirm('Elveted a módosításokat?')) return
+    onClose()
+  }
 
   const handleCustomerSelect = (customerName: string) => {
     setFormData({
@@ -196,6 +206,7 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
     setShowCustomerList(false)
     setCustomerSearchQuery('')
     setProductSearchQuery('')
+    setFieldErrors((prev) => ({ ...prev, customer: undefined }))
   }
 
   const handleProductSelect = (productValue: string) => {
@@ -214,11 +225,23 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
     }))
     setShowProductList(false)
     setProductSearchQuery('')
+    setFieldErrors((prev) => ({ ...prev, product: undefined }))
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
+    // Kötelező mezők: a csillag eddig csak dísz volt — begépelt, de ki nem
+    // választott vevőnél a formData.customer üres, és a rendelés vevő nélkül
+    // jönne létre (utána egyetlen vevő-alapú szűrésben sem található).
+    const errors: { customer?: string; product?: string } = {}
+    if (!formData.customer) errors.customer = 'Válassz vevőt a listából!'
+    if (!formData.productName) errors.product = 'Válassz terméket a listából!'
+    if (errors.customer || errors.product) {
+      setFieldErrors(errors)
+      return
+    }
+
     const autoFields = computeAutoFieldsForOrder(
       formData.customer || '',
       formData.productName || '',
@@ -236,7 +259,7 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) requestClose() }}>
       <DialogContent className="max-w-5xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>{order ? 'Rendelés Szerkesztése' : 'Új Rendelés'}</DialogTitle>
@@ -267,6 +290,14 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
                           setShowCustomerList(true)
                         }}
                         onFocus={() => setShowCustomerList(true)}
+                        onKeyDown={(e) => {
+                          // Enter a keresőben: ne süsse el a formot (üres vevővel
+                          // mentene) — helyette az első találatot választja ki.
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            if (customerOptions.length > 0) handleCustomerSelect(customerOptions[0])
+                          }
+                        }}
                         className="pl-10"
                       />
                     </div>
@@ -297,6 +328,9 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
                     )}
                   </div>
                 )}
+                {fieldErrors.customer && (
+                  <p className="text-sm text-destructive" role="alert">{fieldErrors.customer}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -321,6 +355,12 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
                           setShowProductList(true)
                         }}
                         onFocus={() => formData.customer && setShowProductList(true)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            if (productOptions.length > 0) handleProductSelect(productOptions[0].value)
+                          }
+                        }}
                         className="pl-10"
                         disabled={!formData.customer}
                       />
@@ -362,6 +402,9 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
                       </Card>
                     )}
                   </div>
+                )}
+                {fieldErrors.product && (
+                  <p className="text-sm text-destructive" role="alert">{fieldErrors.product}</p>
                 )}
               </div>
 
@@ -483,7 +526,7 @@ export function OrderDialog({ open, onClose, onSave, order, customers, products,
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t">
-              <Button type="button" variant="secondary" onClick={onClose}>
+              <Button type="button" variant="secondary" onClick={requestClose}>
                 Mégse
               </Button>
               <Button type="submit">

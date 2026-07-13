@@ -1,8 +1,13 @@
-import { TabsContent } from '@/components/ui/tabs'
 import { SimpleListView, SimpleColumnDef } from '@/components/SimpleListView'
 import { Database } from '@phosphor-icons/react'
+import { SKINS } from '@/components/SkinSelect'
 import type { User } from '@/lib/types'
 import type { useAuth } from '@/lib/auth'
+
+/** '' = alap skin; a Radix Select nem enged üres value-t, ezért az 'alap'
+ *  sentinel-t használjuk a táblában (a mentéskor '' lesz belőle). */
+const SKIN_BASE = 'alap'
+const skinName = (id: string) => SKINS.find((s) => s.id === (id || ''))?.name ?? 'Alap'
 
 interface UsersPanelProps {
   users: User[]
@@ -62,12 +67,26 @@ const userColumns: SimpleColumnDef[] = [
       raw === 'false' || raw === 'Nem' ? 'Nem' : 'Igen',
     defaultValue: 'Igen',
   },
+  {
+    key: 'skin',
+    label: 'Megjelenés',
+    type: 'select',
+    options: [
+      { value: SKIN_BASE, label: 'Alap' },
+      ...SKINS.filter((s) => s.id).map((s) => ({ value: s.id, label: s.name })),
+    ],
+    minWidth: 150,
+    // Tárolt '' → 'alap' a szerkesztő-selecthez; a táblában a skin nevét mutatjuk.
+    parseValue: (raw) => raw || SKIN_BASE,
+    formatCell: (v) => skinName(v),
+    defaultValue: SKIN_BASE,
+  },
   { key: 'notes', label: 'Megjegyzés', type: 'textarea', minWidth: 240, truncate: true },
 ]
 
 export function UsersPanel({ users, usersLoading, auth, onSave, onDelete }: UsersPanelProps) {
   return (
-    <TabsContent value="users" className="space-y-6">
+    <section className="space-y-6">
       <SimpleListView<User>
         title="Felhasználók"
         description={
@@ -96,6 +115,6 @@ export function UsersPanel({ users, usersLoading, auth, onSave, onDelete }: User
           delete: 'Felhasználó törölve',
         }}
       />
-    </TabsContent>
+    </section>
   )
 }

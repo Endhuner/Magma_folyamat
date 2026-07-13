@@ -11,6 +11,8 @@ import { ORDERS_TABLE_PAGE_SIZE, VIRTUAL_ROW_STYLE } from '@/lib/virtualRow'
 import { useKV } from '@/hooks/useKV'
 import { kvStore } from '@/lib/kvStore'
 import { cn } from '@/lib/utils'
+import { buildProductIndex, pricesForOrder, type OrderPiecePrices } from '@/lib/materialPriceCalc'
+import type { PriceList } from '@/lib/types'
 
 interface OrdersTableProps {
   orders: Order[]
@@ -22,6 +24,8 @@ interface OrdersTableProps {
   selectedIds: string[]
   onSelectionChange: (ids: string[]) => void
   visibleColumns?: string[]
+  /** Vevői árlisták — az aktuális darabár és a rendelt érték oszlopokhoz. */
+  priceLists?: PriceList[]
   /** Becsült alapanyag-készlet (kg) — az összesítő sáv fedezet-jelzéséhez. */
   materialEstimateKg?: number | null
 }
@@ -65,6 +69,9 @@ const COLUMNS: Array<{ id: string; label: string; sortable?: boolean; headClass?
   { id: 'material', label: 'Anyag' },
   { id: 'orderNumber', label: 'Vevő rendelési száma' },
   { id: 'amountPc', label: 'Mennyiség (db)' },
+  { id: 'currentUnitPrice', label: 'Aktuális ár (€/db)', sortable: false },
+  { id: 'currentValue', label: 'Rendelt érték (€)', sortable: false },
+  { id: 'currentLaborValue', label: 'Rendelt munkadíj (€)', sortable: false },
   { id: 'orderDate', label: 'Rendelés dátuma' },
   { id: 'requiredDate', label: 'Szükséges szállítási dátum' },
   { id: 'pickupDate', label: 'CMR / Szállítólevél dátuma' },
@@ -81,7 +88,7 @@ const COLUMNS: Array<{ id: string; label: string; sortable?: boolean; headClass?
   { id: 'status', label: 'Státusz', sortable: false, headClass: 'min-w-[200px]' },
 ]
 
-function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onStatusChange, selectedIds, onSelectionChange, visibleColumns, materialEstimateKg }: OrdersTableProps) {
+function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onStatusChange, selectedIds, onSelectionChange, visibleColumns, materialEstimateKg, priceLists }: OrdersTableProps) {
   const [sortField, setSortField] = useState<keyof Order | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   /**
@@ -226,12 +233,36 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
     }
   }
 
+  // Rendelésenkénti aktuális darabár a vevői árlistákból (élő termék-súllyal).
+  const priceByOrderId = useMemo(() => {
+    const map = new Map<string, OrderPiecePrices>()
+    if (!priceLists || priceLists.length === 0) return map
+    const idx = buildProductIndex(products || [])
+    for (const o of orders) {
+      const prices = pricesForOrder(o, priceLists, idx)
+      if (prices != null) map.set(o.id, prices)
+    }
+    return map
+  }, [orders, products, priceLists])
+
   const summary = useMemo(() => {
     const ordersToSummarize = selectedIds.length > 0 
       ? sortedOrders.filter(o => selectedIds.includes(o.id))
       : sortedOrders
     
     const totalAmount = ordersToSummarize.reduce((sum, o) => sum + (o.amountPc || 0), 0)
+    // Rendelt érték: aktuális darabár × mennyiség (csak az áras rendeléseknél).
+    let totalValueEur = 0
+    let totalLaborEur = 0
+    let pricedCount = 0
+    for (const o of ordersToSummarize) {
+      const price = priceByOrderId.get(o.id)
+      if (price != null && o.amountPc) {
+        totalValueEur += price.currentPerPiece * o.amountPc
+        totalLaborEur += price.laborPerPiece * o.amountPc
+        pricedCount++
+      }
+    }
     const totalBoxes = ordersToSummarize.reduce((sum, o) => sum + (o.boxesCount || 0), 0)
     const totalPallets = ordersToSummarize.reduce((sum, o) => sum + (o.palletsCount || 0), 0)
     
@@ -255,6 +286,9 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
     
     return {
       count: ordersToSummarize.length,
+      totalValueEur,
+      totalLaborEur,
+      pricedCount,
       totalAmount,
       totalBoxes,
       totalPallets,
@@ -262,7 +296,7 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
       totalRequiredMaterial: totalRequiredMaterial.toFixed(1) + ' kg',
       totalPlannedHours: Math.round(totalPlannedHours) + ' óra',
     }
-  }, [sortedOrders, selectedIds])
+  }, [sortedOrders, selectedIds, priceByOrderId])
 
   if (sortedOrders.length === 0) {
     return (
@@ -351,6 +385,9 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
                   {isColumnVisible('material') && <TableCell className={pinCls('material')} style={pinStyle('material')}>{order.material}</TableCell>}
                   {isColumnVisible('orderNumber') && <TableCell className={cn('font-mono text-sm', pinCls('orderNumber'))} style={pinStyle('orderNumber')}>{order.orderNumber}</TableCell>}
                   {isColumnVisible('amountPc') && <TableCell className={cn('font-mono', pinCls('amountPc'))} style={pinStyle('amountPc')}>{order.amountPc != null ? order.amountPc.toLocaleString('hu-HU') : ''}</TableCell>}
+                  {isColumnVisible('currentUnitPrice') && <TableCell className={cn('font-mono text-right tabular-nums', pinCls('currentUnitPrice'))} style={pinStyle('currentUnitPrice')} title="Aktuális darabár a vevői árlistából (élő anyagárral)">{priceByOrderId.has(order.id) ? priceByOrderId.get(order.id)!.currentPerPiece.toLocaleString('hu-HU', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : ''}</TableCell>}
+                  {isColumnVisible('currentValue') && <TableCell className={cn('font-mono text-right tabular-nums font-medium', pinCls('currentValue'))} style={pinStyle('currentValue')} title="Aktuális ár × rendelt mennyiség">{priceByOrderId.has(order.id) && order.amountPc ? (priceByOrderId.get(order.id)!.currentPerPiece * order.amountPc).toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}</TableCell>}
+                  {isColumnVisible('currentLaborValue') && <TableCell className={cn('font-mono text-right tabular-nums text-destructive', pinCls('currentLaborValue'))} style={pinStyle('currentLaborValue')} title="Munkadíj (anyagár nélkül) × rendelt mennyiség">{priceByOrderId.has(order.id) && order.amountPc ? (priceByOrderId.get(order.id)!.laborPerPiece * order.amountPc).toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}</TableCell>}
                   {isColumnVisible('orderDate') && <TableCell className={pinCls('orderDate')} style={pinStyle('orderDate')}>{order.orderDate}</TableCell>}
                   {isColumnVisible('requiredDate') && <TableCell className={pinCls('requiredDate')} style={pinStyle('requiredDate')}>{order.requiredDate}</TableCell>}
                   {isColumnVisible('pickupDate') && <TableCell className={pinCls('pickupDate')} style={pinStyle('pickupDate')}>{order.pickupDate}</TableCell>}
@@ -369,10 +406,14 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
                       value={order.status}
                       onValueChange={(value) => onStatusChange(order.id, value as OrderStatus)}
                     >
-                      <SelectTrigger 
-                        className="min-w-[200px]" 
-                        style={{ 
+                      <SelectTrigger
+                        className="min-w-[200px]"
+                        style={{
                           backgroundColor: STATUS_COLORS[order.status] || '#ffffff',
+                          // A státuszháttér világos marad sötét módban is, ezért a
+                          // szöveget (és a nyíl-ikont) fixen sötétre kényszerítjük,
+                          // különben a dark-mód világos betűszíne olvashatatlan lenne.
+                          color: 'oklch(0.22 0.02 265)',
                           border: '1px solid oklch(0.88 0.005 250)',
                         }}
                       >
@@ -462,6 +503,20 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
             )}
           </span>
           <span className="whitespace-nowrap"><b className="font-mono">{summary.totalPlannedHours}</b> <span className="text-muted-foreground">gyártás</span></span>
+          {summary.pricedCount > 0 && (
+            <>
+              <span className="whitespace-nowrap">
+                <b className="font-mono">{summary.totalValueEur.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</b>{' '}
+                <span className="text-muted-foreground">
+                  rendelt érték{summary.pricedCount < summary.count ? ` (${summary.pricedCount}/${summary.count} áras)` : ''}
+                </span>
+              </span>
+              <span className="whitespace-nowrap text-destructive">
+                <b className="font-mono">{summary.totalLaborEur.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</b>{' '}
+                <span>rendelt munkadíj</span>
+              </span>
+            </>
+          )}
         </div>
       </div>
     </>

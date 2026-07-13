@@ -1,7 +1,6 @@
 import { Order, Customer, Product } from './types'
 import { kvStore } from './kvStore'
 import { toast } from 'sonner'
-import { DEFAULT_LABEL_MARGINS, resolveMargins, type PrintMargins } from './printConfig'
 
 interface LabelData {
   productName: string
@@ -81,9 +80,7 @@ export async function generateLabels(
   products: Product[],
   customTemplate?: LabelTemplate,
   /** Szerver-alapú cimkesablon lista — ha átadják, nem olvas localStorage-ból */
-  labelTemplatesOverride?: LabelTemplate[],
-  /** Közös „címke margó" — a sablon saját margói felülírják. */
-  labelMargins: PrintMargins = DEFAULT_LABEL_MARGINS
+  labelTemplatesOverride?: LabelTemplate[]
 ) {
   const labels: LabelData[] = []
 
@@ -271,8 +268,8 @@ export async function generateLabels(
     }
   }
 
-  const html = templateToUse
-    ? generateCustomLabelHTML(labels, templateToUse, labelMargins)
+  const html = templateToUse 
+    ? generateCustomLabelHTML(labels, templateToUse)
     : generateLabelHTML(labels)
   
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
@@ -368,7 +365,7 @@ export async function previewLabels(
     : generateLabelHTML(labels)
 }
 
-export function generateCustomLabelHTML(labels: LabelData[], template: LabelTemplate, labelMargins: PrintMargins = DEFAULT_LABEL_MARGINS): string {
+export function generateCustomLabelHTML(labels: LabelData[], template: LabelTemplate): string {
   const labelsPerPage = template.labelsPerPage || 40
   const labelsPerRow = template.labelsPerRow || 5
   const labelsPerColumn = template.labelsPerColumn || 8
@@ -481,12 +478,10 @@ export function generateCustomLabelHTML(labels: LabelData[], template: LabelTemp
     return `<div class="page">${labelItems}</div>`
   }).join('')
 
-  // A sablon saját margói nyernek; ha nincsenek, a közös „címke margó".
-  const m = resolveMargins(template.margins, labelMargins)
-  const pageMarginTop = m.top
-  const pageMarginRight = m.right
-  const pageMarginBottom = m.bottom
-  const pageMarginLeft = m.left
+  const pageMarginTop = template.margins?.top || '1'
+  const pageMarginRight = template.margins?.right || '0'
+  const pageMarginBottom = template.margins?.bottom || '0'
+  const pageMarginLeft = template.margins?.left || '1'
 
   return `<!DOCTYPE html>
 <html lang="hu">

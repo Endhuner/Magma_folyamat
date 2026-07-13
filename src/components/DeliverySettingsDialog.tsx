@@ -180,6 +180,7 @@ export function DeliverySettingsDialog({ open, onClose }: DeliverySettingsDialog
                   <Input
                     id="startingNumber"
                     type="number"
+                    inputMode="decimal"
                     value={localSettings.startingNumber}
                     onChange={(e) => handleInputChange('startingNumber', Math.max(1, parseIntSafe(e.target.value, 1, { allowNegative: false })))}
                     min="1"

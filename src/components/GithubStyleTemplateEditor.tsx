@@ -1019,6 +1019,7 @@ export function GithubStyleTemplateEditor() {
                         <div key={m.id} className="flex items-center gap-1">
                           <Label htmlFor={m.id} className="text-xs text-muted-foreground w-4">{m.label}</Label>
                           <Input id={m.id} type="number" min={0} step="0.1" value={m.val} onChange={e => m.set(e.target.value)} className="w-16 h-7 text-xs" />
+                          inputMode="decimal"
                         </div>
                       ))}
                       <span className="text-xs text-muted-foreground">· Kék szaggatott vonal jelzi az előnézetben</span>
@@ -1030,10 +1031,12 @@ export function GithubStyleTemplateEditor() {
                           <div className="flex items-center gap-1">
                             <Label htmlFor="grid-cols" className="text-xs text-muted-foreground w-12">Oszlop</Label>
                             <Input id="grid-cols" type="number" min={1} max={10} value={gridCols} onChange={e => setGridCols(Math.max(1, parseInt(e.target.value) || 1))} className="w-16 h-7 text-xs" />
+                            inputMode="decimal"
                           </div>
                           <div className="flex items-center gap-1">
                             <Label htmlFor="grid-rows" className="text-xs text-muted-foreground w-8">Sor</Label>
                             <Input id="grid-rows" type="number" min={1} max={20} value={gridRows} onChange={e => setGridRows(Math.max(1, parseInt(e.target.value) || 1))} className="w-16 h-7 text-xs" />
+                            inputMode="decimal"
                           </div>
                           <span className="text-xs text-muted-foreground">= {gridCols * gridRows} cimke/oldal</span>
                         </div>
@@ -1042,10 +1045,12 @@ export function GithubStyleTemplateEditor() {
                           <div className="flex items-center gap-1">
                             <Label htmlFor="cell-pad-h" className="text-xs text-muted-foreground w-16">Vízszintes</Label>
                             <Input id="cell-pad-h" type="number" min={0} max={20} step={0.5} value={cellPaddingH} onChange={e => setCellPaddingH(Math.max(0, parseFloat(e.target.value) || 0))} className="w-16 h-7 text-xs" />
+                            inputMode="decimal"
                           </div>
                           <div className="flex items-center gap-1">
                             <Label htmlFor="cell-pad-v" className="text-xs text-muted-foreground w-16">Függőleges</Label>
                             <Input id="cell-pad-v" type="number" min={0} max={20} step={0.5} value={cellPaddingV} onChange={e => setCellPaddingV(Math.max(0, parseFloat(e.target.value) || 0))} className="w-16 h-7 text-xs" />
+                            inputMode="decimal"
                           </div>
                           <span className="text-xs text-muted-foreground">· az előnézet azonnal frissül</span>
                         </div>

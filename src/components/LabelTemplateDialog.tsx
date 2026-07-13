@@ -387,6 +387,7 @@ export function LabelTemplateDialog({
                   <Input
                     id="margin-top"
                     type="number"
+                    inputMode="decimal"
                     min={0}
                     step="0.1"
                     value={pageMarginTop}
@@ -400,6 +401,7 @@ export function LabelTemplateDialog({
                   <Input
                     id="margin-right"
                     type="number"
+                    inputMode="decimal"
                     min={0}
                     step="0.1"
                     value={pageMarginRight}
@@ -413,6 +415,7 @@ export function LabelTemplateDialog({
                   <Input
                     id="margin-bottom"
                     type="number"
+                    inputMode="decimal"
                     min={0}
                     step="0.1"
                     value={pageMarginBottom}
@@ -426,6 +429,7 @@ export function LabelTemplateDialog({
                   <Input
                     id="margin-left"
                     type="number"
+                    inputMode="decimal"
                     min={0}
                     step="0.1"
                     value={pageMarginLeft}
@@ -445,6 +449,7 @@ export function LabelTemplateDialog({
                   <Input
                     id="padding-top"
                     type="number"
+                    inputMode="decimal"
                     min={0}
                     step="0.1"
                     value={contentPaddingTop}
@@ -458,6 +463,7 @@ export function LabelTemplateDialog({
                   <Input
                     id="padding-right"
                     type="number"
+                    inputMode="decimal"
                     min={0}
                     step="0.1"
                     value={contentPaddingRight}
@@ -471,6 +477,7 @@ export function LabelTemplateDialog({
                   <Input
                     id="padding-bottom"
                     type="number"
+                    inputMode="decimal"
                     min={0}
                     step="0.1"
                     value={contentPaddingBottom}
@@ -484,6 +491,7 @@ export function LabelTemplateDialog({
                   <Input
                     id="padding-left"
                     type="number"
+                    inputMode="decimal"
                     min={0}
                     step="0.1"
                     value={contentPaddingLeft}

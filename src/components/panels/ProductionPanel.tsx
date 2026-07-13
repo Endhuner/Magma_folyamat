@@ -12,7 +12,6 @@
  * `useMediaQuery` hook fusson.
  */
 import type { ReactNode } from 'react'
-import { TabsContent } from '@/components/ui/tabs'
 import { ProductionView } from '@/components/ProductionView'
 import { MobileProductionView } from '@/components/MobileProductionView'
 import type {
@@ -26,6 +25,8 @@ import type {
 
 export interface ProductionPanelProps {
   isMobile: boolean
+  /** Operátornak egyszerűsített nézet (nincs mai-összesítő sáv). */
+  isOperator?: boolean
   orders: Order[] | null | undefined
   products: Product[] | null | undefined
   productionShifts: ProductionShift[] | null | undefined
@@ -46,6 +47,7 @@ export interface ProductionPanelProps {
 
 export function ProductionPanel({
   isMobile,
+  isOperator,
   orders,
   products,
   productionShifts,
@@ -61,7 +63,7 @@ export function ProductionPanel({
   materialSlot,
 }: ProductionPanelProps) {
   return (
-    <TabsContent value="production" className="space-y-6">
+    <section className="space-y-6">
       {materialSlot}
       {isMobile ? (
         <MobileProductionView
@@ -90,8 +92,9 @@ export function ProductionPanel({
           onSaveDefect={handleSaveDefect}
           onDeleteDefect={handleDeleteDefect}
           machines={machines}
+          isOperator={isOperator}
         />
       )}
-    </TabsContent>
+    </section>
   )
 }

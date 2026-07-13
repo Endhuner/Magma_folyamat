@@ -1,9 +1,21 @@
-import { Order, Customer, Product, DeliveryNote, ExtraDeliveryItem } from '@/lib/types'
+import { Order, Customer, Product, DeliveryNote, ExtraDeliveryItem, DeliveryRecipient } from '@/lib/types'
 import { generateDeliveryNoteSequenceNumber, parseFloatSafe } from '@/lib/helpers'
 import { kvStore } from '@/lib/kvStore'
 import { esc } from '@/lib/htmlSafe'
 import { toast } from 'sonner'
-import { DEFAULT_DOCUMENT_MARGINS, resolveMargins, type PrintMargins } from '@/lib/printConfig'
+
+/** Egyéni címzett → Customer-alakú objektum, hogy a meglévő címzett-blokk
+ *  (customerInfo?.xxx) változtatás nélkül működjön rendelés nélkül is. */
+function recipientToCustomer(r: DeliveryRecipient): Customer {
+  return {
+    name: r.name,
+    fullAddress: r.address || '',
+    city: r.city || '',
+    postalCode: r.postalCode || '',
+    country: r.country || '',
+    taxNumber: r.taxNumber || '',
+  } as unknown as Customer
+}
 
 export interface TemplateStyles {
   primaryColor: string
@@ -57,14 +69,16 @@ export function generateDeliveryHtmlTemplate(
   customStyles?: Partial<TemplateStyles>,
   overrideSequenceNumber?: string,
   /** Kiegészítő tételek (szerszám/anyag/szabad sor) — a rendelés-sorok után. */
-  extraItems?: ExtraDeliveryItem[]
+  extraItems?: ExtraDeliveryItem[],
+  /** Egyéni címzett — ha meg van adva, rendelés nélkül is renderelhető. */
+  recipient?: DeliveryRecipient
 ): string {
   const styles = { ...DEFAULT_DELIVERY_STYLES, ...customStyles }
   const sequenceNumber = overrideSequenceNumber || generateDeliveryNoteSequenceNumber(deliveryNotes, 'delivery')
-  
-  const firstCustomer = orders[0]?.customer || ''
-  const customerInfo = customers.find(c => c.name === firstCustomer)
-  
+
+  const firstCustomer = recipient?.name || orders[0]?.customer || ''
+  const customerInfo = recipient ? recipientToCustomer(recipient) : customers.find(c => c.name === firstCustomer)
+
   const fullAddress = customerInfo?.fullAddress || 
     `${customerInfo?.street || ''}, ${customerInfo?.city || ''}, ${customerInfo?.postalCode || ''}, ${customerInfo?.country || ''}`.replace(/,\s*,/g, ',').replace(/^,\s*|,\s*$/g, '')
 
@@ -295,11 +309,11 @@ export function generateDeliveryHtmlTemplate(
         
         <div class="info-box">
           <h3>Címzett / Consignee</h3>
-          <p><strong>${customerInfo?.name || firstCustomer}</strong></p>
-          <p>${fullAddress}</p>
-          <p>${customerInfo?.city || ''}, ${customerInfo?.postalCode || ''}</p>
-          <p>${customerInfo?.country || ''}</p>
-          ${customerInfo?.taxNumber ? `<p>Adószám: ${customerInfo.taxNumber}</p>` : ''}
+          <p><strong>${esc(customerInfo?.name || firstCustomer)}</strong></p>
+          <p>${esc(fullAddress)}</p>
+          <p>${esc(customerInfo?.city || '')}, ${esc(customerInfo?.postalCode || '')}</p>
+          <p>${esc(customerInfo?.country || '')}</p>
+          ${customerInfo?.taxNumber ? `<p>Adószám: ${esc(customerInfo.taxNumber)}</p>` : ''}
         </div>
       </div>
       
@@ -398,12 +412,12 @@ function applyDeliveryTemplateData(
   margins?: { top: string, right: string, bottom: string, left: string },
   issueDate?: string,
   extraItems?: ExtraDeliveryItem[],
-  documentMargins: PrintMargins = DEFAULT_DOCUMENT_MARGINS
+  recipient?: DeliveryRecipient
 ): string {
-  const firstCustomer = orders[0]?.customer || ''
-  const customerInfo = customers.find(c => c.name === firstCustomer)
-  
-  const fullAddress = customerInfo?.fullAddress || 
+  const firstCustomer = recipient?.name || orders[0]?.customer || ''
+  const customerInfo = recipient ? recipientToCustomer(recipient) : customers.find(c => c.name === firstCustomer)
+
+  const fullAddress = customerInfo?.fullAddress ||
     `${customerInfo?.street || ''}, ${customerInfo?.city || ''}, ${customerInfo?.postalCode || ''}, ${customerInfo?.country || ''}`.replace(/,\s*,/g, ',').replace(/^,\s*|,\s*$/g, '')
 
   const totalQuantity = orders.reduce((sum, order) => sum + (order.amountPc || 0), 0)
@@ -523,22 +537,19 @@ function applyDeliveryTemplateData(
   console.log('Használt ownOrderNumber (vevő rendelési szám, csak cikluson KÍVÜL):', ownOrderNumber)
 
   let finalCss = cssTemplate || ''
-
-  // A sablon saját margói nyernek; ha nincsenek, a közös „dokumentum margó".
-  // Mindig injektáljuk, hogy minden szállítólevél azonos margóval nyomtasson.
-  {
-    const m = resolveMargins(margins, documentMargins)
+  
+  if (margins) {
     const marginStyle = `
     @page {
-      margin: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm !important;
+      margin: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm !important;
     }
     body {
       margin: 0 !important;
-      padding: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm !important;
+      padding: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm !important;
     }
     .cmr-document, .delivery-document {
       margin: 0 !important;
-      padding: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm !important;
+      padding: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm !important;
     }
     `
     finalCss = marginStyle + '\n' + finalCss
@@ -762,9 +773,18 @@ export function getDeliveryHtml(
   savedTemplatesOverride?: any[],
   activeTemplatesOverride?: { cmr?: string; delivery?: string },
   issueDate?: string,
-  extraItems?: ExtraDeliveryItem[]
+  extraItems?: ExtraDeliveryItem[],
+  recipient?: DeliveryRecipient
 ): string {
   const seqNum = sequenceNumber || generateDeliveryNoteSequenceNumber(deliveryNotes, 'delivery')
+
+  // Egyéni (rendelés nélküli) szállítólevél: minden tétel az extraItems-ben van.
+  // A mentett/aktív sablonok statikus {{productName}} helyőrzőt is használhatnak
+  // ({{#items}} ciklus nélkül) → a tételek elveszhetnének. Ezért a megbízható
+  // beégetett sablonra megyünk, ami a szabad tételeket biztosan kirendereli.
+  if (recipient) {
+    return generateDeliveryHtmlTemplate(orders, customers, products, deliveryNotes, customStyles, seqNum, extraItems, recipient)
+  }
 
   try {
     const activeTemplates = activeTemplatesOverride ?? kvStore.get<{ cmr?: string, delivery?: string }>('active-templates')
@@ -777,7 +797,7 @@ export function getDeliveryHtml(
     if (customer?.deliveryTemplateId) {
       const t = savedTemplates?.find((s: any) => s.id === customer.deliveryTemplateId)
       if (t?.data?.html) {
-        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate, extraItems)
+        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate, extraItems, recipient)
       }
     }
 
@@ -785,7 +805,7 @@ export function getDeliveryHtml(
     if (activeTemplates?.delivery) {
       const t = savedTemplates?.find((s: any) => s.id === activeTemplates.delivery)
       if (t?.data?.html) {
-        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate, extraItems)
+        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate, extraItems, recipient)
       }
     }
 
@@ -794,7 +814,7 @@ export function getDeliveryHtml(
     if (deliveryTemplates.length > 0) {
       const t = deliveryTemplates[0]
       if (t?.data?.html) {
-        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate, extraItems)
+        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate, extraItems, recipient)
       }
     }
   } catch (err) {
@@ -802,5 +822,5 @@ export function getDeliveryHtml(
   }
 
   // 4. Beégetett sablon (fallback)
-  return generateDeliveryHtmlTemplate(orders, customers, products, deliveryNotes, customStyles, seqNum, extraItems)
+  return generateDeliveryHtmlTemplate(orders, customers, products, deliveryNotes, customStyles, seqNum, extraItems, recipient)
 }

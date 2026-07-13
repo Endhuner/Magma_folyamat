@@ -13,7 +13,6 @@
  */
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { TabsContent } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Plus, MagnifyingGlass, Warning, ListBullets, SquaresFour } from '@phosphor-icons/react'
 import { toast } from 'sonner'
@@ -118,7 +117,7 @@ export function InventoryPanel({
   }
 
   return (
-    <TabsContent value="inventory" className="space-y-6">
+    <section className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-3xl font-bold tracking-tight mb-1">Készlet</h2>
@@ -282,6 +281,6 @@ export function InventoryPanel({
         transactions={inventoryTransactions || []}
         onApply={onMaterialAction}
       />
-    </TabsContent>
+    </section>
   )
 }

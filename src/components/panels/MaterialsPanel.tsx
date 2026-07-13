@@ -1,4 +1,3 @@
-import { TabsContent } from '@/components/ui/tabs'
 import { SimpleListView, SimpleColumnDef } from '@/components/SimpleListView'
 import { Package } from '@phosphor-icons/react'
 import type { Material } from '@/lib/types'
@@ -28,7 +27,7 @@ const materialColumns: SimpleColumnDef[] = [
 
 export function MaterialsPanel({ materials, auth, onSave, onDelete }: MaterialsPanelProps) {
   return (
-    <TabsContent value="materials" className="space-y-6">
+    <section className="space-y-6">
       <SimpleListView<Material>
         title="Anyaglista"
         description="Alapanyagok és granulátumok nyilvántartása"
@@ -47,6 +46,6 @@ export function MaterialsPanel({ materials, auth, onSave, onDelete }: MaterialsP
           m.createdBy === auth.user?.id
         }
       />
-    </TabsContent>
+    </section>
   )
 }

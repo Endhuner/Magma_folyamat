@@ -30,7 +30,9 @@ export function InventoryAdjustDialog({ open, onClose, onSave, item }: Inventory
   }, [open])
 
   const handleSubmit = () => {
-    if (quantity === 0) return
+    // Kézi korrekciónál (=) a 0 érvényes cél (leltári nullázás) — csak a
+    // bevét/kiadás értelmetlen 0 darabbal.
+    if (type !== 'adjustment' && quantity === 0) return
     onSave({ type, quantity, notes })
     onClose()
   }
@@ -98,8 +100,10 @@ export function InventoryAdjustDialog({ open, onClose, onSave, item }: Inventory
             <Input
               id="quantity"
               type="number"
+              inputMode="numeric"
               value={quantity || ''}
               onChange={(e) => setQuantity(parseIntSafe(e.target.value, 0, { allowNegative: false }))}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit() } }}
               min="0"
               placeholder="0"
             />
@@ -121,7 +125,7 @@ export function InventoryAdjustDialog({ open, onClose, onSave, item }: Inventory
           <Button variant="outline" onClick={onClose}>
             Mégse
           </Button>
-          <Button onClick={handleSubmit} disabled={quantity === 0}>
+          <Button onClick={handleSubmit} disabled={type !== 'adjustment' && quantity === 0}>
             Mentés
           </Button>
         </DialogFooter>

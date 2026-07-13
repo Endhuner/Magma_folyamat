@@ -6,8 +6,13 @@ import {
   searchOrders,
   filterByPriority,
   sortByDueDate,
+  deadlineUrgency,
+  URGENCY_BORDER,
+  currentShiftNow,
   buildShiftsByOrder,
   groupOrdersByStatus,
+  lastMachineIdForProduct,
+  previousShiftFor,
 } from './productionHelpers'
 import type { Order, Product, ProductionShift } from './types'
 
@@ -178,6 +183,72 @@ describe('buildShiftsByOrder', () => {
   })
 })
 
+describe('previousShiftFor', () => {
+  const s = (p: Partial<ProductionShift>): ProductionShift =>
+    ({ id: 's', orderId: 'o', date: '2026-01-01', shift: 'de', shotsCount: 0, producedQuantity: 0,
+       notes: '', createdAt: '', endShotsAbsolute: 0, ...p }) as ProductionShift
+
+  it('returns the LATEST previous shift, not the first in the array', () => {
+    // szándékosan rendezetlen sorrend (insertion order, mint buildShiftsByOrder)
+    const shifts = [
+      s({ id: 'a', date: '2026-07-09', endShotsAbsolute: 1056 }),
+      s({ id: 'b', date: '2026-07-11', endShotsAbsolute: 2000 }), // utólag, korábbi napra
+    ]
+    // mai (2026-07-13) új műszakhoz a legutolsó korábbi = 2026-07-11 (2000), nem a 07-09
+    expect(previousShiftFor(shifts, '2026-07-13', 'de')?.id).toBe('b')
+  })
+
+  it('same-day de counts as previous to du', () => {
+    const shifts = [s({ id: 'de1', date: '2026-07-10', shift: 'de', endShotsAbsolute: 500 })]
+    expect(previousShiftFor(shifts, '2026-07-10', 'du')?.id).toBe('de1')
+    // de-hez ugyanaznap nincs korábbi
+    expect(previousShiftFor(shifts, '2026-07-10', 'de')).toBeUndefined()
+  })
+
+  it('returns undefined when nothing precedes', () => {
+    expect(previousShiftFor([s({ date: '2026-07-20' })], '2026-07-10', 'de')).toBeUndefined()
+    expect(previousShiftFor([], '2026-07-10', 'de')).toBeUndefined()
+  })
+})
+
+describe('lastMachineIdForProduct', () => {
+  const mkShift = (p: Partial<ProductionShift>): ProductionShift =>
+    ({ id: 's', orderId: 'o', date: '2026-01-01', shift: 'de', machineId: '', createdAt: '2026-01-01T00:00:00Z', ...p }) as ProductionShift
+
+  it('picks the machine from an EARLIER order of the same product', () => {
+    const orders = [mkOrder({ id: 'o1', productId: 'P' }), mkOrder({ id: 'o2', productId: 'P' })]
+    const shifts = [mkShift({ id: 's1', orderId: 'o1', date: '2026-02-01', machineId: 'M1' })]
+    // az aktuális rendelés (o2) még nincs gyártva → az o1-en beállított gépet ugorja
+    expect(lastMachineIdForProduct(orders[1], orders, shifts)).toBe('M1')
+  })
+
+  it('picks the MOST RECENT machine across the product’s orders', () => {
+    const orders = [mkOrder({ id: 'o1', productId: 'P' }), mkOrder({ id: 'o2', productId: 'P' })]
+    const shifts = [
+      mkShift({ id: 's1', orderId: 'o1', date: '2026-01-01', machineId: 'A' }),
+      mkShift({ id: 's2', orderId: 'o2', date: '2026-03-01', machineId: 'B' }),
+    ]
+    expect(lastMachineIdForProduct(orders[0], orders, shifts)).toBe('B')
+  })
+
+  it('ignores shifts without a machine set', () => {
+    const orders = [mkOrder({ id: 'o1', productId: 'P' })]
+    const shifts = [mkShift({ id: 's1', orderId: 'o1', date: '2026-05-01', machineId: '' })]
+    expect(lastMachineIdForProduct(orders[0], orders, shifts)).toBe('')
+  })
+
+  it('without productId falls back to the current order only', () => {
+    const orders = [mkOrder({ id: 'o1' }), mkOrder({ id: 'o2' })]
+    const shifts = [mkShift({ id: 's1', orderId: 'o2', machineId: 'X' })]
+    expect(lastMachineIdForProduct(orders[0], orders, shifts)).toBe('') // o1-nek nincs saját műszakja
+    expect(lastMachineIdForProduct(orders[1], orders, shifts)).toBe('X')
+  })
+
+  it('returns empty for null order', () => {
+    expect(lastMachineIdForProduct(null, [], [])).toBe('')
+  })
+})
+
 describe('groupOrdersByStatus', () => {
   it('returns the 6 expected status keys', () => {
     const orders = [
@@ -192,5 +263,33 @@ describe('groupOrdersByStatus', () => {
     expect(r.pending).toHaveLength(1)
     expect(r.inProgress).toHaveLength(1)
     expect(r.done).toHaveLength(1)
+  })
+})
+
+describe('deadlineUrgency', () => {
+  const today = new Date('2026-07-10T10:00:00')
+  it('kategóriák a meglévő küszöbökkel (<0 késés, ≤3 sürgős, ≤7 fontos)', () => {
+    expect(deadlineUrgency('2026-07-09', today)).toBe('late')
+    expect(deadlineUrgency('2026-07-10', today)).toBe('urgent')
+    expect(deadlineUrgency('2026-07-13', today)).toBe('urgent')
+    expect(deadlineUrgency('2026-07-14', today)).toBe('soon')
+    expect(deadlineUrgency('2026-07-17', today)).toBe('soon')
+    expect(deadlineUrgency('2026-07-18', today)).toBe('normal')
+    expect(deadlineUrgency(undefined, today)).toBe('normal')
+    expect(deadlineUrgency('', today)).toBe('normal')
+  })
+  it('mindegyik kategóriának van bal-szegély osztálya', () => {
+    for (const k of ['late', 'urgent', 'soon', 'normal'] as const) {
+      expect(URGENCY_BORDER[k]).toMatch(/^border-l-/)
+    }
+  })
+})
+
+describe('currentShiftNow', () => {
+  it('14 óra előtt délelőtt, utána délután', () => {
+    expect(currentShiftNow(new Date('2026-07-10T06:00:00'))).toBe('de')
+    expect(currentShiftNow(new Date('2026-07-10T13:59:00'))).toBe('de')
+    expect(currentShiftNow(new Date('2026-07-10T14:00:00'))).toBe('du')
+    expect(currentShiftNow(new Date('2026-07-10T22:00:00'))).toBe('du')
   })
 })

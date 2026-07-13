@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { PencilSimple, Trash, Package, ClockCounterClockwise, Copy, X } from '@phosphor-icons/react'
+import { FileText, PencilSimple, Trash, Package, ClockCounterClockwise, Copy, X } from '@phosphor-icons/react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +36,9 @@ interface ProductsTableProps {
    * soronként, ami szintén működőképes, csak több tost-üzenetet produkál.
    */
   onBulkDelete?: (ids: string[]) => void
+  /** Adatlap-gomb: a Set azon termék-id-ket tartalmazza, amelyeknek VAN adatlapja. */
+  onOpenDatasheet?: (productId: string) => void
+  datasheetProductIds?: Set<string>
 }
 
 /**
@@ -49,7 +52,7 @@ function duplicateKey(p: Product): string {
   return [norm(p.customer), norm(p.drawingNumber), norm(p.productName)].join('||')
 }
 
-function ProductsTableImpl({ products, orders, onEdit, onDelete, onBulkDelete, savedTemplates }: ProductsTableProps) {
+function ProductsTableImpl({ products, orders, onEdit, onDelete, onBulkDelete, savedTemplates, onOpenDatasheet, datasheetProductIds }: ProductsTableProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState<string | null>(null)
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
@@ -339,6 +342,21 @@ function ProductsTableImpl({ products, orders, onEdit, onDelete, onBulkDelete, s
                           >
                             <ClockCounterClockwise className="w-4 h-4" />
                           </Button>
+                          {onOpenDatasheet && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => onOpenDatasheet(product.id)}
+                              title={datasheetProductIds?.has(product.id)
+                                ? 'Termék Információs Adatlap (kitöltve)'
+                                : 'Termék Információs Adatlap (még hiányzik)'}
+                            >
+                              <FileText
+                                className="w-4 h-4"
+                                weight={datasheetProductIds?.has(product.id) ? 'fill' : 'regular'}
+                              />
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="ghost"

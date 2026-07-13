@@ -72,6 +72,7 @@ import {
   filterByPriority,
   sortByDueDate,
   buildShiftsByOrder,
+  lastMachineIdForProduct,
   type PriorityFilter,
 } from '@/lib/productionHelpers'
 
@@ -503,6 +504,8 @@ export function MobileProductionView({
           setQuickEntry(null)
         }}
         userId={userId}
+        orderShifts={quickEntryOrder ? (shiftsByOrder.get(quickEntryOrder.id) ?? []) : []}
+        lastMachineId={lastMachineIdForProduct(quickEntryOrder, orders, shifts)}
       />
 
       {/* Megjegyzés / javítás-jelzés bottom sheet */}

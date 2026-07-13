@@ -9,7 +9,7 @@ export async function deliveryRoutes(app: FastifyInstance): Promise<void> {
     table: deliveryNotes,
     insertSchema: deliveryNoteCreateSchema,
     updateSchema: deliveryNoteUpdateSchema,
-    jsonFields: ['orderIds', 'exportData', 'extraItems'] as const,
+    jsonFields: ['orderIds', 'exportData', 'extraItems', 'recipient'] as const,
     // delivery note audit-entitás-típus külön nincs a Phase 0 enumban — order-hez társítjuk
     auditEntity: 'order',
     auditLabel: 'Szállítólevél',

@@ -35,7 +35,6 @@ import {
   formatLocationCode,
   parseLocationCode,
   occupiedBinCount,
-  boxWidthPx,
   type RackConfig,
 } from '@/lib/warehouseLocation'
 import type { InventoryItem } from '@/lib/types'
@@ -190,7 +189,7 @@ export function WarehouseShelfView({
                 {formatLocationCode(firstHit.hit.loc.rackId, firstHit.hit.loc.level, firstHit.hit.loc.bin)}
               </span>
               <span className="text-muted-foreground ml-2">
-                {firstHit.rack.name}, {firstHit.hit.loc.level}. szint, {firstHit.hit.loc.bin}. rekesz
+                {firstHit.rack.name}, {firstHit.hit.loc.level}. szint, {firstHit.hit.loc.bin}. oszlop
               </span>
             </span>
             {matches.size > 1 && (
@@ -219,44 +218,71 @@ export function WarehouseShelfView({
           </span>
         </div>
 
-        {levels.map(([level, items]) => (
+        {/* Oszlop-fejléc — melyik rekesz-oszlop hányas */}
+        <div className="flex items-stretch gap-2 mb-1 w-max min-w-full">
+          <span className="shrink-0 w-14" />
           <div
-            key={level}
-            className="flex items-end gap-2.5 px-2 pt-2 pb-1.5 min-h-[84px] border-b-[10px] border-slate-400 dark:border-slate-500 w-max min-w-full"
+            className="grid gap-2 flex-1 min-w-0"
+            style={{ gridTemplateColumns: `repeat(${activeRack.binsPerLevel}, minmax(110px, 1fr))` }}
           >
-            {/* sticky címke: vízszintes görgetésnél is látszik, melyik szint ez */}
-            <span className="sticky left-0 z-10 self-center shrink-0 w-14 text-[11px] text-muted-foreground bg-card/95 rounded pr-1">
-              {level}. szint
-            </span>
-            {items.length === 0 ? (
-              <span className="text-xs text-muted-foreground/50 self-center">— üres —</span>
-            ) : (
-              items.map(({ item, loc }) => {
-                const hit = matches.has(item.id)
-                const sel = selectedId === item.id
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setSelectedId(sel ? null : item.id)}
-                    style={{ width: boxWidthPx(item.quantity) }}
-                    className={`shrink-0 rounded-t-md rounded-b-sm px-2.5 py-1.5 text-left text-[11px] leading-tight cursor-pointer
-                                shadow-[inset_0_-3px_0_rgba(0,0,0,.15)] ${boxPalette(item.itemType)}
-                                ${hit ? 'ring-[3px] ring-green-600 ring-offset-2 ring-offset-background' : ''}
-                                ${sel ? 'outline outline-2 outline-primary' : ''}`}
-                    title={`${item.productName} · ${item.quantity} db · ${item.location}`}
-                  >
-                    <span className="block font-semibold text-xs truncate">
-                      {item.productName || item.drawingNumber || '—'}
-                    </span>
-                    <span className="block truncate opacity-80">
-                      {item.quantity.toLocaleString('hu-HU')} {unitOf(item)} · {formatLocationCode(loc.rackId, loc.level, loc.bin)}
-                    </span>
-                  </button>
-                )
-              })
-            )}
+            {Array.from({ length: activeRack.binsPerLevel }, (_, i) => (
+              <span key={i} className="text-[10px] text-center text-muted-foreground truncate">{i + 1}. oszlop</span>
+            ))}
           </div>
-        ))}
+        </div>
+
+        {levels.map(([level, items]) => {
+          // Oszlopok (rekeszek) szerint csoportosítva — egy rekeszben több tétel is lehet.
+          const byBin = new Map<number, typeof items>()
+          for (let b = 1; b <= activeRack.binsPerLevel; b++) byBin.set(b, [])
+          for (const p of items) byBin.get(p.loc.bin)?.push(p)
+          return (
+            <div
+              key={level}
+              className="flex items-stretch gap-2 px-2 pt-2 pb-1.5 min-h-[76px] border-b-[10px] border-slate-400 dark:border-slate-500 w-max min-w-full"
+            >
+              {/* sticky címke: vízszintes görgetésnél is látszik, melyik szint ez */}
+              <span className="sticky left-0 z-10 self-center shrink-0 w-14 text-[11px] text-muted-foreground bg-card/95 rounded pr-1">
+                {level}. szint
+              </span>
+              <div
+                className="grid gap-2 flex-1 min-w-0"
+                style={{ gridTemplateColumns: `repeat(${activeRack.binsPerLevel}, minmax(110px, 1fr))` }}
+              >
+                {[...byBin.entries()].map(([bin, binItems]) => (
+                  <div key={bin} className="flex flex-col gap-1 min-h-[52px]">
+                    {binItems.length === 0 ? (
+                      <div className="flex-1 rounded-md border border-dashed border-slate-300 dark:border-slate-600 min-h-[48px]" />
+                    ) : (
+                      binItems.map(({ item, loc }) => {
+                        const hit = matches.has(item.id)
+                        const sel = selectedId === item.id
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => setSelectedId(sel ? null : item.id)}
+                            className={`w-full rounded-t-md rounded-b-sm px-2 py-1.5 text-left text-[11px] leading-tight cursor-pointer
+                                        shadow-[inset_0_-3px_0_rgba(0,0,0,.15)] ${boxPalette(item.itemType)}
+                                        ${hit ? 'ring-[3px] ring-green-600 ring-offset-2 ring-offset-background' : ''}
+                                        ${sel ? 'outline outline-2 outline-primary' : ''}`}
+                            title={`${item.productName} · ${item.quantity} db · ${item.location}`}
+                          >
+                            <span className="block font-semibold text-xs truncate">
+                              {item.productName || item.drawingNumber || '—'}
+                            </span>
+                            <span className="block truncate opacity-80">
+                              {item.quantity.toLocaleString('hu-HU')} {unitOf(item)} · {formatLocationCode(loc.rackId, loc.level, loc.bin)}
+                            </span>
+                          </button>
+                        )
+                      })
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })}
 
         {/* állvány-lábak */}
         <div className="flex justify-between px-1 pt-0">
@@ -300,7 +326,13 @@ export function WarehouseShelfView({
             {[...index.unplaced, ...index.orphaned.map((o) => o.item)].map((item) => (
               <div key={item.id} className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
                 <TypeIcon itemType={item.itemType} className="w-4 h-4 shrink-0" />
-                <span className="font-medium truncate">{item.productName || item.drawingNumber || item.id}</span>
+                <div className="min-w-0 flex-1">
+                  {/* Termék neve + rajzszám (megnevezés) — mindkettő látszik. */}
+                  <div className="font-medium truncate">{item.productName || item.drawingNumber || item.id}</div>
+                  {item.productName && item.drawingNumber && (
+                    <div className="text-xs text-muted-foreground truncate">{item.drawingNumber}</div>
+                  )}
+                </div>
                 <span className="text-muted-foreground shrink-0">{item.quantity.toLocaleString('hu-HU')} {unitOf(item)}</span>
                 {item.location && (
                   <span className="text-xs text-muted-foreground italic truncate">„{item.location}"</span>
@@ -428,12 +460,12 @@ function MoveDialog({
             </Select>
           </div>
           <div className="grid gap-1.5">
-            <Label>Rekesz</Label>
+            <Label>Oszlop</Label>
             <Select value={String(safeBin)} onValueChange={(v) => setBin(Number(v))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {Array.from({ length: rack.binsPerLevel }, (_, i) => i + 1).map((b) => (
-                  <SelectItem key={b} value={String(b)}>{b}. rekesz</SelectItem>
+                  <SelectItem key={b} value={String(b)}>{b}. oszlop</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -508,7 +540,7 @@ function RackEditorDialog({
 
         <div className="space-y-2 py-1 max-h-[340px] overflow-y-auto">
           <div className="grid grid-cols-[64px_1fr_84px_84px_36px] gap-2 text-xs text-muted-foreground px-1">
-            <span>Azon.</span><span>Név</span><span>Szintek</span><span>Rekesz/szint</span><span />
+            <span>Azon.</span><span>Név</span><span>Szintek</span><span>Oszlopszám</span><span />
           </div>
           {draft.map((r, i) => (
             <div key={i} className="grid grid-cols-[64px_1fr_84px_84px_36px] gap-2 items-center">
@@ -519,8 +551,10 @@ function RackEditorDialog({
               />
               <Input value={r.name} onChange={(e) => upd(i, { name: e.target.value })} />
               <Input type="number" min={1} max={10} value={r.levels}
+              inputMode="decimal"
                      onChange={(e) => upd(i, { levels: Math.max(1, Math.min(10, Number(e.target.value) || 1)) })} />
               <Input type="number" min={1} max={20} value={r.binsPerLevel}
+              inputMode="decimal"
                      onChange={(e) => upd(i, { binsPerLevel: Math.max(1, Math.min(20, Number(e.target.value) || 1)) })} />
               <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive px-2"
                       onClick={() => setDraft((d) => d.filter((_, j) => j !== i))} disabled={draft.length <= 1}>

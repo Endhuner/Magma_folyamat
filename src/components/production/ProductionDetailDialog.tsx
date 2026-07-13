@@ -1,5 +1,5 @@
 import { generateId } from '@/lib/generateId'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
   Order,
   OrderStatus,
@@ -11,6 +11,7 @@ import type {
 } from '@/lib/types'
 import { DefectEntryDialog } from '@/components/production/DefectEntryDialog'
 import { parseFloatSafe } from '@/lib/helpers'
+import { lastMachineIdForProduct as lastMachineIdForProductHelper, SUGGESTED_SHIFT_SHOTS, previousShiftFor } from '@/lib/productionHelpers'
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberStepper } from '@/components/ui/number-stepper'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -121,7 +123,10 @@ export function ProductionDetailDialog({
   const [date, setDate] = useState<string>(toISODate(new Date()))
   const [shift, setShift] = useState<'de' | 'du'>('de')
   const [startShots, setStartShots] = useState<string>('')
+  const startShotsRef = useRef<HTMLInputElement>(null)
+  const endShotsRef = useRef<HTMLInputElement>(null)
   const [endShots, setEndShots] = useState<string>('')
+  const [endEdited, setEndEdited] = useState(false)
   const [notes, setNotes] = useState<string>('')
   const [machineId, setMachineId] = useState<string>('')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -156,33 +161,10 @@ export function ProductionDetailDialog({
    * rendelés között) használtak — a production history-ból.
    * Ha a rendelésnek nincs productId-ja, csak az aktuális rendelés műszakait nézi.
    */
-  const lastMachineIdForProduct = useMemo(() => {
-    const productId = order?.productId
-    let candidateShifts: ProductionShift[]
-
-    if (productId) {
-      // Az összes olyan rendelés ID-je, amelynek ugyanaz a productId-ja
-      const sameProductOrderIds = new Set(
-        orders.filter((o) => o.productId === productId).map((o) => o.id)
-      )
-      candidateShifts = shifts.filter(
-        (s) => sameProductOrderIds.has(s.orderId) && s.machineId
-      )
-    } else {
-      // Fallback: csak az aktuális rendelés műszakait nézzük
-      candidateShifts = orderShifts.filter((s) => s.machineId)
-    }
-
-    // Legutolsó: dátum + műszak szerint rendezve (de/du), majd createdAt
-    return (
-      [...candidateShifts].sort((a, b) => {
-        const da = a.date + (a.shift === 'du' ? '1' : '0')
-        const db = b.date + (b.shift === 'du' ? '1' : '0')
-        if (da !== db) return da > db ? -1 : 1
-        return a.createdAt > b.createdAt ? -1 : 1
-      })[0]?.machineId ?? ''
-    )
-  }, [order?.productId, orders, shifts, orderShifts])
+  const lastMachineIdForProduct = useMemo(
+    () => lastMachineIdForProductHelper(order, orders, shifts),
+    [order, orders, shifts]
+  )
 
   // Reset form whenever the dialog opens or prefills change.
   useEffect(() => {
@@ -191,6 +173,7 @@ export function ProductionDetailDialog({
     setShift(prefillShift || 'de')
     setStartShots('')
     setEndShots('')
+    setEndEdited(false)
     setNotes('')
     setEditingId(null)
     setMachineId(lastMachineIdForProduct)
@@ -200,11 +183,35 @@ export function ProductionDetailDialog({
   // az előző műszak endShotsAbsolute-jából töltjük ki (átírható).
   useEffect(() => {
     if (!open || editingId) return
-    const shiftOrder = (s: ProductionShift) =>
-      s.date < date ? true : s.date === date && s.shift === 'de' && shift === 'du'
-    const prevShift = orderShifts.find(shiftOrder)
+    const prevShift = previousShiftFor(orderShifts, date, shift)
     setStartShots(prevShift?.endShotsAbsolute != null ? String(prevShift.endShotsAbsolute) : '')
   }, [open, date, shift, editingId, orderShifts])
+
+  // Vég lövésszám JAVASLAT: Kezdő + egy műszaknyi lövés (1440). Szerkesztésnél
+  // (editingId) nem, és amint a gépkezelő kézzel átírja, nem írjuk felül.
+  useEffect(() => {
+    if (!open || editingId || endEdited) return
+    const n = Number.parseInt(startShots, 10)
+    setEndShots(startShots.trim() !== '' && Number.isFinite(n) ? String(n + SUGGESTED_SHIFT_SHOTS) : '')
+  }, [open, startShots, editingId, endEdited])
+
+  // Nyitáskor a kurzor a Vég lövésszám mezőbe (ott a következő beírandó szám) —
+  // a mező autoFocus-a hozza fel a tablet-billentyűzetet. Ha még nincs Kezdő
+  // lövésszám, oda visszük a fókuszt (a Kezdő mezőt a fenti effekt tölti ki,
+  // ezért a DOM-értéket olvassuk 60 ms után).
+  useEffect(() => {
+    if (!open) return
+    const t = setTimeout(() => {
+      const hasStart = (startShotsRef.current?.value ?? '').trim() !== ''
+      if (hasStart) {
+        endShotsRef.current?.select()
+      } else {
+        startShotsRef.current?.focus()
+        startShotsRef.current?.select()
+      }
+    }, 60)
+    return () => clearTimeout(t)
+  }, [open])
 
   const totalShots = useMemo(
     () => orderShifts.reduce((sum, s) => sum + (s.shotsCount || 0), 0),
@@ -472,13 +479,13 @@ export function ProductionDetailDialog({
           </Alert>
         )}
 
-        {/* Műszak rögzítő form */}
+        {/* Műszak-szerkesztő form — csak meglévő műszak szerkesztésekor jelenik
+            meg. Új műszakot a kártya „+" gyorsrögzítőjével lehet felvenni. */}
+        {editingId && (
         <div className="bg-card border-2 rounded-xl p-5 space-y-5">
           <div className="flex items-center gap-2">
             <PlayCircle className="w-7 h-7 text-accent" weight="duotone" />
-            <h3 className="text-xl font-semibold">
-              {editingId ? 'Műszak szerkesztése' : 'Új műszak rögzítése'}
-            </h3>
+            <h3 className="text-xl font-semibold">Műszak szerkesztése</h3>
           </div>
 
           {/* Dátum + Műszak + Gép sor */}
@@ -529,14 +536,15 @@ export function ProductionDetailDialog({
               <Label htmlFor="start-shots" className="text-lg font-medium">
                 Kezdő lövésszám (számláló állás)
               </Label>
-              <Input
+              <NumberStepper
                 id="start-shots"
-                type="number"
-                min={0}
-                className="font-mono h-20 text-center font-bold" style={{ fontSize: '2.8rem' }}
+                inputRef={startShotsRef}
                 value={startShots}
+                onChange={setStartShots}
                 placeholder="pl. 12 500"
-                onChange={(e) => setStartShots(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit() } }}
+                inputClassName="font-mono h-20 font-bold text-[2.8rem] md:text-[2.8rem] coarse:text-[2.8rem]"
+                buttonClassName="h-20 px-4"
               />
             </div>
             <div className="flex items-center justify-center pb-1">
@@ -546,14 +554,16 @@ export function ProductionDetailDialog({
               <Label htmlFor="end-shots" className="text-lg font-medium">
                 Vég lövésszám (számláló állás)
               </Label>
-              <Input
+              <NumberStepper
                 id="end-shots"
-                type="number"
-                min={0}
-                className="font-mono h-20 text-center font-bold" style={{ fontSize: '2.8rem' }}
+                inputRef={endShotsRef}
+                autoFocus
                 value={endShots}
-                placeholder="pl. 12 620"
-                onChange={(e) => setEndShots(e.target.value)}
+                onChange={(v) => { setEndShots(v); setEndEdited(true) }}
+                placeholder="Kezdő + 1440"
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit() } }}
+                inputClassName="font-mono h-20 font-bold text-[2.8rem] md:text-[2.8rem] coarse:text-[2.8rem]"
+                buttonClassName="h-20 px-4"
               />
             </div>
           </div>
@@ -617,10 +627,11 @@ export function ProductionDetailDialog({
               disabled={shotsNum <= 0}
             >
               <CheckCircle className="w-6 h-6 mr-2" weight="fill" />
-              {editingId ? 'Módosítás mentése' : 'Rögzítés'}
+              Módosítás mentése
             </Button>
           </div>
         </div>
+        )}
 
         <Separator />
 

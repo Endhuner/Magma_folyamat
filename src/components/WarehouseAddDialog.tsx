@@ -216,6 +216,7 @@ export function WarehouseAddDialog({
               <Input
                 id="wh-qty"
                 type="number"
+                inputMode="decimal"
                 min={1}
                 value={quantityStr}
                 onChange={(e) => setQuantityStr(e.target.value)}

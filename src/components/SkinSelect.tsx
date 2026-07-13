@@ -1,13 +1,17 @@
 /**
  * Skin-választó a fejlécben (a sötét mód kapcsoló mellett).
  *
- * A választás felhasználó-gépenként él (localStorage), és a <html
- * data-skin="…"> attribútumot állítja — a stílusokat a styles/skins.css
- * adja. A sötét móddal szabadon kombinálható.
+ * A választás FELHASZNÁLÓNKÉNT él: bejelentkezve a saját user-rekordba
+ * mentődik (a szerverre), így más felhasználót nem érint, és követi a
+ * belépést eszköztől függetlenül. Bypass/dev módban localStorage a tartalék.
+ * A <html data-skin="…"> attribútumot állítja — a stílusokat a
+ * styles/skins.css adja; a sötét móddal szabadon kombinálható.
  */
 import { useEffect, useState } from 'react'
 import { Palette, Check } from '@phosphor-icons/react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/lib/auth'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -15,6 +19,9 @@ import {
 export const SKINS: Array<{ id: string; name: string; desc: string }> = [
   { id: '', name: 'Alap', desc: 'Az eredeti kék megjelenés' },
   { id: 'prime', name: 'Prime', desc: 'primeng.dev — slate + smaragd, aláhúzásos fülek' },
+  { id: 'ipari', name: 'Ipari-modern', desc: 'Sötét menü, világos munkaterület, kék kiemelés' },
+  { id: 'minimal', name: 'Világos-minimál', desc: 'Világos menü, finom vonalak, indigó kiemelés' },
+  { id: 'uzemi', name: 'Üzemi-kontraszt', desc: 'Fekete menü, borostyán kiemelés, vastag kontúrok' },
 ]
 
 const STORAGE_KEY = 'pp-skin'
@@ -28,21 +35,41 @@ export function applySavedSkin(): void {
   } catch { /* privát mód stb. — marad az alap */ }
 }
 
+function applyDataSkin(id: string): void {
+  if (id) document.documentElement.dataset.skin = id
+  else delete document.documentElement.dataset.skin
+}
+
 export function SkinSelect() {
+  const { status, user, setUserSkin } = useAuth()
+  const isBypass = status === 'bypass'
   const [skin, setSkin] = useState<string>('')
 
+  // A választott skin forrása: bejelentkezve a saját user-rekord, dev/bypass
+  // módban a localStorage.
   useEffect(() => {
-    try { setSkin(localStorage.getItem(STORAGE_KEY) || '') } catch { /* noop */ }
-  }, [])
+    if (isBypass) {
+      try { setSkin(localStorage.getItem(STORAGE_KEY) || '') } catch { /* noop */ }
+    } else {
+      setSkin(user?.skin ?? '')
+    }
+  }, [isBypass, user?.skin])
 
-  const choose = (id: string) => {
+  const choose = async (id: string) => {
     setSkin(id)
+    applyDataSkin(id)            // azonnali visszajelzés
+    if (isBypass) {
+      try {
+        if (id) localStorage.setItem(STORAGE_KEY, id)
+        else localStorage.removeItem(STORAGE_KEY)
+      } catch { /* noop */ }
+      return
+    }
     try {
-      if (id) localStorage.setItem(STORAGE_KEY, id)
-      else localStorage.removeItem(STORAGE_KEY)
-    } catch { /* noop */ }
-    if (id) document.documentElement.dataset.skin = id
-    else delete document.documentElement.dataset.skin
+      await setUserSkin(id)      // a saját user-rekordba menti (szerver)
+    } catch {
+      toast.error('A megjelenés mentése nem sikerült')
+    }
   }
 
   return (

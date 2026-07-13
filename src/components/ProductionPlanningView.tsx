@@ -247,7 +247,7 @@ function MachineCard({ machine, assignments, orderMap, activeDragOrderId, canEdi
           </div>
           <button onClick={() => onOpenLog(machine)}
             className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-            title="Log"><List size={14} /></button>
+            title="Napló"><List size={14} /></button>
           <button onClick={() => onRemoveFromView(machine.id)}
             className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
             title="Eltávolítás a nézetből"><X size={14} /></button>

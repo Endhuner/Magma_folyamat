@@ -4,7 +4,6 @@
  * Csak prop-okon át kap adatot — a CRUD műveleteket a hívó (App.tsx) végzi.
  */
 import { Button } from '@/components/ui/button'
-import { TabsContent } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Plus, Upload, MagnifyingGlass } from '@phosphor-icons/react'
 import { ProductsTable } from '@/components/ProductsTable'
@@ -17,6 +16,8 @@ interface SavedTemplateRef {
 }
 
 export interface ProductsPanelProps {
+  onOpenDatasheet?: (productId: string) => void
+  datasheetProductIds?: Set<string>
   filteredProducts: Product[]
   orders: Order[] | null | undefined
   productSearchQuery: string
@@ -40,9 +41,11 @@ export function ProductsPanel({
   handleDeleteProduct,
   handleBulkDeleteProducts,
   savedTemplates,
+  onOpenDatasheet,
+  datasheetProductIds,
 }: ProductsPanelProps) {
   return (
-    <TabsContent value="products" className="space-y-6">
+    <section className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight mb-1">Termékek</h2>
@@ -71,6 +74,8 @@ export function ProductsPanel({
       </div>
 
       <ProductsTable
+        onOpenDatasheet={onOpenDatasheet}
+        datasheetProductIds={datasheetProductIds}
         products={filteredProducts}
         orders={orders || []}
         onEdit={handleEditProduct}
@@ -78,6 +83,6 @@ export function ProductsPanel({
         onBulkDelete={handleBulkDeleteProducts}
         savedTemplates={savedTemplates}
       />
-    </TabsContent>
+    </section>
   )
 }

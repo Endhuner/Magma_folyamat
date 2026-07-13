@@ -13,7 +13,6 @@
  */
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { TabsContent } from '@/components/ui/tabs'
 import {
   Collapsible,
   CollapsibleContent,
@@ -99,6 +98,8 @@ export interface OrdersPanelProps {
   labelTemplates: LabelTemplate[] | null | undefined
   /** Becsült alapanyag-készlet (kg) az összesítő sáv fedezet-jelzéséhez. */
   materialEstimateKg?: number | null
+  /** Vevői árlisták — aktuális ár/rendelt érték oszlopok az OrdersTable-ben. */
+  priceLists?: import('@/lib/types').PriceList[]
   activeLabelTemplateId: string | null | undefined
   savedDeliveryTemplates?: Array<{ id: string; data: { type: string; html: string; css: string; active?: boolean } }> | null
   activeTemplates?: { cmr?: string; delivery?: string; pallet?: string; 'box-label'?: string }
@@ -144,8 +145,8 @@ export interface OrdersPanelProps {
   handleBatchStatusChange: (ids: string[], status: OrderStatus) => void
   handleDeleteSelectedOrders: () => void
   handleUndoLastAction: () => void
-  handleExportDelivery: () => void | Promise<void>
-  handleExportCmr: () => void | Promise<void>
+  handleExportDelivery: (idsOverride?: string[]) => void | Promise<void>
+  handleExportCmr: (idsOverride?: string[]) => void | Promise<void>
 }
 
 export function OrdersPanel({
@@ -155,6 +156,7 @@ export function OrdersPanel({
   products,
   labelTemplates,
   materialEstimateKg,
+  priceLists,
   activeLabelTemplateId,
   savedDeliveryTemplates,
   activeTemplates,
@@ -231,7 +233,7 @@ export function OrdersPanel({
   }, [orders])
 
   return (
-    <TabsContent value="orders" className="space-y-6 pb-32">
+    <section className="space-y-6 pb-32">
 
       {/* ── Rendelésállomány összesítő ──────────────────────────────── */}
       <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
@@ -539,14 +541,14 @@ export function OrdersPanel({
                     Szállítási dokumentumok
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={handleExportDelivery}
+                    onSelect={() => handleExportDelivery()}
                     className="pl-6 gap-2 text-foreground bg-accent/10 hover:bg-accent/20 focus:bg-accent/20"
                   >
                     <Truck className="w-4 h-4" />
                     Szállítólevél készítés
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={handleExportCmr}
+                    onSelect={() => handleExportCmr()}
                     className="pl-6 gap-2 text-foreground bg-secondary/10 hover:bg-secondary/20 focus:bg-secondary/20"
                   >
                     <FileText className="w-4 h-4" />
@@ -729,6 +731,7 @@ export function OrdersPanel({
         orders={filteredOrders}
         products={products || []}
         materialEstimateKg={materialEstimateKg}
+        priceLists={priceLists}
         onEdit={handleEditOrder}
         onDelete={handleDeleteOrder}
         onDuplicate={handleDuplicateOrder}
@@ -770,6 +773,6 @@ export function OrdersPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </TabsContent>
+    </section>
   )
 }

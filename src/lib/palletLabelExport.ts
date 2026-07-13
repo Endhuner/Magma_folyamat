@@ -1,5 +1,4 @@
 import { Order, Customer, Product } from './types'
-import { buildPrintPageCss, DEFAULT_LABEL_MARGINS, type PrintMargins } from './printConfig'
 import { parseIntSafe, parseFloatSafe } from './helpers'
 import { esc } from './htmlSafe'
 import { findProductForOrder } from './productionHelpers'
@@ -131,7 +130,7 @@ function renderLabel(d: PalletLabelData): string {
   `
 }
 
-function buildHTML(labels: PalletLabelData[], margins: PrintMargins): string {
+function buildHTML(labels: PalletLabelData[]): string {
   const rendered = labels.map(renderLabel).join('\n')
 
   return `<!DOCTYPE html>
@@ -140,7 +139,7 @@ function buildHTML(labels: PalletLabelData[], margins: PrintMargins): string {
   <meta charset="UTF-8">
   <title>Raklap cimke</title>
   <style>
-    ${buildPrintPageCss({ size: 'A4 landscape', margins })}
+    @page { size: A4 landscape; margin: 10mm; }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -311,7 +310,7 @@ function applyPalletTemplate(templateHtml: string, templateCss: string, d: Palle
   return html
 }
 
-function buildHTMLFromTemplate(labels: PalletLabelData[], templateHtml: string, templateCss: string, margins: PrintMargins): string {
+function buildHTMLFromTemplate(labels: PalletLabelData[], templateHtml: string, templateCss: string): string {
   const rendered = labels.map(d => applyPalletTemplate(templateHtml, templateCss, d)).join('\n')
   return `<!DOCTYPE html>
 <html lang="hu">
@@ -331,7 +330,8 @@ function buildHTMLFromTemplate(labels: PalletLabelData[], templateHtml: string, 
     }
     .pallet-label:last-child { page-break-after: avoid; }
     ${templateCss}
-    ${buildPrintPageCss({ size: 'A4 landscape', margins })}
+    @page { size: A4 landscape; margin: 10mm; }
+    @media print { body { margin: 0; } }
   </style>
 </head>
 <body>
@@ -344,9 +344,8 @@ export function generatePalletLabels(
   orders: Order[],
   customers: Customer[],
   products: Product[],
-  savedTemplatesOverride?: Array<{ id: string; data: { type: string; html: string; css: string; active?: boolean } }>,
-  margins: PrintMargins = DEFAULT_LABEL_MARGINS
-): void {
+  savedTemplatesOverride?: Array<{ id: string; data: { type: string; html: string; css: string; active?: boolean } }>
+): boolean {
   const allLabels: PalletLabelData[] = []
 
   for (const order of orders) {
@@ -361,7 +360,7 @@ export function generatePalletLabels(
 
   if (allLabels.length === 0) {
     alert('Nem sikerült cimkéket generálni — ellenőrizze, hogy a kijelölt rendelésekhez van vevő és termék rendelve.')
-    return
+    return false
   }
 
   // Mentett raklap sablon keresése
@@ -369,13 +368,14 @@ export function generatePalletLabels(
     ?? savedTemplatesOverride?.find(t => t.data?.type === 'pallet')
 
   const html = savedPalletTemplate
-    ? buildHTMLFromTemplate(allLabels, savedPalletTemplate.data.html, savedPalletTemplate.data.css, margins)
-    : buildHTML(allLabels, margins)
+    ? buildHTMLFromTemplate(allLabels, savedPalletTemplate.data.html, savedPalletTemplate.data.css)
+    : buildHTML(allLabels)
 
   const win = window.open('', '_blank')
-  if (!win) return
+  if (!win) return false
   win.document.write(html)
   win.document.close()
   win.focus()
   setTimeout(() => win.print(), 400)
+  return true
 }
