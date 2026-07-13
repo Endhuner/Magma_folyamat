@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   deductInventoryForOrders,
   applyInventoryDeduction,
+  restoreInventoryForOrders,
 } from './inventoryService'
-import type { Order, Product, InventoryItem } from './types'
+import type { Order, Product, InventoryItem, InventoryTransaction } from './types'
 
 const mkOrder = (p: Partial<Order>): Order =>
   ({
@@ -188,6 +189,35 @@ describe('applyInventoryDeduction', () => {
     }
     const updated = applyInventoryDeduction(inventory, result)
     expect(updated[0].quantity).toBe(0)
+  })
+
+  it('restores exactly the net deducted amount (out − previous restores)', () => {
+    const order = mkOrder({ id: 'o1', ownOrderNumber: 'M261001' })
+    const txs: InventoryTransaction[] = [
+      { id: 't1', inventoryItemId: 'inv1', type: 'out', quantity: 100, orderId: 'o1', notes: '', createdAt: '' },
+      // korábbi részleges visszatöltés
+      { id: 't2', inventoryItemId: 'inv1', type: 'in', quantity: 40, orderId: 'o1', notes: '', createdAt: '' },
+      // műszakból származó bevét — NEM számít bele
+      { id: 't3', inventoryItemId: 'inv1', type: 'in', quantity: 500, orderId: 'o1', shiftId: 's1', notes: '', createdAt: '' },
+      // másik rendelés mozgása — nem számít
+      { id: 't4', inventoryItemId: 'inv1', type: 'out', quantity: 30, orderId: 'o2', notes: '', createdAt: '' },
+    ]
+    const r = restoreInventoryForOrders([order], txs)
+    expect(r.restoredItems).toHaveLength(1)
+    expect(r.restoredItems[0].quantity).toBe(60) // 100 − 40
+    expect(r.transactions[0].type).toBe('in')
+    expect(r.transactions[0].orderId).toBe('o1')
+  })
+
+  it('restore is idempotent — nothing left after a full restore', () => {
+    const order = mkOrder({ id: 'o1' })
+    const txs: InventoryTransaction[] = [
+      { id: 't1', inventoryItemId: 'inv1', type: 'out', quantity: 50, orderId: 'o1', notes: '', createdAt: '' },
+      { id: 't2', inventoryItemId: 'inv1', type: 'in', quantity: 50, orderId: 'o1', notes: '', createdAt: '' },
+    ]
+    const r = restoreInventoryForOrders([order], txs)
+    expect(r.restoredItems).toHaveLength(0)
+    expect(r.transactions).toHaveLength(0)
   })
 
   it('aggregates multiple deductions targeting the same item', () => {

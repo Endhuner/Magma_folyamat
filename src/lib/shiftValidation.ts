@@ -11,6 +11,7 @@
  *   - A mai nap és a jövő (csak múltbeli, lezárt napokra érvényes)
  */
 import type { Order, ProductionShift } from '@/lib/types'
+import { isWorkday, DEFAULT_WORK_CALENDAR, type WorkCalendarSettings } from '@/lib/workCalendar'
 
 export interface MissingShift {
   orderId: string
@@ -39,17 +40,22 @@ function atMidnight(d: Date): Date {
 }
 
 /**
- * Visszaadja azt a dátumot, amikortól már hiányzó műszakot kell jelezni.
- * Ez az első rögzített műszak dátuma — ha még nincs egyetlen műszak sem,
- * null-t ad vissza (ilyenkor nem jelzünk hiányt: a gyártás még nem indult el).
+ * Rendelésenként a legkorábbi műszak-dátum (= a gyártás indulása) egyetlen
+ * végigolvasással. Ha egy rendeléshez nincs műszak, nem kerül a map-be —
+ * ilyenkor nem jelzünk hiányt: a gyártás még nem indult el.
  */
-function orderProductionStartDate(orderId: string, shifts: ProductionShift[]): Date | null {
-  const orderShifts = shifts.filter(s => s.orderId === orderId)
-  if (orderShifts.length === 0) return null
-  const earliest = orderShifts.reduce((min, s) => s.date < min ? s.date : min, orderShifts[0].date)
-  const d = new Date(earliest)
-  if (Number.isNaN(d.getTime())) return null
-  return atMidnight(d)
+function buildProductionStartDates(shifts: ProductionShift[]): Map<string, Date> {
+  const earliest = new Map<string, string>()
+  for (const s of shifts) {
+    const cur = earliest.get(s.orderId)
+    if (cur === undefined || s.date < cur) earliest.set(s.orderId, s.date)
+  }
+  const result = new Map<string, Date>()
+  for (const [orderId, date] of earliest) {
+    const d = new Date(date)
+    if (!Number.isNaN(d.getTime())) result.set(orderId, atMidnight(d))
+  }
+  return result
 }
 
 /**
@@ -58,12 +64,21 @@ function orderProductionStartDate(orderId: string, shifts: ProductionShift[]): D
  */
 export function detectMissingShifts(
   orders: Order[],
-  shifts: ProductionShift[]
+  shifts: ProductionShift[],
+  opts: { includeWeekends?: boolean; calendar?: WorkCalendarSettings } = {}
 ): MissingShift[] {
+  // Munkanaptár: alapból magyar ünnepnapok + H–P munkarend. Csak munkanapokra
+  // jelzünk hiányt (hétvége/ünnep nem álriasztás). Az includeWeekends visszafelé
+  // kompatibilis kapcsoló: minden napot munkanapnak vesz.
+  const calendar: WorkCalendarSettings = opts.includeWeekends
+    ? { ...DEFAULT_WORK_CALENDAR, workdays: [0, 1, 2, 3, 4, 5, 6], observeHolidays: false }
+    : opts.calendar ?? DEFAULT_WORK_CALENDAR
   const today = atMidnight(new Date())
   const lookback: Date[] = []
   for (let i = 1; i <= LOOKBACK_DAYS; i++) {
-    lookback.push(new Date(today.getTime() - i * MS_PER_DAY))
+    const day = new Date(today.getTime() - i * MS_PER_DAY)
+    if (!isWorkday(day, calendar)) continue
+    lookback.push(day)
   }
 
   // Indexeljük a meglévő műszakokat (orderId|date|shift → ProductionShift)
@@ -75,9 +90,11 @@ export function detectMissingShifts(
   // Csak `Folyamatban` rendelésekre nézzük — a PRD erről konkrétan rendelkezik.
   const trackedOrders = orders.filter((o) => o.status === 'Folyamatban')
 
+  const startDates = buildProductionStartDates(shifts)
+
   const missing: MissingShift[] = []
   for (const order of trackedOrders) {
-    const startDate = orderProductionStartDate(order.id, shifts)
+    const startDate = startDates.get(order.id)
     // Ha még egyetlen műszak sincs rögzítve, a gyártás nem kezdődött el → nincs hiány
     if (!startDate) continue
     for (const day of lookback) {

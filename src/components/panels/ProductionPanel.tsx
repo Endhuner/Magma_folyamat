@@ -11,6 +11,7 @@
  * is propként adjuk át, hogy a panel teszthető legyen anélkül, hogy a
  * `useMediaQuery` hook fusson.
  */
+import type { ReactNode } from 'react'
 import { TabsContent } from '@/components/ui/tabs'
 import { ProductionView } from '@/components/ProductionView'
 import { MobileProductionView } from '@/components/MobileProductionView'
@@ -38,6 +39,9 @@ export interface ProductionPanelProps {
   handleUpdateOrderNotes: (orderId: string, notes: string) => void
   handleSaveDefect: (defect: ProductionDefect) => void
   handleDeleteDefect: (id: string) => void
+
+  /** Opcionális blokk a nézet fölé — pl. az alapanyag-sáv (MaterialPanel). */
+  materialSlot?: ReactNode
 }
 
 export function ProductionPanel({
@@ -54,9 +58,11 @@ export function ProductionPanel({
   handleUpdateOrderNotes,
   handleSaveDefect,
   handleDeleteDefect,
+  materialSlot,
 }: ProductionPanelProps) {
   return (
     <TabsContent value="production" className="space-y-6">
+      {materialSlot}
       {isMobile ? (
         <MobileProductionView
           orders={orders || []}

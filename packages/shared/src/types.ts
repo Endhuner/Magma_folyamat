@@ -333,6 +333,8 @@ export type AuditEntityType =
   | 'defect'
   | 'inventory'
   | 'inventoryTransaction'
+  | 'maintenance'
+  | 'message'
 
 /** Az audit-log műveletek. */
 export type AuditAction =

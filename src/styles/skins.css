@@ -1,0 +1,327 @@
+/**
+ * Skin-rendszer — a <html data-skin="…"> attribútum kapcsolja.
+ *
+ * A skin két rétegből áll:
+ *  1) SZÍN-tokenek: az index.css :root / .dark változóinak felülírása
+ *  2) KIALAKÍTÁS: strukturális felülírások a shadcn data-slot attribútumain
+ *     (fülek, kártyák, táblák, gombok) — a Prime skin a primeng.dev teljes
+ *     formavilágát hozza, nem csak a színeit.
+ *
+ * A skin a sötét móddal kombinálható: [data-skin] + .dark[data-skin] blokkok.
+ */
+
+/* ═══════════════════ PRIME (primeng.dev ihletésű) ═══════════════════ */
+
+/* ── Szín-tokenek · világos ── */
+html[data-skin='prime'] {
+  --background: #f8fafc;        /* slate-50 */
+  --foreground: #334155;        /* slate-700 */
+  --card: #ffffff;
+  --card-foreground: #334155;
+  --popover: #ffffff;
+  --popover-foreground: #334155;
+  --primary: #10b981;           /* emerald-500 */
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;         /* slate-100 */
+  --secondary-foreground: #334155;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;  /* slate-500 */
+  --accent: #d1fae5;            /* emerald-100 */
+  --accent-foreground: #047857; /* emerald-700 */
+  --border: #e2e8f0;            /* slate-200 */
+  --input: #e2e8f0;
+  --ring: #10b981;
+  --radius: 0.75rem;            /* kerekebb, PrimeNG-es */
+  /* táblázat csíkozás (virtualRow / even sorok) */
+  --row-stripe: #f8fafc;
+}
+
+/* ── Szín-tokenek · sötét (PrimeNG dark: slate-900 felületek) ── */
+html.dark[data-skin='prime'] {
+  --background: #0f172a;        /* slate-900 */
+  --foreground: #cbd5e1;        /* slate-300 */
+  --card: #1e293b;              /* slate-800 */
+  --card-foreground: #cbd5e1;
+  --popover: #1e293b;
+  --popover-foreground: #cbd5e1;
+  --primary: #34d399;           /* emerald-400 — sötéten világosabb */
+  --primary-foreground: #052e1b;
+  --secondary: #334155;
+  --secondary-foreground: #cbd5e1;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #064e3b;            /* emerald-900 */
+  --accent-foreground: #6ee7b7;
+  --border: #334155;            /* slate-700 */
+  --input: #334155;
+  --ring: #34d399;
+  --row-stripe: #16213404;
+}
+
+/* ── Kártyák — lágy PrimeNG-árnyék, nagyobb lekerekítés, hover-emelkedés ── */
+html[data-skin='prime'] [data-slot='card'] {
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.06),
+    0 4px 12px rgb(15 23 42 / 0.06);
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+html.dark[data-skin='prime'] [data-slot='card'] {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+}
+
+/* ── Csempék (dashboard statisztika-kártyák) — Sakai-stílus ── */
+html[data-skin='prime'] .stat-tile {
+  border-radius: 14px;
+}
+html[data-skin='prime'] .stat-tile:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 2px 4px rgb(15 23 42 / 0.06),
+    0 10px 24px rgb(15 23 42 / 0.10);
+}
+/* az ikon kap egy smaragd-tónusú, lekerekített "dobozt" */
+html[data-skin='prime'] .stat-tile svg {
+  background: var(--accent);
+  color: var(--accent-foreground);
+  border-radius: 10px;
+  padding: 8px;
+  width: 42px !important;
+  height: 42px !important;
+  box-sizing: border-box;
+}
+html.dark[data-skin='prime'] .stat-tile svg {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+/* ── Fülek — aláhúzásos stílus a kitöltött helyett ── */
+html[data-skin='prime'] [data-slot='tabs-list'] {
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0;
+  gap: 0.25rem;
+}
+html[data-skin='prime'] [data-slot='tabs-trigger'] {
+  background: transparent !important;
+  border-radius: 0;
+  border: none;
+  box-shadow: none !important;
+  color: var(--muted-foreground);
+  padding-bottom: 0.55rem;
+  position: relative;
+  transition: color 150ms ease;
+}
+html[data-skin='prime'] [data-slot='tabs-trigger']:hover {
+  color: var(--foreground);
+}
+html[data-skin='prime'] [data-slot='tabs-trigger'][data-state='active'] {
+  color: var(--foreground);
+  font-weight: 600;
+}
+html[data-skin='prime'] [data-slot='tabs-trigger'][data-state='active']::after {
+  content: '';
+  position: absolute;
+  left: 0.4rem;
+  right: 0.4rem;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--primary);
+}
+
+/* ── Adattábla — PrimeNG DataTable: félkövér fejléc, tágas cellák, hover ── */
+html[data-skin='prime'] [data-slot='table-head'],
+html[data-skin='prime'] thead th {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #475569;
+  background: var(--muted);
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+  text-transform: none;
+  letter-spacing: normal;
+}
+html.dark[data-skin='prime'] [data-slot='table-head'],
+html.dark[data-skin='prime'] thead th {
+  color: #94a3b8;
+}
+html[data-skin='prime'] [data-slot='table-cell'],
+html[data-skin='prime'] tbody td {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+html[data-skin='prime'] [data-slot='table-row'],
+html[data-skin='prime'] tbody tr {
+  transition: background-color 120ms ease;
+}
+html[data-skin='prime'] [data-slot='table-row']:hover,
+html[data-skin='prime'] tbody tr:hover {
+  background: color-mix(in srgb, var(--primary) 7%, transparent);
+}
+
+/* ── Gombok — PrimeNG "outlined": átlátszó háttér, színes keret + szöveg,
+      halvány szín-kitöltés hoverre. A szegély színe a gomb szerepe szerint. ── */
+html[data-skin='prime'] [data-slot='button'] {
+  border-radius: 8px;
+  font-weight: 500;
+  border-width: 1px;
+  border-style: solid;
+  box-shadow: none !important;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 90ms ease;
+}
+html[data-skin='prime'] [data-slot='button']:active { transform: scale(0.98); }
+
+/* Elsődleges (Primary) — smaragd kontúr */
+html[data-skin='prime'] [data-slot='button'][data-variant='default'] {
+  background: transparent !important;
+  color: #059669 !important;
+  border-color: #10b981 !important;
+}
+html[data-skin='prime'] [data-slot='button'][data-variant='default']:hover {
+  background: color-mix(in srgb, #10b981 10%, transparent) !important;
+}
+
+/* Másodlagos (Secondary) — slate kontúr */
+html[data-skin='prime'] [data-slot='button'][data-variant='secondary'] {
+  background: transparent !important;
+  color: #475569 !important;
+  border-color: #94a3b8 !important;
+}
+html[data-skin='prime'] [data-slot='button'][data-variant='secondary']:hover {
+  background: color-mix(in srgb, #64748b 12%, transparent) !important;
+}
+
+/* Törlés / veszély (Danger) — piros kontúr */
+html[data-skin='prime'] [data-slot='button'][data-variant='destructive'] {
+  background: transparent !important;
+  color: #dc2626 !important;
+  border-color: #ef4444 !important;
+}
+html[data-skin='prime'] [data-slot='button'][data-variant='destructive']:hover {
+  background: color-mix(in srgb, #ef4444 10%, transparent) !important;
+}
+
+/* Semleges körvonal (outline variáns) */
+html[data-skin='prime'] [data-slot='button'][data-variant='outline'] {
+  color: var(--foreground);
+  border-color: #cbd5e1;
+}
+html[data-skin='prime'] [data-slot='button'][data-variant='outline']:hover {
+  background: color-mix(in srgb, var(--primary) 8%, transparent) !important;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Ghost / link — keret nélkül, halvány hover-kiemeléssel */
+html[data-skin='prime'] [data-slot='button'][data-variant='ghost'],
+html[data-skin='prime'] [data-slot='button'][data-variant='link'] {
+  border-color: transparent;
+}
+html[data-skin='prime'] [data-slot='button'][data-variant='ghost']:hover {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--primary);
+}
+
+/* Sötét mód — világosabb kontúr-színek */
+html.dark[data-skin='prime'] [data-slot='button'][data-variant='default'] {
+  color: #34d399 !important; border-color: #34d399 !important;
+}
+html.dark[data-skin='prime'] [data-slot='button'][data-variant='destructive'] {
+  color: #f87171 !important; border-color: #f87171 !important;
+}
+html.dark[data-skin='prime'] [data-slot='button'][data-variant='secondary'] {
+  color: #cbd5e1 !important; border-color: #475569 !important;
+}
+
+/* ── Beviteli mezők / select / autocomplete — Aura fókuszgyűrű ── */
+html[data-skin='prime'] [data-slot='input'],
+html[data-skin='prime'] input:not([type='checkbox']):not([type='radio']),
+html[data-skin='prime'] textarea,
+html[data-skin='prime'] [data-slot='select-trigger'] {
+  border-radius: 8px;
+  border-color: #cbd5e1; /* slate-300 */
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+html.dark[data-skin='prime'] [data-slot='input'],
+html.dark[data-skin='prime'] input:not([type='checkbox']):not([type='radio']),
+html.dark[data-skin='prime'] textarea,
+html.dark[data-skin='prime'] [data-slot='select-trigger'] {
+  border-color: #475569;
+}
+html[data-skin='prime'] [data-slot='input']:focus-visible,
+html[data-skin='prime'] input:focus-visible,
+html[data-skin='prime'] textarea:focus-visible,
+html[data-skin='prime'] [data-slot='select-trigger']:focus-visible,
+html[data-skin='prime'] [data-slot='select-trigger'][data-state='open'] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--primary) 25%, transparent);
+  outline: none;
+}
+
+/* ── Lenyíló panelek (select / dropdown / popover / kereső) — Aura overlay ── */
+html[data-skin='prime'] [data-slot='select-content'],
+html[data-skin='prime'] [data-slot='dropdown-menu-content'],
+html[data-skin='prime'] [data-slot='popover-content'],
+html[data-skin='prime'] [data-slot='command'] {
+  border-radius: 10px;
+  box-shadow:
+    0 4px 6px -1px rgb(15 23 42 / 0.1),
+    0 10px 24px -2px rgb(15 23 42 / 0.12);
+  border-color: var(--border);
+}
+html[data-skin='prime'] [data-slot='select-item'],
+html[data-skin='prime'] [data-slot='dropdown-menu-item'],
+html[data-skin='prime'] [data-slot='command-item'] {
+  border-radius: 6px;
+  transition: background-color 120ms ease;
+}
+html[data-skin='prime'] [data-slot='select-item'][data-state='checked'] {
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-weight: 600;
+}
+
+/* ── Dialógusok (ablakok) — tágasabb, kerekebb, nagy Aura-árnyék ── */
+html[data-skin='prime'] [data-slot='dialog-content'] {
+  border-radius: 14px;
+  padding: 1.5rem;
+  gap: 1.1rem;
+  box-shadow: 0 20px 60px rgb(15 23 42 / 0.22);
+}
+html[data-skin='prime'] [data-slot='dialog-title'] {
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+html[data-skin='prime'] [data-slot='dialog-header'] {
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.25rem;
+}
+html[data-skin='prime'] [data-slot='dialog-footer'] {
+  padding-top: 0.5rem;
+}
+
+/* ── Jelvények / státusz-pillek ── */
+html[data-skin='prime'] [data-slot='badge'] {
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+/* ── Vékony, slate görgetősáv (PrimeNG-es finomság) ── */
+html[data-skin='prime'] ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+html[data-skin='prime'] ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+  border: 2px solid var(--background);
+}
+html.dark[data-skin='prime'] ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+html[data-skin='prime'] ::-webkit-scrollbar-track {
+  background: transparent;
+}

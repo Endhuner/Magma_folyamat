@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Card } from '@/components/ui/card'
 import { DeliveryNote, Order, Customer, Product, ColumnFilter } from '@/lib/types'
-import { Trash, FileText, FileCsv, Eye, FileArrowDown, MagnifyingGlass, X, PencilSimple, Funnel, CalendarBlank, TrendUp, Envelope } from '@phosphor-icons/react'
+import { Trash, FileText, FileCsv, Eye, FileArrowDown, MagnifyingGlass, X, PencilSimple, Funnel, CalendarBlank, TrendUp, Envelope, Package, Plus, FilePdf } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 import { hu } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -23,10 +24,16 @@ interface DeliveryNotesTableProps {
   products: Product[]
   onDelete: (id: string) => void
   onUpdate?: (id: string, updatedData: Record<string, string | number | null | undefined>[]) => void
+  /** Kiegészítő tételek szerkesztése (szerszám/anyag/szabad sor a nyomtatványra). */
+  onEditExtraItems?: (note: DeliveryNote) => void
+  /** Új szállítólevél/CMR készítése rendelés-kiválasztással. */
+  onCreateNew?: () => void
+  /** PDF letöltés (szerver-oldali generálás + mentés a PDF-mappába). */
+  onDownloadPdf?: (note: DeliveryNote) => void
   visibleColumns?: string[]
 }
 
-function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, onDelete, onUpdate, visibleColumns }: DeliveryNotesTableProps) {
+function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, onDelete, onUpdate, onEditExtraItems, onCreateNew, onDownloadPdf, visibleColumns }: DeliveryNotesTableProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'delivery' | 'cmr'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all')
@@ -35,8 +42,15 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false)
   const [activeColumnFilter, setActiveColumnFilter] = useState<ColumnFilter | null>(null)
 
+  // orderId → Order térkép egyszer, hogy a getOrderNumbers ne O(n) find-oljon
+  // soronként (100 szállítólevél × 5000 rendelés = milliós keresés helyett O(1)).
+  const orderById = useMemo(
+    () => new Map(orders.map((o) => [o.id, o])),
+    [orders]
+  )
+
   const sortedNotes = useMemo(() => {
-    return [...deliveryNotes].sort((a, b) => 
+    return [...deliveryNotes].sort((a, b) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
   }, [deliveryNotes])
@@ -86,7 +100,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
 
   const getOrderNumbers = (orderIds: string[]) => {
     const orderNumbers = orderIds
-      .map(id => orders.find(o => o.id === id)?.ownOrderNumber)
+      .map(id => orderById.get(id)?.ownOrderNumber)
       .filter(Boolean)
     
     if (orderNumbers.length === 0) return '-'
@@ -360,6 +374,12 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
 
       <div className="mb-4 space-y-3">
         <div className="flex flex-col md:flex-row gap-3">
+          {onCreateNew && (
+            <Button onClick={onCreateNew} className="gap-1.5 shrink-0">
+              <Plus className="w-4 h-4" />
+              Új szállítólevél / CMR
+            </Button>
+          )}
           <div className="relative flex-1">
             <MagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
@@ -434,6 +454,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
       </div>
 
       <div className="border rounded-lg">
+        <ScrollArea className="w-full whitespace-nowrap">
         <Table>
           <TableHeader>
             <TableRow>
@@ -456,7 +477,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
               </TableRow>
             ) : (
               filteredNotes.map((note, index) => (
-                <TableRow key={note.id} className="even:bg-[oklch(0.94_0.015_250)] hover:bg-[oklch(0.88_0.02_250)]">
+                <TableRow key={note.id} className="even:bg-[var(--row-stripe)] hover:bg-[var(--row-hover)]">
                   {isColumnVisible('sequenceNumber') && (
                     <TableCell>
                       <Badge variant="outline" className="font-mono">
@@ -514,7 +535,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
                           variant="ghost"
                           size="icon"
                           onClick={() => handleViewDetails(note)}
-                          className="h-8 w-8"
+                          className="h-8 w-8 coarse:h-10 coarse:w-10"
                           title="Részletek megtekintése"
                         >
                           <Eye className="w-4 h-4" />
@@ -524,18 +545,45 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
                             variant="ghost"
                             size="icon"
                             onClick={() => handleOpenPreview(note)}
-                            className="h-8 w-8"
+                            className="h-8 w-8 coarse:h-10 coarse:w-10"
                             title="Előnézet és szerkesztés"
                           >
                             <PencilSimple className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {onEditExtraItems && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onEditExtraItems(note)}
+                            className="h-8 w-8 coarse:h-10 coarse:w-10 relative"
+                            title="Kiegészítő tételek (szerszám / anyag / szabad sor)"
+                          >
+                            <Package className="w-4 h-4" />
+                            {(note.extraItems?.length ?? 0) > 0 && (
+                              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-0.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold leading-4">
+                                {note.extraItems!.length}
+                              </span>
+                            )}
+                          </Button>
+                        )}
+                        {onDownloadPdf && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onDownloadPdf(note)}
+                            className="h-8 w-8 coarse:h-10 coarse:w-10 text-red-600"
+                            title="PDF letöltés (a szerver PDF-mappájába is menti)"
+                          >
+                            <FilePdf className="w-4 h-4" />
                           </Button>
                         )}
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleReExport(note)}
-                          className="h-8 w-8"
-                          title="Újra letöltés"
+                          className="h-8 w-8 coarse:h-10 coarse:w-10"
+                          title="Excel újra letöltés"
                         >
                           <FileArrowDown className="w-4 h-4" />
                         </Button>
@@ -551,7 +599,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
+                              className="h-8 w-8 coarse:h-10 coarse:w-10"
                               title={email ? `Email küldése: ${email}` : 'Az ügyfélnek nincs email-címe'}
                               disabled={!email}
                               asChild={!!email}
@@ -570,7 +618,7 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
                           variant="ghost"
                           size="icon"
                           onClick={() => onDelete(note.id)}
-                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          className="h-8 w-8 coarse:h-10 coarse:w-10 text-destructive hover:text-destructive hover:bg-destructive/10"
                           title="Törlés"
                         >
                           <Trash className="w-4 h-4" />
@@ -583,6 +631,8 @@ function DeliveryNotesTableImpl({ deliveryNotes, orders, customers, products, on
             )}
           </TableBody>
         </Table>
+        <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       </div>
 
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>

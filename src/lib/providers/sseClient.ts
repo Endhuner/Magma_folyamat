@@ -50,6 +50,8 @@ function dispatch(type: string): void {
   }
 }
 
+let wasDisconnected = false
+
 function connect(): void {
   teardown()
   const types = activeTypes()
@@ -61,12 +63,22 @@ function connect(): void {
     es.addEventListener(type, () => dispatch(type))
   }
 
-  es.onerror = () => {
-    teardown()
-    reconnectTimer = setTimeout(() => {
+  // Csak SIKERES újracsatlakozás után kérünk teljes frissítést — a kimaradt
+  // események pótlására. (Korábban minden hibánál, ami szakadozó hálózaton
+  // 5 mp-enként teljes újratöltés-vihart okozott, kapcsolat nélkül is.)
+  es.onopen = () => {
+    if (wasDisconnected) {
+      wasDisconnected = false
       for (const [type] of listeners) {
         dispatch(type)
       }
+    }
+  }
+
+  es.onerror = () => {
+    wasDisconnected = true
+    teardown()
+    reconnectTimer = setTimeout(() => {
       connect()
     }, 5000)
   }

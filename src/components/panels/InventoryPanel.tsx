@@ -11,16 +11,22 @@
  * Az audit-naplózást a hívó által átadott `appendAudit` callback végzi,
  * így a szigetelt panelnek nem kell ismernie az audit-rendszert.
  */
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { TabsContent } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
-import { Plus, MagnifyingGlass, Warning } from '@phosphor-icons/react'
+import { Plus, MagnifyingGlass, Warning, ListBullets, SquaresFour } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { InventoryTable } from '@/components/InventoryTable'
+import { WarehouseShelfView } from '@/components/WarehouseShelfView'
+import { MaterialPanel } from '@/components/MaterialPanel'
+import type { MaterialActionKind } from '@/lib/materialService'
 import type {
   Order,
   Product,
   InventoryItem,
+  InventoryTransaction,
+  ProductionShift,
   AuditEntityType,
   AuditAction,
   AuditFieldChange,
@@ -34,6 +40,15 @@ export interface InventoryPanelProps {
   ) => void
   products: Product[] | null | undefined
   orders: Order[] | null | undefined
+
+  // Az alapanyag-blokkhoz (élő fogyás-becslés + bevét/visszaolvasztás/leltár)
+  inventoryTransactions: InventoryTransaction[] | null | undefined
+  productionShifts: ProductionShift[] | null | undefined
+  onMaterialAction: (result: {
+    updatedItem: InventoryItem
+    transaction: InventoryTransaction
+    kind: MaterialActionKind
+  }) => void
 
   inventorySearchQuery: string
   setInventorySearchQuery: (q: string) => void
@@ -62,6 +77,9 @@ export function InventoryPanel({
   setInventory,
   products,
   orders,
+  inventoryTransactions,
+  productionShifts,
+  onMaterialAction,
   lowStockItems = [],
   inventorySearchQuery,
   setInventorySearchQuery,
@@ -74,14 +92,57 @@ export function InventoryPanel({
   setWarehouseAddDialogOpen,
   appendAudit,
 }: InventoryPanelProps) {
+  const [viewMode, setViewMode] = useState<'list' | 'shelf'>('list')
+
+  /** Helykód mentése a polc-nézetből — auditálva, szinkronizálva. */
+  const handleUpdateLocation = (item: InventoryItem, newLocation: string) => {
+    const before = item.location
+    if (before === newLocation) return
+    setInventory((current) =>
+      (current || []).map((i) =>
+        i.id === item.id ? { ...i, location: newLocation, lastUpdated: new Date().toISOString() } : i
+      )
+    )
+    appendAudit(
+      'inventory',
+      'Készlet',
+      item.id,
+      item.productName || item.drawingNumber || item.id,
+      'update',
+      {
+        changes: [{ field: 'location', label: 'Raktár hely', before, after: newLocation }],
+        notes: newLocation ? `Elhelyezve: ${newLocation}` : 'Hely törölve',
+      }
+    )
+    toast.success(newLocation ? `Elhelyezve: ${newLocation}` : 'Hely törölve')
+  }
+
   return (
     <TabsContent value="inventory" className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-3xl font-bold tracking-tight mb-1">Készlet</h2>
           <p className="text-muted-foreground">Termék készlet nyilvántartás</p>
         </div>
         <div className="flex gap-2">
+          <div className="flex rounded-lg border overflow-hidden mr-2">
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none gap-1.5"
+              onClick={() => setViewMode('list')}
+            >
+              <ListBullets className="w-4 h-4" /> Lista
+            </Button>
+            <Button
+              variant={viewMode === 'shelf' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none gap-1.5"
+              onClick={() => setViewMode('shelf')}
+            >
+              <SquaresFour className="w-4 h-4" /> Polc nézet
+            </Button>
+          </div>
           <Button
             variant="outline"
             onClick={() => {
@@ -127,6 +188,22 @@ export function InventoryPanel({
         </div>
       )}
 
+      {viewMode === 'shelf' && (
+        <WarehouseShelfView
+          inventory={inventory || []}
+          onUpdateLocation={handleUpdateLocation}
+          onShowHistory={(item) => {
+            setHistoryInventoryItem(item)
+            setInventoryHistoryDialogOpen(true)
+          }}
+          onAdjust={(item) => {
+            setSelectedInventoryItem(item)
+            setInventoryAdjustDialogOpen(true)
+          }}
+        />
+      )}
+
+      {viewMode === 'list' && (
       <div className="relative">
         <MagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
         <Input
@@ -136,7 +213,9 @@ export function InventoryPanel({
           className="pl-10"
         />
       </div>
+      )}
 
+      {viewMode === 'list' && (
       <InventoryTable
         inventory={(inventory || []).filter((item) => {
           if (!inventorySearchQuery) return true
@@ -189,6 +268,19 @@ export function InventoryPanel({
           setWarehouseAddPrefillProductId(productId)
           setWarehouseAddDialogOpen(true)
         }}
+      />
+      )}
+
+      {/* Alapanyag-tároló — külön kijelölt hely, nem a polcrendszeren.
+          Élő fogyás-becslés + bevét / visszaolvasztás / leltár. */}
+      <MaterialPanel
+        title="Alapanyag-tároló"
+        inventory={inventory || []}
+        shifts={productionShifts || []}
+        orders={orders || []}
+        products={products || []}
+        transactions={inventoryTransactions || []}
+        onApply={onMaterialAction}
       />
     </TabsContent>
   )

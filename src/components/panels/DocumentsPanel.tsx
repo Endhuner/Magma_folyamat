@@ -67,6 +67,10 @@ export interface DocumentsPanelProps {
   ) => void
   handlePreviewNote: (note: DeliveryNote) => void | Promise<void>
   handleDownloadPdf: (note: DeliveryNote) => Promise<void>
+  /** Kiegészítő tételek szerkesztése (szerszám/anyag/szabad sor a nyomtatványra). */
+  onEditExtraItems?: (note: DeliveryNote) => void
+  /** Új szállítólevél/CMR készítése rendelés-kiválasztással. */
+  onCreateNew?: () => void
   handleEmailNote: (note: DeliveryNote, ccEmails?: string) => void
   emailTemplate: string
   setEmailTemplate: (t: string) => void
@@ -87,6 +91,8 @@ export function DocumentsPanel({
   handleUpdateDeliveryNote,
   handlePreviewNote,
   handleDownloadPdf,
+  onEditExtraItems,
+  onCreateNew,
   handleEmailNote,
   emailTemplate,
   setEmailTemplate,
@@ -167,6 +173,9 @@ export function DocumentsPanel({
             products={products || []}
             onDelete={handleDeleteDeliveryNote}
             onUpdate={handleUpdateDeliveryNote}
+            onEditExtraItems={onEditExtraItems}
+            onCreateNew={onCreateNew}
+            onDownloadPdf={handleDownloadPdf}
             visibleColumns={
               activeFilterId
                 ? documentFilters?.find((f) => f.id === activeFilterId)?.columns

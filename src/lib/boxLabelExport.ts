@@ -1,5 +1,8 @@
 import { Order, Customer, Product } from './types'
 import { buildPrintPageCss } from './printConfig'
+import { parseFloatSafe } from './helpers'
+import { esc } from './htmlSafe'
+import { findProductForOrder } from './productionHelpers'
 
 interface BoxLabelData {
   designation: string
@@ -37,13 +40,18 @@ function formatDate(iso: string): string {
 }
 
 function buildLabelData(order: Order, product: Product | undefined): BoxLabelData {
-  const piecesPerBox = parseFloat(product?.piecesPerBox || '0') || 0
-  const weightPerPieceG = parseFloat(product?.weightPerPiece || '0') || 0
+  // parseFloatSafe: a magyar "12,5" és "1 500" formátumot is helyesen kezeli
+  const piecesPerBox = parseFloatSafe(product?.piecesPerBox)
+  const weightPerPieceG = parseFloatSafe(product?.weightPerPiece)
   const boxWeightKg = piecesPerBox * weightPerPieceG / 1000
   const boxWeight = boxWeightKg > 0 ? boxWeightKg.toFixed(1) + ' kg' : ''
 
   return {
-    designation:   order.designation || order.productName || '',
+    // Megnevezés az ÉLŐ termékből (product.productName) — így a termék
+    // szerkesztése azonnal helyesen jelenik meg a címkén, akkor is, ha a
+    // rendelés eltárolt másolata (order.designation) még a régit tartalmazza.
+    // Ugyanezt a sorrendet használja a labelTemplate és a labelExportFormats is.
+    designation:   product?.productName || order.designation || order.productName || '',
     drawingNumber: product?.drawingNumber || order.productName || '',
     piecesPerBox:  product?.piecesPerBox || '',
     material:      order.material || product?.material || '',
@@ -56,16 +64,18 @@ function buildLabelData(order: Order, product: Product | undefined): BoxLabelDat
 }
 
 function applyTemplate(templateHtml: string, d: BoxLabelData): string {
+  // Az adatmezők escape-elve kerülnek a sablonba — a felhasználói adat
+  // (pl. vevőnév "<" jellel) nem törheti el / nem injektálhat HTML-t.
   return templateHtml
-    .replace(/{{designation}}/g, d.designation)
-    .replace(/{{drawingNumber}}/g, d.drawingNumber)
-    .replace(/{{piecesPerBox}}/g, d.piecesPerBox)
-    .replace(/{{material}}/g, d.material)
-    .replace(/{{orderNumber}}/g, d.orderNumber)
-    .replace(/{{requiredDate}}/g, d.requiredDate)
-    .replace(/{{customer}}/g, d.customer)
-    .replace(/{{productNotes}}/g, d.productNotes)
-    .replace(/{{boxWeight}}/g, d.boxWeight)
+    .replace(/{{designation}}/g, esc(d.designation))
+    .replace(/{{drawingNumber}}/g, esc(d.drawingNumber))
+    .replace(/{{piecesPerBox}}/g, esc(d.piecesPerBox))
+    .replace(/{{material}}/g, esc(d.material))
+    .replace(/{{orderNumber}}/g, esc(d.orderNumber))
+    .replace(/{{requiredDate}}/g, esc(d.requiredDate))
+    .replace(/{{customer}}/g, esc(d.customer))
+    .replace(/{{productNotes}}/g, esc(d.productNotes))
+    .replace(/{{boxWeight}}/g, esc(d.boxWeight))
 }
 
 // Scope CSS rules to a wrapper class so multiple templates don't conflict
@@ -200,9 +210,9 @@ export function generateBoxLabels(
   const groupMap = new Map<string, PageGroup>()
 
   for (const order of orders) {
-    const product = order.productId
-      ? products.find(p => p.id === order.productId)
-      : products.find(p => p.customer.trim().toLowerCase() === order.customer.trim().toLowerCase())
+    // productId → rajzszám/név egyezés fallback-kel; korábban productId nélkül
+    // a vevő BÁRMELYIK terméke találatnak számított → rossz termék adatai a címkén.
+    const product = findProductForOrder(order, products)
 
     const productTemplate = product?.labelTemplateId
       ? savedTemplatesOverride?.find(t => t.id === product.labelTemplateId)

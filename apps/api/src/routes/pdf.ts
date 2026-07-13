@@ -98,4 +98,28 @@ export async function pdfRoutes(app: FastifyInstance): Promise<void> {
       .header('Content-Disposition', `attachment; filename="${pdfName}"`)
       .send(pdfBuffer)
   })
+
+  /**
+   * A KORÁBBAN mentett PDF letöltése a PDF_OUTPUT_DIR mappából.
+   * Tartalék, ha az újragenerálás nem menne (pl. Chromium hiba): a már
+   * elmentett fájlt szolgáljuk ki ugyanarról a helyről.
+   *
+   * GET /api/v1/pdf-file/:filename
+   */
+  app.get<{ Params: { filename: string } }>('/pdf-file/:filename', {
+    preHandler: [tryAuth],
+  }, async (request, reply) => {
+    if (!PDF_OUTPUT_DIR) {
+      return reply.code(404).send({ error: 'Nincs PDF-mappa beállítva a szerveren' })
+    }
+    const safe = path.basename(request.params.filename).replace(/[^a-zA-Z0-9_\-. ]/g, '_')
+    const full = path.join(PDF_OUTPUT_DIR, safe)
+    if (!fs.existsSync(full)) {
+      return reply.code(404).send({ error: `A mentett PDF nem található: ${safe}` })
+    }
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `attachment; filename="${safe}"`)
+      .send(fs.readFileSync(full))
+  })
 }

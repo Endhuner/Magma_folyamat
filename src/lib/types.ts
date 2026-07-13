@@ -117,6 +117,17 @@ export interface Product {
   updatedAt: string
 }
 
+/**
+ * Kiegészítő tétel a szállítólevélen — rendszerben nem lévő szabad sor,
+ * vagy készletből (szerszám / alapanyag / termék) felvett tétel.
+ */
+export interface ExtraDeliveryItem {
+  name: string
+  quantity: number
+  unit: 'db' | 'kg'
+  notes?: string
+}
+
 export interface DeliveryNote {
   id: string
   type: 'delivery' | 'cmr'
@@ -127,6 +138,8 @@ export interface DeliveryNote {
   exportDate: string
   issueDate?: string
   exportData?: Record<string, string | number | null | undefined>[]
+  /** Kiegészítő tételek — a nyomtatott dokumentumon a rendelés-sorok után. */
+  extraItems?: ExtraDeliveryItem[]
   createdAt: string
   updatedAt: string
 }
@@ -153,6 +166,8 @@ export interface InventoryItem {
   totalShots?: number
   /** Termékhez tartozó fészekszám, cache-elve. Üres ha a termékről nem érkezett adat. */
   nestCount?: string
+  /** 'termek' (kész termék) | 'szerszam' | 'alapanyag' — a polc-nézet színkódjához. */
+  itemType?: 'termek' | 'szerszam' | 'alapanyag'
   location: string
   notes: string
   lastUpdated: string
@@ -262,6 +277,47 @@ export interface MachineRepair {
   status: 'tervezett' | 'elvégzett'
   notes: string
   createdAt: string
+}
+
+/**
+ * Felhasználók közti üzenet vagy feladat.
+ * toUserId = 'all' → mindenkinek szól. readAt/doneAt üres = még nem történt meg.
+ */
+export interface AppMessage {
+  id: string
+  kind: 'uzenet' | 'feladat'
+  body: string
+  fromUserId: string
+  fromUserName: string
+  toUserId: string
+  toUserName: string
+  /** Opcionális rendelés-hivatkozás (feladat egy aktív munkához). */
+  orderId?: string
+  orderLabel?: string
+  readAt: string
+  doneAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Gép-karbantartási bejegyzés — a MachineRepair (ad-hoc javítás) mellett ez
+ * az ütemezett/esedékes karbantartásokat követi (nextDueAt = következő
+ * esedékesség), külön szerver-táblában, hogy lekérdezhető és riasztható legyen.
+ */
+export interface MachineMaintenance {
+  id: string
+  machineId: string
+  type: 'scheduled' | 'repair' | 'inspection'
+  description: string
+  /** Elvégzés dátuma (ISO YYYY-MM-DD), üres ha még nem történt meg. */
+  performedAt: string
+  /** Következő esedékesség (ISO YYYY-MM-DD), üres ha nem ismétlődő. */
+  nextDueAt: string
+  cost: string
+  performedBy: string
+  createdAt: string
+  updatedAt: string
 }
 
 /**

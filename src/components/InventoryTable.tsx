@@ -1,6 +1,7 @@
-import { memo, useState } from 'react'
+import { memo, useMemo } from 'react'
+import { unitOf } from '@/lib/materialService'
 import { InventoryItem, Product, Order } from '@/lib/types'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Pencil, Trash, Package, Clock, BoxArrowDown } from '@phosphor-icons/react'
@@ -18,6 +19,19 @@ interface InventoryTableProps {
 }
 
 function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, onShowHistory, onWarehouseAdd }: InventoryTableProps) {
+  // Összesítők a láblécbe: db és kg külön (alapanyag kg-ban, a többi db-ban),
+  // + hány tétel van a küszöb alatt.
+  const totals = useMemo(() => {
+    let totalDb = 0
+    let totalKg = 0
+    for (const i of inventory) {
+      if (unitOf(i) === 'kg') totalKg += i.quantity || 0
+      else totalDb += i.quantity || 0
+    }
+    const lowCount = inventory.filter((i) => unitOf(i) === 'db' && i.quantity < 50).length
+    return { totalDb, totalKg: Math.round(totalKg * 10) / 10, lowCount }
+  }, [inventory])
+
   const getStockStatus = (quantity: number) => {
     if (quantity === 0) return { label: 'Nincs készleten', variant: 'destructive' as const }
     if (quantity < 50) return { label: 'Alacsony', variant: 'outline' as const }
@@ -38,14 +52,16 @@ function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, o
   return (
     <>
 
-      <div className="border rounded-lg overflow-hidden">
+      {/* overflow-x-auto: telefonon/tableten a sok oszlop + művelet-gomb
+          a táblázaton belül görgethető, nem tolja szét a teljes oldalt. */}
+      <div className="border rounded-lg overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Rajzszám</TableHead>
               <TableHead>Termék neve</TableHead>
               <TableHead>Vevő</TableHead>
-              <TableHead className="text-right">Mennyiség (db)</TableHead>
+              <TableHead className="text-right">Mennyiség</TableHead>
               <TableHead>Státusz</TableHead>
               <TableHead>Raktár hely</TableHead>
               <TableHead>Megjegyzés</TableHead>
@@ -57,11 +73,21 @@ function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, o
           {inventory.map((item, index) => {
             const status = getStockStatus(item.quantity)
             return (
-              <TableRow key={item.id} className="even:bg-[oklch(0.94_0.015_250)] hover:bg-[oklch(0.88_0.02_250)]">
+              <TableRow key={item.id} className="even:bg-[var(--row-stripe)] hover:bg-[var(--row-hover)]">
                 <TableCell className="font-mono text-sm">{item.drawingNumber}</TableCell>
-                <TableCell className="font-medium">{item.productName}</TableCell>
+                <TableCell className="font-medium">
+                  {item.productName}
+                  {item.itemType === 'szerszam' && (
+                    <Badge variant="outline" className="ml-2 text-[10px] text-amber-700 dark:text-amber-300 border-amber-400">szerszám</Badge>
+                  )}
+                  {item.itemType === 'alapanyag' && (
+                    <Badge variant="outline" className="ml-2 text-[10px] text-emerald-700 dark:text-emerald-300 border-emerald-400">alapanyag</Badge>
+                  )}
+                </TableCell>
                 <TableCell>{item.customer}</TableCell>
-                <TableCell className="text-right font-mono font-semibold">{item.quantity}</TableCell>
+                <TableCell className="text-right font-mono font-semibold">
+                  {item.quantity.toLocaleString('hu-HU')} <span className="text-muted-foreground font-sans text-xs">{unitOf(item)}</span>
+                </TableCell>
                 <TableCell>
                   <Badge variant={status.variant}>{status.label}</Badge>
                 </TableCell>
@@ -124,6 +150,19 @@ function InventoryTableImpl({ inventory, products, onEdit, onDelete, onAdjust, o
             )
           })}
         </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TableCell colSpan={3} className="font-semibold">
+              Összesen ({inventory.length} tétel
+              {totals.lowCount > 0 && <span className="text-destructive"> · {totals.lowCount} alacsony</span>})
+            </TableCell>
+            <TableCell className="text-right font-mono font-bold whitespace-nowrap">
+              {totals.totalDb.toLocaleString('hu-HU')} db
+              {totals.totalKg > 0 && <> · {totals.totalKg.toLocaleString('hu-HU')} kg</>}
+            </TableCell>
+            <TableCell colSpan={5} />
+          </TableRow>
+        </TableFooter>
       </Table>
     </div>
     </>

@@ -53,7 +53,6 @@ import {
   Funnel,
   Truck,
   FileText,
-  FilePdf,
   Tag,
   CaretDown,
   CaretUp,
@@ -64,7 +63,9 @@ import {
   Export,
   Package,
   ChartBar,
+  Pencil,
 } from '@phosphor-icons/react'
+import { OrderColumnFilterDialog } from '@/components/OrderColumnFilterDialog'
 import { toast } from 'sonner'
 import { OrdersTable } from '@/components/OrdersTable'
 import {
@@ -96,6 +97,8 @@ export interface OrdersPanelProps {
   customers: Customer[] | null | undefined
   products: Product[] | null | undefined
   labelTemplates: LabelTemplate[] | null | undefined
+  /** Becsült alapanyag-készlet (kg) az összesítő sáv fedezet-jelzéséhez. */
+  materialEstimateKg?: number | null
   activeLabelTemplateId: string | null | undefined
   savedDeliveryTemplates?: Array<{ id: string; data: { type: string; html: string; css: string; active?: boolean } }> | null
   activeTemplates?: { cmr?: string; delivery?: string; pallet?: string; 'box-label'?: string }
@@ -151,6 +154,7 @@ export function OrdersPanel({
   customers,
   products,
   labelTemplates,
+  materialEstimateKg,
   activeLabelTemplateId,
   savedDeliveryTemplates,
   activeTemplates,
@@ -191,6 +195,8 @@ export function OrdersPanel({
 }: OrdersPanelProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
+  /** Épp szerkesztés alatt álló mentett oszlopszűrő (null = a dialógus zárva). */
+  const [editingFilter, setEditingFilter] = useState<OrderColumnFilter | null>(null)
   const activeTemplate = labelTemplates?.find((t) => t.id === activeLabelTemplateId)
   const selectedOrders = (orders || []).filter((o) => selectedOrderIds.includes(o.id))
 
@@ -486,18 +492,30 @@ export function OrdersPanel({
           </Button>
 
           {activeOrderFilterId && (
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setOrderColumnFilters((current) =>
-                  (current || []).filter((f) => f.id !== activeOrderFilterId)
-                )
-                setActiveOrderFilterId(null)
-                toast.success('Szűrő törölve')
-              }}
-            >
-              Szűrő törlése
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const filter = orderColumnFilters?.find((f) => f.id === activeOrderFilterId)
+                  if (filter) setEditingFilter(filter)
+                }}
+              >
+                <Pencil className="w-4 h-4 mr-2" />
+                Szűrő szerkesztése
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setOrderColumnFilters((current) =>
+                    (current || []).filter((f) => f.id !== activeOrderFilterId)
+                  )
+                  setActiveOrderFilterId(null)
+                  toast.success('Szűrő törölve')
+                }}
+              >
+                Szűrő törlése
+              </Button>
+            </>
           )}
         </div>
 
@@ -522,71 +540,17 @@ export function OrdersPanel({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={handleExportDelivery}
-                    className="pl-6 gap-2 text-accent-foreground bg-accent/10 hover:bg-accent/20 focus:bg-accent/20"
+                    className="pl-6 gap-2 text-foreground bg-accent/10 hover:bg-accent/20 focus:bg-accent/20"
                   >
                     <Truck className="w-4 h-4" />
-                    Szállító (HTML)
+                    Szállítólevél készítés
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={handleExportCmr}
-                    className="pl-6 gap-2 text-secondary-foreground bg-secondary/10 hover:bg-secondary/20 focus:bg-secondary/20"
+                    className="pl-6 gap-2 text-foreground bg-secondary/10 hover:bg-secondary/20 focus:bg-secondary/20"
                   >
                     <FileText className="w-4 h-4" />
                     CMR (HTML)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={async () => {
-                      const { exportLabelsAsPDF } = await import('@/lib/labelExportFormats')
-                      await exportLabelsAsPDF(
-                        selectedOrders,
-                        customers || [],
-                        products || [],
-                        activeTemplate,
-                        labelTemplates || []
-                      )
-                    }}
-                    className="pl-6 gap-2 text-orange-700 bg-orange-50 hover:bg-orange-100 focus:bg-orange-100 dark:text-orange-300 dark:bg-orange-950/30 dark:hover:bg-orange-950/50"
-                  >
-                    <FilePdf className="w-4 h-4" />
-                    Címke export PDF-be
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled
-                    className="font-semibold text-foreground opacity-100 mt-1"
-                  >
-                    Címke készítés
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => setLabelPrintSettingsDialogOpen(true)}
-                    className="pl-6"
-                  >
-                    Címkék nyomtatása (beállítások)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      generateLabels(
-                        selectedOrders,
-                        customers || [],
-                        products || [],
-                        activeTemplate
-                      )
-                    }}
-                    className="pl-6"
-                  >
-                    Címkék generálása (HTML)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={async () => {
-                      await generateLabelsByCustomer(
-                        selectedOrders,
-                        customers || [],
-                        products || [],
-                        labelTemplates || []
-                      )
-                    }}
-                    className="pl-6"
-                  >
-                    Címkék vevőnként (külön fájlok)
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled
@@ -745,9 +709,26 @@ export function OrdersPanel({
         </div>
       </div>
 
+      {/* Mentett oszlopszűrő szerkesztése — ugyanaz a dialógus, mint az "Új szűrő",
+          csak a meglévő szűrő értékeivel előtöltve, és mentéskor felülír. */}
+      <OrderColumnFilterDialog
+        open={editingFilter !== null}
+        initialFilter={editingFilter}
+        onClose={() => setEditingFilter(null)}
+        onSave={({ name, columns }) => {
+          setOrderColumnFilters((current) =>
+            (current || []).map((f) =>
+              f.id === editingFilter?.id ? { ...f, name, columns } : f
+            )
+          )
+          toast.success(`Szűrő módosítva: ${name}`)
+        }}
+      />
+
       <OrdersTable
         orders={filteredOrders}
         products={products || []}
+        materialEstimateKg={materialEstimateKg}
         onEdit={handleEditOrder}
         onDelete={handleDeleteOrder}
         onDuplicate={handleDuplicateOrder}

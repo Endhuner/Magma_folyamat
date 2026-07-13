@@ -29,6 +29,7 @@ import { z, type ZodTypeAny } from 'zod'
 import { getDb } from '../db/connection.js'
 import { broadcast } from './sseBroadcaster.js'
 import { recordAudit } from './auditService.js'
+import { registerTrashable, moveToTrash } from './trashService.js'
 import { tryAuth, requireAuth, requireRole } from './authGuards.js'
 import type { AuditEntityType, UserRole, CurrentUser } from '@produktivpro/shared'
 
@@ -80,9 +81,13 @@ export interface CrudOptions<TInsertSchema extends ZodTypeAny, TUpdateSchema ext
   requireAuthForMutations?: boolean
   /**
    * Hook, amely a Zod-validáció UTÁN, az insert/update ELŐTT módosíthatja
-   * a payload-ot. Pl. PIN → bcrypt hash transformáció.
+   * a payload-ot. Pl. PIN → bcrypt hash transformáció, sorszám-ütközés feloldás.
+   * A `ctx` megmondja, create vagy update fut, és update-nél a rekord id-ját.
    */
-  transformInput?: (input: Record<string, unknown>) => Record<string, unknown>
+  transformInput?: (
+    input: Record<string, unknown>,
+    ctx?: { op: 'create' | 'update'; id?: string }
+  ) => Record<string, unknown>
   /**
    * Hook, amely a DB-ből visszaolvasott rekordot a kliens előtt szűri.
    * Pl. `pinHash` mező eltávolítása. NEM hívódik a list-result minden
@@ -131,8 +136,11 @@ function deserializeJsonFields<T extends Record<string, unknown>>(
       try {
         out[field] = JSON.parse(v)
       } catch {
-        // Hagyjuk, ahogy van — a hibás JSON-t a frontend látni fogja és
-        // a felhasználó értesülhet a problémáról.
+        // Sérült JSON a DB-ben — naplózzuk (különben felderíthetetlen), és a
+        // frontend várta típusnak megfelelő üres értéket adunk, hogy a
+        // .map()/.length hívások ne dobjanak el egy teljes listanézetet.
+        console.warn(`[crudFactory] hibás JSON a(z) "${field}" mezőben (id: ${String(out.id ?? '?')}):`, String(v).slice(0, 120))
+        out[field] = v.trim().startsWith('{') ? {} : []
       }
     }
   }
@@ -174,6 +182,10 @@ export function registerCrudRoutes<
     redactOutput = (r) => r,
   } = opts
   const base = `/${resource}`
+
+  // Lomtár-regisztráció: a törléskor ide mentett rekord a `trash`-route-tal
+  // visszaállítható az eredeti táblába.
+  registerTrashable(auditEntity, table, auditLabel)
 
   /**
    * preHandler-ek összerakása egy adott művelethez. A sorrend:
@@ -226,7 +238,7 @@ export function registerCrudRoutes<
       })
     }
     const rawInput = parsed.data as Record<string, unknown>
-    const input = transformInput ? transformInput(rawInput) : rawInput
+    const input = transformInput ? transformInput(rawInput, { op: 'create' }) : rawInput
     const now = nowIso()
     const row = serializeJsonFields(
       {
@@ -286,8 +298,25 @@ export function registerCrudRoutes<
     if (existingRows.length === 0) return reply.code(404).send({ error: `${auditLabel} nem található` })
     const before = deserializeJsonFields(existingRows[0]!, jsonFields)
 
+    // Optimista konkurencia-ellenőrzés: ha a kliens elküldi az általa ismert
+    // verziót (x-if-unmodified-since = a szerkesztés alapjául vett updatedAt),
+    // és az időközben megváltozott, 409-cel jelezzük az ütközést + visszaadjuk
+    // az aktuális szerver-verziót, hogy a kliens ne írja felül a más módosítását.
+    const baseVersion = req.headers['x-if-unmodified-since']
+    if (typeof baseVersion === 'string' && baseVersion.length > 0) {
+      const currentVersion = before.updatedAt
+      if (typeof currentVersion === 'string' && currentVersion !== baseVersion) {
+        return reply.code(409).send({
+          error: 'A rekordot időközben más módosította',
+          current: redactOutput(before),
+        })
+      }
+    }
+
     const updateRaw = parsed.data as Record<string, unknown>
-    const transformed: Record<string, unknown> = transformInput ? transformInput(updateRaw) : updateRaw
+    const transformed: Record<string, unknown> = transformInput
+      ? transformInput(updateRaw, { op: 'update', id: req.params.id })
+      : updateRaw
     const update: Record<string, unknown> = serializeJsonFields(
       { ...transformed, updatedAt: nowIso() },
       jsonFields
@@ -324,7 +353,21 @@ export function registerCrudRoutes<
     if (existingRows.length === 0) return reply.code(404).send({ error: `${auditLabel} nem található` })
     const before = deserializeJsonFields(existingRows[0]!, jsonFields)
 
-    db.delete(table).where(eq(idCol as unknown as never, req.params.id)).run()
+    // Soft delete: a nyers rekord (szerializált JSON-mezőkkel) a lomtárba
+    // kerül, majd a fő táblából törlünk — egy tranzakcióban.
+    const { userId, userName } = userOf(req)
+    db.transaction(() => {
+      moveToTrash({
+        entityType: auditEntity,
+        entityId: req.params.id,
+        entityLabel: auditLabel,
+        entityName: pickName(before, nameField),
+        row: existingRows[0]!,
+        deletedBy: userId,
+        deletedByName: userName,
+      })
+      db.delete(table).where(eq(idCol as unknown as never, req.params.id)).run()
+    })
 
     recordAudit({
       entityType: auditEntity,

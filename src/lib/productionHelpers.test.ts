@@ -92,7 +92,7 @@ describe('findProductForOrder', () => {
 })
 
 describe('filterProductionOrders', () => {
-  it('keeps only the 5 active production statuses', () => {
+  it('keeps only the 6 active production statuses', () => {
     const orders = [
       mkOrder({ id: '1', status: 'Felvéve' }),
       mkOrder({ id: '2', status: 'Folyamatban' }),
@@ -101,10 +101,11 @@ describe('filterProductionOrders', () => {
       mkOrder({ id: '5', status: 'Javítás alatt' }),
       mkOrder({ id: '6', status: 'Kiszállítva' }),
       mkOrder({ id: '7', status: 'Csomagolás alatt' }),
+      mkOrder({ id: '8', status: 'Elkészült' }),
     ]
     const r = filterProductionOrders(orders)
-    expect(r).toHaveLength(5)
-    expect(r.map((o) => o.id).sort()).toEqual(['1', '2', '3', '4', '5'])
+    expect(r).toHaveLength(6)
+    expect(r.map((o) => o.id).sort()).toEqual(['1', '2', '3', '4', '5', '8'])
   })
 })
 
@@ -178,16 +179,18 @@ describe('buildShiftsByOrder', () => {
 })
 
 describe('groupOrdersByStatus', () => {
-  it('returns the 5 expected status keys', () => {
+  it('returns the 6 expected status keys', () => {
     const orders = [
       mkOrder({ id: '1', status: 'Felvéve' }),
       mkOrder({ id: '2', status: 'Folyamatban' }),
+      mkOrder({ id: '3', status: 'Elkészült' }),
     ]
     const r = groupOrdersByStatus(orders)
     expect(Object.keys(r).sort()).toEqual(
-      ['inProgress', 'paused', 'pending', 'ready', 'repair'].sort()
+      ['done', 'inProgress', 'paused', 'pending', 'ready', 'repair'].sort()
     )
     expect(r.pending).toHaveLength(1)
     expect(r.inProgress).toHaveLength(1)
+    expect(r.done).toHaveLength(1)
   })
 })

@@ -179,6 +179,8 @@ export const deliveryNotes = sqliteTable('delivery_notes', {
   issueDate: text('issue_date'),
   // JSON: Record<string, string|number|null|undefined>[]
   exportData: text('export_data'),
+  // JSON: ExtraDeliveryItem[] — kiegészítő tételek (szerszám/anyag/szabad sor)
+  extraItems: text('extra_items').notNull().default('[]'),
   createdAt: text('created_at').notNull().default(nowDefault),
   updatedAt: text('updated_at').notNull().default(nowDefault),
 }, (t) => ({
@@ -198,6 +200,8 @@ export const inventoryItems = sqliteTable('inventory_items', {
   quantity: integer('quantity').notNull().default(0),
   totalShots: integer('total_shots'),
   nestCount: text('nest_count'),
+  /** 'termek' (kész termék) | 'szerszam' | 'alapanyag' — a polc-nézet színkódjához. */
+  itemType: text('item_type').notNull().default('termek'),
   location: text('location').notNull().default(''),
   notes: text('notes').notNull().default(''),
   lastUpdated: text('last_updated').notNull().default(nowDefault),
@@ -465,6 +469,72 @@ export const machinePlanningLog = sqliteTable('machine_planning_log', {
   timestamp: text('timestamp').notNull(),
   createdAt: text('created_at').notNull().default(nowDefault),
 })
+
+// ----------------------------------------------------------------------
+// Lomtár — soft delete. A törölt entitások teljes payloadja ide kerül,
+// hogy 30 napig visszaállítható legyen. A `payload` a törölt rekord JSON-je
+// (a JSON-mezők már szerializált stringként, ahogy a DB-ben tároltuk).
+// ----------------------------------------------------------------------
+export const trash = sqliteTable('trash', {
+  id: text('id').primaryKey(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id').notNull(),
+  entityLabel: text('entity_label').notNull().default(''),
+  entityName: text('entity_name').notNull().default(''),
+  payload: text('payload').notNull(),
+  deletedBy: text('deleted_by').notNull().default(''),
+  deletedByName: text('deleted_by_name').notNull().default(''),
+  deletedAt: text('deleted_at').notNull(),
+}, (t) => ({
+  byDeletedAt: index('trash_deleted_at_idx').on(t.deletedAt),
+  byEntity: index('trash_entity_idx').on(t.entityType, t.entityId),
+}))
+
+// ----------------------------------------------------------------------
+// Gép-karbantartási napló — esedékesség + előzmények gépenként.
+// ----------------------------------------------------------------------
+export const machineMaintenance = sqliteTable('machine_maintenance', {
+  id: text('id').primaryKey(),
+  machineId: text('machine_id').notNull(),
+  /** 'scheduled' (tervezett) | 'repair' (javítás) | 'inspection' (ellenőrzés) */
+  type: text('type').notNull().default('scheduled'),
+  description: text('description').notNull().default(''),
+  /** Elvégzés dátuma (ISO YYYY-MM-DD), ha már megtörtént. */
+  performedAt: text('performed_at').notNull().default(''),
+  /** Következő esedékesség (ISO YYYY-MM-DD), ha ismétlődő. */
+  nextDueAt: text('next_due_at').notNull().default(''),
+  cost: text('cost').notNull().default(''),
+  performedBy: text('performed_by').notNull().default(''),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+}, (t) => ({
+  byMachine: index('machine_maintenance_machine_idx').on(t.machineId),
+  byDue: index('machine_maintenance_due_idx').on(t.nextDueAt),
+}))
+
+// ----------------------------------------------------------------------
+// Üzenetek / feladatok a felhasználók között.
+// toUserId = 'all' → mindenkinek szól. A readAt/doneAt üres string = még nem.
+// ----------------------------------------------------------------------
+export const messages = sqliteTable('messages', {
+  id: text('id').primaryKey(),
+  /** 'uzenet' | 'feladat' */
+  kind: text('kind').notNull().default('uzenet'),
+  body: text('body').notNull(),
+  fromUserId: text('from_user_id').notNull().default(''),
+  fromUserName: text('from_user_name').notNull().default(''),
+  toUserId: text('to_user_id').notNull(),
+  toUserName: text('to_user_name').notNull().default(''),
+  /** Opcionális rendelés-hivatkozás (feladat egy aktív munkához). */
+  orderId: text('order_id').notNull().default(''),
+  orderLabel: text('order_label').notNull().default(''),
+  readAt: text('read_at').notNull().default(''),
+  doneAt: text('done_at').notNull().default(''),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+}, (t) => ({
+  byTo: index('messages_to_idx').on(t.toUserId, t.createdAt),
+}))
 
 // Hagyományos numerikus mezőkhöz, ha valaha kellene `real`-t használni
 // (pl. súlyok), itt egy hint:

@@ -1,0 +1,1 @@
+ALTER TABLE `delivery_notes` ADD COLUMN `extra_items` text DEFAULT '[]' NOT NULL;

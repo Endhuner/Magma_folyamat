@@ -30,9 +30,14 @@ import { customerSequencesRoutes } from './routes/customerSequences.js'
 import { templatesRoutes } from './routes/templates.js'
 import { planningRoutes } from './routes/planning.js'
 import { pdfRoutes } from './routes/pdf.js'
+import { trashRoutes } from './routes/trash.js'
+import { maintenanceRoutes } from './routes/maintenance.js'
+import { messagesRoutes } from './routes/messages.js'
 import { registerRequestLogger } from './lib/requestLogger.js'
 import { registerAuthPlugins } from './lib/authPlugin.js'
 import { bootstrapAdmin } from './lib/bootstrap.js'
+import { startScheduledBackups } from './lib/scheduledBackup.js'
+import { startMaterialConsolidation } from './lib/materialConsolidation.js'
 
 /**
  * Csak akkor használjuk a `pino-pretty` transportot, ha a csomag valóban
@@ -91,6 +96,12 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Bootstrap admin user (idempotens — csak ha nincs admin a DB-ben)
   bootstrapAdmin(app.log)
 
+  // Ütemezett automatikus adatbázis-mentés (naponta, 30 napos megőrzés)
+  startScheduledBackups(app.log)
+
+  // Napi anyagfogyás-könyvelés (A3 hibrid modell — ld. materialConsolidation)
+  startMaterialConsolidation(app.log)
+
   // ── Statikus frontend kiszolgálása (Docker all-in-one mód) ─────────────
   // Ha a STATIC_DIR env be van állítva, a Fastify kiszolgálja a React SPA-t.
   // Fejlesztéskor ez nincs beállítva — a Vite dev server kezeli a frontendet.
@@ -134,6 +145,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     await api.register(templatesRoutes)
     await api.register(planningRoutes)
     await api.register(pdfRoutes)
+    await api.register(trashRoutes)
+    await api.register(maintenanceRoutes)
+    await api.register(messagesRoutes)
   }, { prefix: '/api/v1' })
 
   // 404-kezelő:

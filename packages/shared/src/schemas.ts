@@ -128,6 +128,16 @@ export const deliveryNoteCreateSchema = z.object({
   exportDate: z.string().default(''),
   issueDate: z.string().optional(),
   exportData: z.array(z.record(z.unknown())).optional(),
+  extraItems: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        quantity: z.number(),
+        unit: z.enum(['db', 'kg']).default('db'),
+        notes: z.string().optional(),
+      })
+    )
+    .optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 })
@@ -145,6 +155,7 @@ export const inventoryItemCreateSchema = z.object({
   quantity: z.number().int().default(0),
   totalShots: z.number().int().min(0).optional(),
   nestCount: z.string().optional(),
+  itemType: z.enum(['termek', 'szerszam', 'alapanyag']).default('termek'),
   location: z.string().default(''),
   notes: z.string().default(''),
   lastUpdated: z.string().optional(),
@@ -346,6 +357,44 @@ export const machinePlanningReorderSchema = z.object({
   /** Rendezett ID-lista az adott gépen (position = tömb index) */
   orderedIds: z.array(z.string()),
 })
+
+// ----------------------------------------------------------------------
+// Gép-karbantartási napló
+// ----------------------------------------------------------------------
+export const machineMaintenanceCreateSchema = z.object({
+  id: z.string().optional(),
+  machineId: z.string().min(1),
+  type: z.enum(['scheduled', 'repair', 'inspection']).default('scheduled'),
+  description: z.string().default(''),
+  performedAt: z.string().default(''),
+  nextDueAt: z.string().default(''),
+  cost: z.string().default(''),
+  performedBy: z.string().default(''),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+})
+export const machineMaintenanceUpdateSchema = machineMaintenanceCreateSchema.partial()
+
+// ----------------------------------------------------------------------
+// Üzenetek / feladatok
+// ----------------------------------------------------------------------
+export const messageCreateSchema = z.object({
+  id: z.string().optional(),
+  kind: z.enum(['uzenet', 'feladat']).default('uzenet'),
+  body: z.string().min(1, 'Az üzenet nem lehet üres').max(2000),
+  fromUserId: z.string().default(''),
+  fromUserName: z.string().default(''),
+  /** Felhasználó id vagy 'all' (mindenki) */
+  toUserId: z.string().min(1),
+  toUserName: z.string().default(''),
+  orderId: z.string().default(''),
+  orderLabel: z.string().default(''),
+  readAt: z.string().default(''),
+  doneAt: z.string().default(''),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+})
+export const messageUpdateSchema = messageCreateSchema.partial()
 
 // ----------------------------------------------------------------------
 // Gépalap log

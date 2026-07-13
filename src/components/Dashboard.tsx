@@ -1,7 +1,8 @@
-import { DashboardMetrics, OrderStatus, ProductionKPIs, InventoryItem } from '@/lib/types'
+import { DashboardMetrics, Order, OrderStatus, ProductionKPIs, InventoryItem } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, Clock, Package, Receipt, ArrowRight, Factory, Warning } from '@phosphor-icons/react'
+import { CheckCircle, Clock, Package, Receipt, ArrowRight, Factory, Warning, CalendarX } from '@phosphor-icons/react'
+import { formatDate } from '@/lib/helpers'
 import {
   BarChart,
   Bar,
@@ -27,7 +28,8 @@ function MetricCard({ title, value, icon: Icon, iconColor = 'text-primary', onVi
   // Számokat ezres tagolással jelenítünk meg (hu-HU), a string értéket változatlanul.
   const displayValue = typeof value === 'number' ? value.toLocaleString('hu-HU') : value
   return (
-    <Card className="p-6 hover:shadow-lg transition-shadow">
+    // stat-tile: a Prime skin csempe-stílusa célozza (skins.css)
+    <Card className="stat-tile p-6 hover:shadow-lg transition-shadow">
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">{title}</p>
@@ -76,11 +78,20 @@ interface DashboardProps {
   metrics: DashboardMetrics
   productionKPIs?: ProductionKPIs
   lowStockItems?: InventoryItem[]
+  overdueOrders?: Order[]
   onFilterByStatus?: (status: OrderStatus | 'all') => void
   onNavigateToInventory?: () => void
+  onShowOverdue?: () => void
 }
 
-export function Dashboard({ metrics, productionKPIs, lowStockItems = [], onFilterByStatus, onNavigateToInventory }: DashboardProps) {
+/** Naptári napok száma egy múltbeli határidő óta (pozitív = ennyi napja lejárt). */
+function daysOverdue(dueDate: string): number {
+  if (!dueDate) return 0
+  const diff = Date.now() - new Date(dueDate).getTime()
+  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)))
+}
+
+export function Dashboard({ metrics, productionKPIs, lowStockItems = [], overdueOrders = [], onFilterByStatus, onNavigateToInventory, onShowOverdue }: DashboardProps) {
   const deliveryRate = metrics.totalOrders > 0
     ? Math.round((metrics.deliveredOrders / metrics.totalOrders) * 100)
     : 0
@@ -96,6 +107,37 @@ export function Dashboard({ metrics, productionKPIs, lowStockItems = [], onFilte
 
   return (
     <div className="space-y-8">
+      {/* Lejárt határidő figyelmeztetés — a legfontosabb akcióigényes tétel, legfelül */}
+      {overdueOrders.length > 0 && (
+        <Card className="p-5 border-destructive/60 bg-destructive/5">
+          <div className="flex items-start gap-3">
+            <CalendarX className="w-5 h-5 text-destructive mt-0.5 shrink-0" weight="fill" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-destructive">
+                {overdueOrders.length} rendelés határideje lejárt
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                {overdueOrders.slice(0, 3).map(order => (
+                  <li key={order.id} className="text-sm text-muted-foreground truncate">
+                    {order.customer} — {order.productName || order.designation} · határidő: {formatDate(order.requiredDate)}
+                    <span className="text-destructive font-medium"> ({daysOverdue(order.requiredDate)} napja)</span>
+                  </li>
+                ))}
+                {overdueOrders.length > 3 && (
+                  <li className="text-sm text-muted-foreground">… és még {overdueOrders.length - 3} rendelés</li>
+                )}
+              </ul>
+            </div>
+            {onShowOverdue && (
+              <Button variant="ghost" size="sm" onClick={onShowOverdue} className="shrink-0 gap-1 text-destructive hover:text-destructive">
+                Megnézem
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
+
       {/* Rendelések szekció */}
       <div>
         <h2 className="text-2xl font-bold tracking-tight mb-1">Rendelések Áttekintése</h2>

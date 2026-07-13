@@ -8,7 +8,10 @@
  * exportOrdersToExcel(orders, filename?) — exportálja a megadott rendelés-
  *   tömböt Excel formátumba, az összes mezővel, fejléccel és alapformázással.
  */
-import ExcelJS from 'exceljs'
+// Csak típus — a futásidejű ExcelJS-t a függvényekben `await import`-tal
+// húzzuk be, hogy a ~250 KB-os könyvtár ne kerüljön a kezdő bundle-be
+// (az OrdersPanel mindig betöltődik, de exportálni ritkán kell).
+import type ExcelJS from 'exceljs'
 import type { Order } from '@/lib/types'
 
 // ─── Oszlop definíciók (fejléc label + Order mező neve) ──────────────────────
@@ -150,6 +153,7 @@ function buildSheet(ws: ExcelJS.Worksheet, rows: Record<string, unknown>[]) {
 // ─── Sablon letöltése ─────────────────────────────────────────────────────────
 
 export async function downloadOrderImportTemplate(): Promise<void> {
+  const ExcelJS = await import('exceljs')
   const wb = new ExcelJS.Workbook()
   wb.creator = 'ProduktívPro'
   wb.created = new Date()
@@ -252,6 +256,7 @@ export async function exportOrdersToExcel(
   orders: Order[],
   filename?: string
 ): Promise<void> {
+  const ExcelJS = await import('exceljs')
   const wb = new ExcelJS.Workbook()
   wb.creator = 'ProduktívPro'
   wb.created = new Date()

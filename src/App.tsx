@@ -1,5 +1,6 @@
 import { generateId } from '@/lib/generateId'
-import { useState, useMemo, useEffect, useRef, Suspense, useCallback } from 'react'
+import { APP_VERSION } from '@/version'
+import { useState, useMemo, useEffect, useRef, Suspense, useCallback, lazy } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { useEntityKV } from '@/hooks/useEntityKV'
 import { auditLogRepo } from '@/lib/db/repos'
@@ -27,15 +28,40 @@ import { ProductionPlanningView } from '@/components/ProductionPlanningView'
 import { useIsTouchLayout } from '@/hooks/useMediaQuery'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { OfflineBanner } from '@/components/OfflineBanner'
-import { Order, OrderStatus, Customer, Product, DeliveryNote, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
+import { Order, OrderStatus, Customer, Product, DeliveryNote, ExtraDeliveryItem, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, MachineMaintenance, AppMessage, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
 import { diffObjects, buildAuditEntry, pruneAuditLog, AUDIT_LOG_MAX_ENTRIES } from '@/lib/auditLog'
-import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered, isInvoiced } from '@/lib/helpers'
-import { computeAutoFieldsForOrder } from '@/lib/orderService'
+import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered, isInvoiced, isOverdue, generateDeliveryNoteSequenceNumber } from '@/lib/helpers'
+import {
+  computeAutoFieldsForOrder,
+  computeBoxesCount,
+  computePalletsCount,
+  computeRequiredMaterialKg,
+  computeGrossWeightKg,
+  computePlannedProductionHours,
+} from '@/lib/orderService'
 import { CmrLayoutSettings } from '@/lib/cmrTemplateBuilder'
 import { useAuth } from '@/lib/auth'
 import { listUsers, createUser, updateUser, deleteUser } from '@/lib/api/usersApi'
 import type { UserRole } from '@produktivpro/shared'
 import { Plus, Factory, MagnifyingGlass, FileText, CaretDown, Database, SignOut, Gear } from '@phosphor-icons/react'
+import { ThemeToggle } from '@/components/ThemeToggle'
+import { SkinSelect } from '@/components/SkinSelect'
+import { GlobalSearch } from '@/components/GlobalSearch'
+import { WorkCalendarDialog } from '@/components/WorkCalendarDialog'
+import { MessageCenter, unreadMessagesFor } from '@/components/MessageCenter'
+import { MaterialPanel } from '@/components/MaterialPanel'
+import { ExtraItemsDialog } from '@/components/ExtraItemsDialog'
+import { CreateDeliveryNoteDialog } from '@/components/CreateDeliveryNoteDialog'
+import {
+  computeMaterialStatuses,
+  totalEstimatedMaterialKg,
+  MATERIAL_BOOKED_THROUGH_KEY,
+  type MaterialActionKind,
+  type MaterialBookedThroughMap,
+} from '@/lib/materialService'
+const TrashView = lazy(() => import('@/components/TrashView').then(m => ({ default: m.TrashView })))
+const ReportsView = lazy(() => import('@/components/ReportsView').then(m => ({ default: m.ReportsView })))
+const MaintenanceView = lazy(() => import('@/components/MaintenanceView').then(m => ({ default: m.MaintenanceView })))
 import { ACTIVE_WORK_STATUSES } from '@/lib/constants/orderStatus'
 import { suggestStatusChange, sumProducedForOrder } from '@/lib/statusSuggestions'
 import { toast } from 'sonner'
@@ -43,7 +69,7 @@ import { exportCmrAsHtml, generateCmrHtmlTemplate, getCmrHtml } from '@/lib/cmrH
 import { exportDeliveryAsHtml, generateDeliveryHtmlTemplate, getDeliveryHtml, TemplateStyles } from '@/lib/deliveryHtmlTemplate'
 import { validateCmrExport, validateDeliveryExport, ValidationResult } from '@/lib/exportValidation'
 import { LabelTemplate } from '@/lib/labelTemplate'
-import { deductInventoryForOrders, commitInventoryDeduction, InventoryDeductionResult } from '@/lib/inventoryService'
+import { deductInventoryForOrders, commitInventoryDeduction, restoreInventoryForOrders, commitInventoryRestore, InventoryDeductionResult } from '@/lib/inventoryService'
 import { LabelTemplatesPanel } from '@/components/panels/LabelTemplatesPanel'
 import { InventoryPanel } from '@/components/panels/InventoryPanel'
 import { DocumentsPanel } from '@/components/panels/DocumentsPanel'
@@ -159,6 +185,8 @@ function App() {
   // Változásnapló — minden lényeges adatmódosítás itt is rögzül (Dokumentumok → Változások).
   const [auditLog, setAuditLog] = useEntityKV<AuditLogEntry>(auditLogRepo)
   const machinesApi = useServerCrud<Machine>('machines', ['machine'])
+  const maintenanceApi = useServerCrud<MachineMaintenance>('machine-maintenance', ['maintenance'])
+  const messagesApi = useServerCrud<AppMessage>('messages', ['message'])
   // Felhasználók: a backend a forrás (auth + bcrypt PIN miatt nem lehet
   // local-only). A "Felhasználók" tab onSave/onDelete a `usersApi`-n
   // keresztül a `/api/v1/users` endpointtal beszél, mentés után
@@ -166,6 +194,13 @@ function App() {
   const [users, setUsers] = useState<User[]>([])
   const [usersLoading, setUsersLoading] = useState(false)
   const auth = useAuth()
+
+  // Olvasatlan üzenetek száma — a fejléc márkaneve villog tőle (1-es variáció).
+  // FONTOS: az auth deklarációja UTÁN kell állnia (TDZ).
+  const unreadMessageCount = useMemo(
+    () => unreadMessagesFor(messagesApi.items, auth.user?.id ?? '').length,
+    [messagesApi.items, auth.user?.id]
+  )
   const refreshUsers = async (): Promise<void> => {
     try {
       setUsersLoading(true)
@@ -225,7 +260,9 @@ function App() {
   const [currentTab, setCurrentTab] = useState(() =>
     auth.user?.role === 'operator' ? 'production' : 'dashboard'
   )
-  
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
+  const [workCalendarDialogOpen, setWorkCalendarDialogOpen] = useState(false)
+
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
   const [hideDelivered, setHideDelivered] = useState(true)
@@ -475,24 +512,45 @@ function App() {
   const handleBatchStatusChange = (orderIds: string[], status: OrderStatus) => {
     const ordersToUpdate = (orders || []).filter(o => orderIds.includes(o.id))
     const isChangingToDelivered = isDelivered(status)
-    
+
     if (isChangingToDelivered && ordersToUpdate.length > 0) {
-      const deductionResult = deductInventoryForOrders(
-        ordersToUpdate,
-        inventory || [],
-        products || []
+      // Csak azok a rendelések, amelyek MOST váltanak kiszállítottra, és még
+      // nincs szállítói levonásuk. Enélkül a Kiszállítva → Kiszállítva/Számlázva
+      // (számlázás) átmenet másodszor is levonta ugyanazt a készletet.
+      const ordersForDeduction = ordersToUpdate.filter(
+        o => !isDelivered(o.status) && !hasExistingShipmentDeduction(o.id)
       )
-      
-      if (deductionResult.deductedItems.length > 0 || deductionResult.failedItems.length > 0) {
-        setPendingDeductionResult(deductionResult)
-        setPendingStatusChange({ orderIds, status })
-        setPendingPostDeduction(null)
-        setDeductionContext('státuszváltás')
-        setInventoryDeductionDialogOpen(true)
-        return
+      if (ordersForDeduction.length > 0) {
+        const deductionResult = deductInventoryForOrders(
+          ordersForDeduction,
+          inventory || [],
+          products || []
+        )
+
+        if (deductionResult.deductedItems.length > 0 || deductionResult.failedItems.length > 0) {
+          setPendingDeductionResult(deductionResult)
+          setPendingStatusChange({ orderIds, status })
+          setPendingPostDeduction(null)
+          setDeductionContext('státuszváltás')
+          setInventoryDeductionDialogOpen(true)
+          return
+        }
       }
     }
-    
+
+    // Kiszállított → nem-kiszállított váltás: a korábban levont készlet
+    // visszatöltése (tranzakció-alapú, idempotens — ld. inventoryService).
+    if (!isChangingToDelivered) {
+      const revertedOrders = ordersToUpdate.filter(o => isDelivered(o.status))
+      if (revertedOrders.length > 0) {
+        const restore = restoreInventoryForOrders(revertedOrders, inventoryTransactions || [])
+        if (restore.restoredItems.length > 0) {
+          commitInventoryRestore(restore, setInventory, setInventoryTransactions)
+          toast.success(`Készlet visszatöltve: ${restore.restoredItems.length} tétel`)
+        }
+      }
+    }
+
     executeStatusChange(orderIds, status)
   }
 
@@ -1022,19 +1080,34 @@ function App() {
     setOrderDialogOpen(true)
   }
 
+  const orderImportKey = (o: Partial<Order>): string => {
+    // Természetes kulcs: vevő + rendelési szám + termék. Ha nincs rendelési
+    // szám, a saját szám azonosít; e nélkül nem szűrünk (nincs identitás).
+    const num = o.orderNumber || o.ownOrderNumber
+    if (!num) return ''
+    return `${stripDiacritics(o.customer)}|${stripDiacritics(num)}|${stripDiacritics(o.productName)}`
+  }
+
   const handleOrderBulkImport = (importedOrders: Partial<Order>[]) => {
-    setOrders((current) => [...(current || []), ...(importedOrders as Order[])])
-    if (importedOrders.length > 0) {
-      appendAudit(
-        'order',
-        'Rendelés',
-        importedOrders.map((o) => (o as Order).id ?? '').filter(Boolean).join(','),
-        `${importedOrders.length} rendelés`,
-        'bulkImport',
-        { notes: `Tömeges import: ${importedOrders.length} rendelés` }
-      )
-    }
-    toast.success(`${importedOrders.length} rendelés sikeresen importálva`)
+    const existingKeys = new Set((orders || []).map(orderImportKey).filter(Boolean))
+    const fresh = importedOrders.filter((o) => {
+      const key = orderImportKey(o)
+      return !key || !existingKeys.has(key)
+    })
+    const skipped = importedOrders.length - fresh.length
+    if (skipped > 0) toast.warning(`${skipped} rendelés már létezik — kihagyva`)
+    if (fresh.length === 0) return
+
+    setOrders((current) => [...(current || []), ...(fresh as Order[])])
+    appendAudit(
+      'order',
+      'Rendelés',
+      fresh.map((o) => (o as Order).id ?? '').filter(Boolean).join(','),
+      `${fresh.length} rendelés`,
+      'bulkImport',
+      { notes: `Tömeges import: ${fresh.length} rendelés` }
+    )
+    toast.success(`${fresh.length} rendelés sikeresen importálva`)
   }
 
   const handleUndoLastAction = () => {
@@ -1045,6 +1118,33 @@ function App() {
       toast.success('Visszavonva')
       setLastAction(null)
     } else if (lastAction.type === 'edit') {
+      // Készlet-kompenzáció: ha a visszavont művelet státuszt váltott a
+      // kiszállított állapotba/állapotból, a készletet is vissza kell igazítani.
+      const current = (orders || []).find(o => o.id === lastAction.orderId)
+      const before = lastAction.before
+      if (current) {
+        if (isDelivered(current.status) && !isDelivered(before.status)) {
+          // A visszavont váltás levont készletet → visszatöltés
+          const restore = restoreInventoryForOrders([current], inventoryTransactions || [])
+          if (restore.restoredItems.length > 0) {
+            commitInventoryRestore(restore, setInventory, setInventoryTransactions)
+            toast.success(`Készlet visszatöltve: ${restore.restoredItems.length} tétel`)
+          }
+        } else if (
+          !isDelivered(current.status) &&
+          isDelivered(before.status) &&
+          !hasExistingShipmentDeduction(before.id)
+        ) {
+          // Visszavonás egy kiszállított állapotra → az eredetileg már
+          // megerősített levonás újra-alkalmazása (dialógus nélkül).
+          const d = deductInventoryForOrders([before], inventory || [], products || [])
+          if (d.deductedItems.length > 0) {
+            commitInventoryDeduction(d, setInventory, setInventoryTransactions)
+            toast.success(`Készlet levonva: ${d.deductedItems.length} tétel`)
+          }
+        }
+      }
+
       setOrders((current) =>
         (current || []).map(o => o.id === lastAction.orderId ? lastAction.before : o)
       )
@@ -1062,6 +1162,34 @@ function App() {
           c.id === selectedCustomer.id ? { ...c, ...customerData } : c
         )
       )
+
+      // ── Cégnév átgyűrűztetése ──
+      // A rendelés / termék / készlet NÉV szerint kapcsolódik a vevőhöz, ezért
+      // átnevezéskor el kell vinni az új nevet minden hivatkozó rekordra,
+      // különben elszakad a kapcsolat (a rendelés "árván" marad a régi néven).
+      const oldName = before?.name?.trim()
+      const newName = customerData.name?.trim()
+      if (oldName && newName && oldName !== newName) {
+        const now = new Date().toISOString()
+        let touched = 0
+        setOrders((current) =>
+          (current || []).map((o) => {
+            if (o.customer?.trim() !== oldName) return o
+            touched++
+            return { ...o, customer: newName, updatedAt: now }
+          })
+        )
+        setProducts((current) =>
+          (current || []).map((p) => (p.customer?.trim() === oldName ? { ...p, customer: newName } : p))
+        )
+        setInventory((current) =>
+          (current || []).map((i) => (i.customer?.trim() === oldName ? { ...i, customer: newName, lastUpdated: now } : i))
+        )
+        if (touched > 0) {
+          toast.info(`A névváltozás átvezetve ${touched} rendelésre (+ termékek, készlet)`)
+        }
+      }
+
       if (before && after) {
         const changes = diffObjects(
           before as unknown as Record<string, unknown>,
@@ -1110,13 +1238,21 @@ function App() {
   }
 
   const handleBulkImport = (importedCustomers: Partial<Customer>[]) => {
-    setCustomers((current) => [...(current || []), ...(importedCustomers as Customer[])])
-    if (importedCustomers.length > 0) {
-      appendAudit('customer', 'Vevő', '-', `${importedCustomers.length} vevő`, 'bulkImport', {
-        notes: `Tömeges import: ${importedCustomers.length} vevő`,
-      })
-    }
-    toast.success(`${importedCustomers.length} vevő sikeresen importálva`)
+    // Duplikátum-szűrés név alapján — ugyanaz a fájl kétszer importálva
+    // korábban minden vevőt megduplázott (új ID-kkal).
+    const existingNames = new Set((customers || []).map((c) => stripDiacritics(c.name)))
+    const fresh = importedCustomers.filter(
+      (c) => !c.name || !existingNames.has(stripDiacritics(c.name))
+    )
+    const skipped = importedCustomers.length - fresh.length
+    if (skipped > 0) toast.warning(`${skipped} vevő már létezik — kihagyva`)
+    if (fresh.length === 0) return
+
+    setCustomers((current) => [...(current || []), ...(fresh as Customer[])])
+    appendAudit('customer', 'Vevő', '-', `${fresh.length} vevő`, 'bulkImport', {
+      notes: `Tömeges import: ${fresh.length} vevő`,
+    })
+    toast.success(`${fresh.length} vevő sikeresen importálva`)
   }
 
   const handleSaveProduct = (productData: Partial<Product>) => {
@@ -1128,6 +1264,72 @@ function App() {
           p.id === selectedProduct.id ? { ...p, ...productData } : p
         )
       )
+
+      // ── Termékadat átgyűrűztetése a kötött rendelésekre / készletre ──
+      // A rendelés a termékből átmásolt mezőkkel dolgozik (a gyártás az élő
+      // findProductForOrder-t használja, de a rendelés-táblában eltárolt
+      // másolat különben elavulna). Csak a VALÓBAN megváltozott mezőket
+      // visszük át, hogy a rendelésen kézzel felülírt értékeket ne töröljük.
+      //   order.productName ← product.drawingNumber (rajzszám)
+      //   order.designation ← product.productName   (terméknév)
+      //   order.material    ← product.material
+      if (before && after) {
+        // 1) Azonos-mezős átmásolás (csak a változott mezőket)
+        const orderPatch: Partial<Order> = {}
+        if (before.drawingNumber !== after.drawingNumber) orderPatch.productName = after.drawingNumber || ''
+        if (before.productName !== after.productName) orderPatch.designation = after.productName || ''
+        if (before.material !== after.material) orderPatch.material = after.material || ''
+
+        // 2) SZÁMÍTOTT mezők: ha a doboz/raklap/súly/idő forrás-mezők
+        //    változtak a terméken, a rendelés kiszámolt értékeit (doboz,
+        //    raklap, anyagigény, bruttó súly, gyártási idő) újra kell számolni
+        //    a rendelt darabszámmal. Ez az, ami eddig hiányzott.
+        const calcChanged =
+          before.piecesPerBox !== after.piecesPerBox ||
+          before.boxesPerPallet !== after.boxesPerPallet ||
+          before.weightPerPiece !== after.weightPerPiece ||
+          before.cycleTime !== after.cycleTime ||
+          before.nestCount !== after.nestCount ||
+          before.surfaceTreatment !== after.surfaceTreatment
+
+        if (Object.keys(orderPatch).length > 0 || calcChanged) {
+          const now = new Date().toISOString()
+          let touched = 0
+          setOrders((current) =>
+            (current || []).map((o) => {
+              if (o.productId !== selectedProduct.id) return o
+              touched++
+              const updated: Order = { ...o, ...orderPatch, updatedAt: now }
+              if (calcChanged) {
+                const amount = o.amountPc || 0
+                const boxes = computeBoxesCount(amount, after.piecesPerBox)
+                const pallets = computePalletsCount(boxes, after.boxesPerPallet)
+                updated.boxesCount = boxes
+                updated.palletsCount = pallets
+                updated.requiredMaterialKg = computeRequiredMaterialKg(amount, after.weightPerPiece)
+                updated.grossWeightKg = computeGrossWeightKg(amount, after.weightPerPiece, pallets)
+                updated.plannedProductionHours = computePlannedProductionHours(amount, undefined, after.cycleTime, after.nestCount)
+                updated.surfaceTreatment = after.surfaceTreatment || ''
+              }
+              return updated
+            })
+          )
+          // Készlet: a termékhez kötött tételek neve/rajzszáma is kövesse
+          if (before.productName !== after.productName || before.drawingNumber !== after.drawingNumber) {
+            setInventory((current) =>
+              (current || []).map((i) =>
+                i.productId === selectedProduct.id
+                  ? { ...i, productName: after.productName || '', drawingNumber: after.drawingNumber || '', lastUpdated: now }
+                  : i
+              )
+            )
+          }
+          if (touched > 0) {
+            toast.info(`A termékmódosítás átvezetve ${touched} rendelésre`)
+          }
+        }
+      }
+
       if (before && after) {
         const changes = diffObjects(
           before as unknown as Record<string, unknown>,
@@ -1366,8 +1568,40 @@ function App() {
   }
 
   const handleProductBulkImport = (importedProducts: Partial<Product>[]) => {
-    setProducts((current) => [...(current || []), ...(importedProducts as Product[])])
-    toast.success(`${importedProducts.length} termék sikeresen importálva`)
+    // Duplikátum-szűrés: vevő + rajzszám (ha nincs rajzszám, vevő + terméknév)
+    const productKey = (p: Partial<Product>): string => {
+      const ident = p.drawingNumber || p.productName
+      if (!ident) return ''
+      return `${stripDiacritics(p.customer)}|${stripDiacritics(ident)}`
+    }
+    const existingKeys = new Set((products || []).map(productKey).filter(Boolean))
+    const fresh = importedProducts.filter((p) => {
+      const key = productKey(p)
+      return !key || !existingKeys.has(key)
+    })
+    const skipped = importedProducts.length - fresh.length
+    if (skipped > 0) toast.warning(`${skipped} termék már létezik — kihagyva`)
+    if (fresh.length === 0) return
+
+    setProducts((current) => [...(current || []), ...(fresh as Product[])])
+    toast.success(`${fresh.length} termék sikeresen importálva`)
+  }
+
+  // Szállítólevél/CMR készítése a Dokumentumok fülről — a kiválasztott
+  // rendeléseket a meglévő kiállítás-láncba adja (dátum → validáció → export).
+  const [createNoteDialogOpen, setCreateNoteDialogOpen] = useState(false)
+  const handleCreateNoteFromDocuments = (type: 'delivery' | 'cmr', orderIds: string[]) => {
+    setSelectedOrderIds(orderIds)
+    setIssueDateDialogType(type)
+    setIssueDateDialogOpen(true)
+  }
+
+  // Kiegészítő tételek a szállítólevélen (szerszám / anyag / szabad sor)
+  const [extraItemsNote, setExtraItemsNote] = useState<DeliveryNote | null>(null)
+  const handleSaveExtraItems = (note: DeliveryNote, extraItems: ExtraDeliveryItem[]) => {
+    const existing = deliveryNotesApi.items.find((dn) => dn.id === note.id)
+    if (!existing) return
+    deliveryNotesApi.replace({ ...existing, extraItems, updatedAt: new Date().toISOString() })
   }
 
   const handleDeleteDeliveryNote = (id: string) => {
@@ -1395,7 +1629,7 @@ function App() {
       await exportDeliveryAsHtml(
         noteOrders, customers || [], products || [], deliveryNotes || [],
         undefined, undefined, savedTemplates, activeTemplates,
-        note.issueDate, note.sequenceNumber
+        note.issueDate, note.sequenceNumber, note.extraItems
       )
     }
   }
@@ -1415,46 +1649,38 @@ function App() {
       html = getDeliveryHtml(
         noteOrders, customers || [], products || [], deliveryNotes || [],
         undefined, note.sequenceNumber,
-        savedTemplates, activeTemplates, note.issueDate
+        savedTemplates, activeTemplates, note.issueDate, note.extraItems
       )
     }
 
     const type = note.type === 'cmr' ? 'CMR' : 'Szallitolevel'
     const filename = `${type}_${note.sequenceNumber}_${note.customer.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
 
-    try {
-      const token = document.cookie
-        .split(';')
-        .map(c => c.trim())
-        .find(c => c.startsWith('pp_session='))
-        ?.split('=')[1] ?? ''
-
-      const res = await fetch('/api/v1/generate-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: 'include',
-        body: JSON.stringify({ html, filename }),
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        toast.error(`PDF generálás sikertelen: ${(err as any).detail || res.statusText}`)
-        return
-      }
-
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.click()
-      URL.revokeObjectURL(url)
+    // 1) Frissen generált PDF (a szerver a /pdf-output mappába is menti)
+    const ok = await generateAndSavePdf(html, filename, true)
+    if (ok) {
       toast.success(`PDF letöltve: ${filename}`)
-    } catch (err) {
-      toast.error(`PDF generálás sikertelen: ${String(err)}`)
+      return
+    }
+
+    // 2) Tartalék: ha az újragenerálás nem ment, a KORÁBBAN mentett fájlt
+    //    töltjük le ugyanarról a helyről (PDF_OUTPUT_DIR).
+    try {
+      const res = await fetch(`/api/v1/pdf-file/${encodeURIComponent(filename)}`, { credentials: 'include' })
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        a.click()
+        URL.revokeObjectURL(url)
+        toast.success(`PDF letöltve a mentett fájlból: ${filename}`)
+      } else {
+        toast.error('A PDF újragenerálása nem sikerült, és mentett fájl sincs a szerver PDF-mappájában.')
+      }
+    } catch {
+      toast.error('A PDF letöltése nem sikerült.')
     }
   }
 
@@ -1608,40 +1834,150 @@ function App() {
     setIssueDateDialogOpen(true)
   }
   
+  /**
+   * PDF generálás + szerver-oldali mentés (a /pdf-output mappába). Ha `download`,
+   * a böngészőbe is letölti. Visszaadja, sikerült-e.
+   */
+  const generateAndSavePdf = async (html: string, filename: string, download: boolean): Promise<boolean> => {
+    try {
+      const token = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('pp_session='))?.split('=')[1] ?? ''
+      const res = await fetch('/api/v1/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        credentials: 'include',
+        body: JSON.stringify({ html, filename }),
+      })
+      if (!res.ok) return false
+      if (download) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url)
+      }
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * A CMR-hez automatikusan létrehozza a szállítólevél REKORDOT is (saját
+   * sorszámmal) + PDF-et ment a szerverre. NEM állítja az order mezőket —
+   * azt a hívó teszi (a cmr + deliveryNote EGY setOrders-ben, hogy ne
+   * versenyezzenek). Visszaadja a szállítólevél sorszámát.
+   */
+  const autoCreateDeliveryNoteRecord = async (selectedOrders: Order[], issueDate: string): Promise<string> => {
+    const seq = generateDeliveryNoteSequenceNumber(deliveryNotes || [], 'delivery')
+    const firstCustomer = selectedOrders[0]?.customer || 'export'
+    const fileName = `Szallitolevel_${seq}_${firstCustomer.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
+    const now = new Date().toISOString()
+
+    deliveryNotesApi.add({
+      id: generateId(),
+      type: 'delivery',
+      sequenceNumber: seq,
+      customer: firstCustomer,
+      orderIds: selectedOrders.map(o => o.id),
+      fileName,
+      exportDate: now,
+      issueDate,
+      createdAt: now,
+      updatedAt: now,
+    } as DeliveryNote)
+
+    const html = getDeliveryHtml(
+      selectedOrders, customers || [], products || [], deliveryNotes || [],
+      undefined, seq, savedTemplates, activeTemplates, issueDate
+    )
+    const ok = await generateAndSavePdf(html, fileName, false)
+    toast.success(ok ? `Szállítólevél is elkészült: ${seq}` : `Szállítólevél létrehozva (${seq}) — PDF mentése kihagyva`)
+    return seq
+  }
+
   const executeCmrExport = async (issueDate?: string) => {
     const selectedOrders = (orders || []).filter(o => selectedOrderIds.includes(o.id))
+    const orderIds = selectedOrders.map(o => o.id)
+    const iso = issueDate ?? new Date().toISOString().slice(0, 10)
 
+    // 1) Automatikus szállítólevél-rekord + PDF (a sorszám előre kell a közös
+    //    order-frissítéshez)
+    const deliveryNoteSeq = await autoCreateDeliveryNoteRecord(selectedOrders, iso)
+
+    // 2) CMR generálás (nyomtatás-ablak + rekord). Az order-mezőket NEM itt
+    //    állítjuk — lásd lent az EGYETLEN setOrders-t (különben a több
+    //    párhuzamos PATCH last-write-wins alapon felülírná egymást).
+    let cmrSeq = ''
     await exportCmrAsHtml(
       selectedOrders,
       customers || [],
       products || [],
       deliveryNotes || [],
       (deliveryNote, sequenceNumber) => {
-        const newNote = {
+        const now = new Date().toISOString()
+        deliveryNotesApi.add({
           ...deliveryNote,
           id: generateId(),
           sequenceNumber: sequenceNumber || '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-        deliveryNotesApi.add(newNote as DeliveryNote)
-
-        if (sequenceNumber) {
-          const orderIdsToUpdate = selectedOrders.map(o => o.id)
-          setOrders((current) =>
-            (current || []).map(o =>
-              orderIdsToUpdate.includes(o.id)
-                ? { ...o, cmr: sequenceNumber, updatedAt: new Date().toISOString() }
-                : o
-            )
-          )
-        }
+          createdAt: now,
+          updatedAt: now,
+        } as DeliveryNote)
+        cmrSeq = sequenceNumber || ''
       },
       cmrSettings,
       savedTemplates,
       activeTemplates,
       issueDate ?? undefined
     )
+
+    // Az order-mezők commit-ja: cmr + deliveryNote + status EGY setOrders-ben,
+    // + audit a státuszváltásról. A készletlevonás UTÁN fut (a dialógus
+    // megerősítésekor vagy csendes levonásnál közvetlenül), így pontosan egy
+    // PATCH megy az egyes rendelésekre — nincs versenyhelyzet.
+    const commitOrderFields = () => {
+      const now = new Date().toISOString()
+      selectedOrders.forEach((o) => {
+        if (o.status !== 'Kiszállítva') {
+          appendAudit('order', 'Rendelés', o.id, o.orderNumber || o.productName || o.id, 'status', {
+            changes: [{ field: 'status', label: 'Státusz', before: o.status, after: 'Kiszállítva' }],
+            notes: `${o.customer} · ${o.productName}${cmrSeq ? ` · CMR ${cmrSeq}` : ''}`,
+          })
+        }
+      })
+      setOrders((current) =>
+        (current || []).map(o =>
+          orderIds.includes(o.id)
+            ? { ...o, cmr: cmrSeq || o.cmr, deliveryNote: deliveryNoteSeq, status: 'Kiszállítva' as OrderStatus, updatedAt: now }
+            : o
+        )
+      )
+    }
+
+    // 3) Készletlevonás a szállítólevéllel AZONOS módon: teljes fedezetnél
+    //    csendben levonunk, hiánynál megerősítő dialógus (a
+    //    hasExistingShipmentDeduction őrzi, hogy ne vonjon le kétszer).
+    if (orderIds.length > 0) {
+      const ordersForDeduction = selectedOrders.filter(
+        (o) => !hasExistingShipmentDeduction(o.id) && !isDelivered(o.status)
+      )
+      if (ordersForDeduction.length > 0) {
+        const deductionResult = deductInventoryForOrders(ordersForDeduction, inventory || [], products || [])
+        const needsConfirmation =
+          deductionResult.failedItems.length > 0 ||
+          deductionResult.deductedItems.some((d) => d.shortage > 0)
+        if (needsConfirmation) {
+          setPendingDeductionResult(deductionResult)
+          setDeductionContext('CMR + szállítólevél')
+          setPendingStatusChange(null)
+          // A levonás megerősítése UTÁN egyetlen setOrders-ben commitoljuk a mezőket.
+          setPendingPostDeduction(() => commitOrderFields)
+          setInventoryDeductionDialogOpen(true)
+          return // a dialógus megerősítése végzi a levonást + a commit-ot
+        }
+        if (deductionResult.deductedItems.length > 0) {
+          commitInventoryDeduction(deductionResult, setInventory, setInventoryTransactions)
+        }
+      }
+      commitOrderFields()
+    }
   }
 
   const handleValidationContinue = async () => {
@@ -1707,44 +2043,97 @@ function App() {
   // / `ProductsTable` virtualizációja vagy memoizációja sem invalidálódik
   // szükségtelenül.
   const filteredCustomers = useMemo(() => {
-    const query = customerSearchQuery.toLowerCase()
+    const query = stripDiacritics(customerSearchQuery)
     if (!query) return customers || []
     return (customers || []).filter(
       (customer) =>
-        customer.name.toLowerCase().includes(query) ||
-        customer.city.toLowerCase().includes(query) ||
-        customer.country.toLowerCase().includes(query) ||
-        customer.taxNumber.toLowerCase().includes(query) ||
-        customer.postalCode.toLowerCase().includes(query)
+        stripDiacritics(customer.name).includes(query) ||
+        stripDiacritics(customer.city).includes(query) ||
+        stripDiacritics(customer.country).includes(query) ||
+        stripDiacritics(customer.taxNumber).includes(query) ||
+        stripDiacritics(customer.postalCode).includes(query)
     )
   }, [customers, customerSearchQuery])
 
   const filteredProducts = useMemo(() => {
-    const query = productSearchQuery.toLowerCase()
+    const query = stripDiacritics(productSearchQuery)
     if (!query) return products || []
     return (products || []).filter(
       (product) =>
-        product.customer.toLowerCase().includes(query) ||
-        product.productName.toLowerCase().includes(query) ||
-        product.drawingNumber.toLowerCase().includes(query) ||
-        product.articleNumber.toLowerCase().includes(query) ||
-        product.material.toLowerCase().includes(query)
+        stripDiacritics(product.customer).includes(query) ||
+        stripDiacritics(product.productName).includes(query) ||
+        stripDiacritics(product.drawingNumber).includes(query) ||
+        stripDiacritics(product.articleNumber).includes(query) ||
+        stripDiacritics(product.material).includes(query)
     )
   }, [products, productSearchQuery])
 
   const dashboardFilteredOrders = useMemo(() => {
-    if (!dashboardSearchQuery) return orders || []
-    const query = dashboardSearchQuery.toLowerCase()
+    const query = stripDiacritics(dashboardSearchQuery)
+    if (!query) return orders || []
     return (orders || []).filter(
       (order) =>
-        order.productName.toLowerCase().includes(query) ||
-        order.orderNumber.toLowerCase().includes(query) ||
-        order.customer.toLowerCase().includes(query)
+        stripDiacritics(order.productName).includes(query) ||
+        stripDiacritics(order.orderNumber).includes(query) ||
+        stripDiacritics(order.customer).includes(query)
     )
   }, [orders, dashboardSearchQuery])
 
   const metrics = useMemo(
     () => calculateDashboardMetrics(dashboardFilteredOrders),
+    [dashboardFilteredOrders]
+  )
+
+  // ── Alapanyag-gazdálkodás (A3 hibrid modell) ──
+  // Élő becslés a Rendelések összesítő sávjához; a részletes kártyák a
+  // MaterialPanel-ben élnek (Gyártás + Készlet fül).
+  const [materialBookedThrough] = useAppSetting<MaterialBookedThroughMap>(MATERIAL_BOOKED_THROUGH_KEY, {})
+  const materialEstimateKg = useMemo(() => {
+    const statuses = computeMaterialStatuses(
+      inventory || [],
+      productionShifts || [],
+      orders || [],
+      products || [],
+      inventoryTransactions || [],
+      materialBookedThrough
+    )
+    return statuses.length > 0 ? totalEstimatedMaterialKg(statuses) : null
+  }, [inventory, productionShifts, orders, products, inventoryTransactions, materialBookedThrough])
+
+  /** Anyag-művelet (bevét/visszaolvasztás/leltár) átvezetése + audit. */
+  const handleMaterialAction = useCallback(
+    ({ updatedItem, transaction, kind }: {
+      updatedItem: InventoryItem
+      transaction: InventoryTransaction
+      kind: MaterialActionKind
+    }) => {
+      setInventory((current) =>
+        (current || []).map((i) => (i.id === updatedItem.id ? updatedItem : i))
+      )
+      setInventoryTransactions((current) => [...(current || []), transaction])
+      appendAudit(
+        'inventory',
+        'Készlet',
+        updatedItem.id,
+        updatedItem.productName || updatedItem.id,
+        transaction.type as AuditAction,
+        { notes: transaction.notes, userId: auth.user?.id, userName: auth.user?.name }
+      )
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [auth.user?.id, auth.user?.name]
+  )
+
+  // Lejárt határidejű, még ki nem szállított rendelések — a legrégebben
+  // lejárt elöl. A dashboard piros sávban jelzi (a leginkább akcióigényes tétel).
+  const overdueOrders = useMemo(
+    () =>
+      (dashboardFilteredOrders || [])
+        .filter((o) => isOverdue(o.requiredDate, o.status))
+        .sort(
+          (a, b) =>
+            new Date(a.requiredDate).getTime() - new Date(b.requiredDate).getTime()
+        ),
     [dashboardFilteredOrders]
   )
 
@@ -1811,19 +2200,44 @@ function App() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">
-                  ProduktívPro
+                  {/* Olvasatlan üzenetnél a márkanév pirosan villog (a kis "!"
+                      jelvény az üzenet-gombon emellett megmarad). */}
+                  <span
+                    className={unreadMessageCount > 0 ? 'pp-brand-alert' : undefined}
+                    title={unreadMessageCount > 0 ? `${unreadMessageCount} olvasatlan üzenet` : undefined}
+                  >
+                    ProduktívPro
+                  </span>
                   <span className="ml-2 align-middle text-xs font-mono font-normal text-muted-foreground">
-                    {import.meta.env.VITE_APP_VERSION || 'dev'}
+                    {import.meta.env.VITE_APP_VERSION || APP_VERSION}
                   </span>
                 </h1>
                 <p className="text-sm text-muted-foreground">Termelés Irányítási Rendszer</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 text-muted-foreground hidden sm:flex"
+                onClick={() => setGlobalSearchOpen(true)}
+                title="Gyorskereső (Ctrl+K)"
+              >
+                <MagnifyingGlass className="w-4 h-4" />
+                <span className="hidden md:inline">Keresés</span>
+                <kbd className="hidden md:inline pointer-events-none rounded border bg-muted px-1.5 font-mono text-[10px]">Ctrl K</kbd>
+              </Button>
               <NotificationBell
                 {...notificationCenter}
                 onNavigate={handleNotificationNavigate}
               />
+              <MessageCenter
+                messagesApi={messagesApi}
+                currentUser={auth.user ? { id: auth.user.id, name: auth.user.name } : null}
+                orders={orders || []}
+              />
+              <SkinSelect />
+              <ThemeToggle />
               {auth.user && (
                 <div className="flex items-center gap-2 border-l pl-4">
                   <div className="text-right hidden sm:block">
@@ -1882,7 +2296,9 @@ function App() {
           <OfflineBanner isOnline={isOnline} pendingCount={pendingCount} isSyncing={isSyncing} />
 
           <div className="flex items-center gap-3 flex-wrap">
-            <TabsList className={`grid w-full md:w-auto md:inline-grid ${auth.user?.role === 'operator' ? 'grid-cols-3 md:grid-cols-3' : 'grid-cols-5 md:grid-cols-5'}`}>
+            {/* Telefonon vízszintesen görgethető sáv (a magyar címkék nem férnek
+                5 fix oszlopba 375px-en); md-től rácsba rendezve. */}
+            <TabsList className={`flex w-full max-w-full overflow-x-auto md:grid md:w-auto md:inline-grid text-xs sm:text-sm ${auth.user?.role === 'operator' ? 'md:grid-cols-3' : 'md:grid-cols-5'}`}>
               {auth.user?.role !== 'operator' && <TabsTrigger value="dashboard">Áttekintés</TabsTrigger>}
               <TabsTrigger value="production">Gyártás</TabsTrigger>
               <TabsTrigger value="planning">Gy. tervezés</TabsTrigger>
@@ -1917,21 +2333,24 @@ function App() {
                   <DropdownMenuItem onSelect={() => setCurrentTab('machines')}>
                     Gépek
                   </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setCurrentTab('maintenance')}>
+                    Karbantartás
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setCurrentTab('materials')}>
                     Anyaglista
                   </DropdownMenuItem>
                   {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('users')}>
                     Felhasználók
                   </DropdownMenuItem>}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => setCurrentTab('production-history')}>
-                    Gyártás előzmények
-                  </DropdownMenuItem>
+                  {auth.user?.role === 'admin' && <DropdownMenuSeparator />}
+                  {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('reports')}>
+                    Riportok
+                  </DropdownMenuItem>}
                 </DropdownMenuContent>
               </DropdownMenu>}
 
-              {/* Dokumentumok — kimenő iratok és mentett fájlok */}
-              {auth.user?.role === 'admin' && <DropdownMenu>
+              {/* Dokumentumok — kimenő iratok, mentett fájlok, gyártás előzmények */}
+              {(auth.user?.role === 'admin' || auth.user?.role === 'operator') && <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2">
                     <FileText className="w-4 h-4" />
@@ -1940,11 +2359,15 @@ function App() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => setCurrentTab('documents')}>
+                  {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('documents')}>
                     Szállítólevelek / CMR
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setCurrentTab('saves')}>
+                  </DropdownMenuItem>}
+                  {auth.user?.role === 'admin' && <DropdownMenuItem onSelect={() => setCurrentTab('saves')}>
                     Mentett fájlok
+                  </DropdownMenuItem>}
+                  {auth.user?.role === 'admin' && <DropdownMenuSeparator />}
+                  <DropdownMenuItem onSelect={() => setCurrentTab('production-history')}>
+                    Gyártás előzmények
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>}
@@ -1968,6 +2391,13 @@ function App() {
                   <DropdownMenuItem onSelect={() => setCurrentTab('label-templates')}>
                     Címke sablonok
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setWorkCalendarDialogOpen(true)}>
+                    Munkanaptár
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setCurrentTab('trash')}>
+                    Lomtár
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>}
             </div>
@@ -1988,8 +2418,10 @@ function App() {
               metrics={metrics}
               productionKPIs={productionKPIs}
               lowStockItems={lowStockItems}
+              overdueOrders={overdueOrders}
               onFilterByStatus={handleFilterByStatus}
               onNavigateToInventory={() => setCurrentTab('inventory')}
+              onShowOverdue={() => { setCurrentTab('orders'); setStatusFilter('all'); setHideDelivered(true) }}
             />
 
             {(orders || []).length === 0 && (
@@ -2014,6 +2446,17 @@ function App() {
             productionShifts={productionShifts}
             productionDefects={productionDefects}
             machines={machinesApi.items || []}
+            materialSlot={
+              <MaterialPanel
+                compact
+                inventory={inventory || []}
+                shifts={productionShifts || []}
+                orders={orders || []}
+                products={products || []}
+                transactions={inventoryTransactions || []}
+                onApply={handleMaterialAction}
+              />
+            }
             handleStatusChange={handleStatusChange}
             handleEditOrder={handleEditOrder}
             handleSaveShift={handleSaveShift}
@@ -2035,6 +2478,7 @@ function App() {
             orders={orders}
             customers={customers}
             products={products}
+            materialEstimateKg={materialEstimateKg}
             labelTemplates={labelTemplates}
             savedDeliveryTemplates={savedTemplates}
             activeTemplates={activeTemplates}
@@ -2153,6 +2597,8 @@ function App() {
             handleUpdateDeliveryNote={handleUpdateDeliveryNote}
             handlePreviewNote={handlePreviewNote}
             handleDownloadPdf={handleDownloadPdf}
+            onEditExtraItems={setExtraItemsNote}
+            onCreateNew={() => setCreateNoteDialogOpen(true)}
             handleEmailNote={handleEmailNote}
             emailTemplate={emailTemplate}
             setEmailTemplate={setEmailTemplate}
@@ -2160,6 +2606,36 @@ function App() {
 
           <TabsContent value="saves" className="space-y-6">
             <BackupRestore />
+          </TabsContent>
+
+          <TabsContent value="trash" className="space-y-6">
+            <Suspense fallback={<div className="text-muted-foreground p-4">Lomtár betöltése…</div>}>
+              <TrashView />
+            </Suspense>
+          </TabsContent>
+
+          <TabsContent value="reports" className="space-y-6">
+            <Suspense fallback={<div className="text-muted-foreground p-4">Riportok betöltése…</div>}>
+              <ReportsView
+                orders={orders || []}
+                shifts={productionShifts || []}
+                defects={productionDefects || []}
+                machines={machinesApi.items || []}
+                products={products || []}
+                inventory={inventory || []}
+              />
+            </Suspense>
+          </TabsContent>
+
+          <TabsContent value="maintenance" className="space-y-6">
+            <Suspense fallback={<div className="text-muted-foreground p-4">Karbantartás betöltése…</div>}>
+              <MaintenanceView
+                machines={machinesApi.items || []}
+                maintenance={maintenanceApi.items || []}
+                onSave={(m) => maintenanceApi.add(m)}
+                onDelete={(id) => maintenanceApi.remove(id)}
+              />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="production-history" className="space-y-6">
@@ -2184,6 +2660,9 @@ function App() {
               products={products || []}
               onDelete={handleDeleteDeliveryNote}
               onUpdate={handleUpdateDeliveryNote}
+              onEditExtraItems={setExtraItemsNote}
+              onCreateNew={() => setCreateNoteDialogOpen(true)}
+              onDownloadPdf={handleDownloadPdf}
             />
           </TabsContent>
 
@@ -2205,6 +2684,9 @@ function App() {
             setInventory={setInventory}
             products={products}
             orders={orders}
+            inventoryTransactions={inventoryTransactions}
+            productionShifts={productionShifts}
+            onMaterialAction={handleMaterialAction}
             lowStockItems={lowStockItems}
             inventorySearchQuery={inventorySearchQuery}
             setInventorySearchQuery={setInventorySearchQuery}
@@ -2225,6 +2707,37 @@ function App() {
         type={issueDateDialogType}
         onConfirm={handleIssueDateConfirm}
         onClose={() => setIssueDateDialogOpen(false)}
+      />
+
+      <GlobalSearch
+        open={globalSearchOpen}
+        onOpenChange={setGlobalSearchOpen}
+        orders={orders || []}
+        customers={customers || []}
+        products={products || []}
+        onOpenOrder={handleEditOrder}
+        onOpenCustomer={(id) => { setCurrentTab('customers'); handleEditCustomer(id) }}
+        onOpenProduct={(id) => { setCurrentTab('products'); handleEditProduct(id) }}
+        onNavigate={setCurrentTab}
+      />
+
+      <WorkCalendarDialog
+        open={workCalendarDialogOpen}
+        onClose={() => setWorkCalendarDialogOpen(false)}
+      />
+
+      <ExtraItemsDialog
+        note={extraItemsNote}
+        inventory={inventory || []}
+        onClose={() => setExtraItemsNote(null)}
+        onSave={handleSaveExtraItems}
+      />
+
+      <CreateDeliveryNoteDialog
+        open={createNoteDialogOpen}
+        onClose={() => setCreateNoteDialogOpen(false)}
+        orders={orders || []}
+        onCreate={handleCreateNoteFromDocuments}
       />
 
       <AppDialogs

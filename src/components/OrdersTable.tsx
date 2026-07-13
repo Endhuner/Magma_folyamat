@@ -1,13 +1,16 @@
-import { memo, useEffect, useMemo, useState } from 'react'
+import { CSSProperties, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Order, OrderStatus, Product } from '@/lib/types'
 import { getPlannedHoursForOrder } from '@/lib/orderService'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Pencil, Trash, Package, CopySimple } from '@phosphor-icons/react'
+import { Pencil, Trash, Package, CopySimple, PushPin } from '@phosphor-icons/react'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ORDERS_TABLE_PAGE_SIZE, VIRTUAL_ROW_STYLE } from '@/lib/virtualRow'
+import { useKV } from '@/hooks/useKV'
+import { kvStore } from '@/lib/kvStore'
+import { cn } from '@/lib/utils'
 
 interface OrdersTableProps {
   orders: Order[]
@@ -19,6 +22,8 @@ interface OrdersTableProps {
   selectedIds: string[]
   onSelectionChange: (ids: string[]) => void
   visibleColumns?: string[]
+  /** Becsült alapanyag-készlet (kg) — az összesítő sáv fedezet-jelzéséhez. */
+  materialEstimateKg?: number | null
 }
 
 const STATUS_OPTIONS: OrderStatus[] = [
@@ -45,7 +50,38 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
   'Elkészült': 'oklch(0.88 0.10 145)',
 }
 
-function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onStatusChange, selectedIds, onSelectionChange, visibleColumns }: OrdersTableProps) {
+/**
+ * Oszlop-definíciók megjelenítési sorrendben — a fejléc ebből renderel,
+ * és a rögzített (sticky) oszlopok bal-offszete is ebben a sorrendben
+ * halmozódik. A cellák tartalma egyedi, az a törzsben marad kézzel írva.
+ */
+const COLUMNS: Array<{ id: string; label: string; sortable?: boolean; headClass?: string }> = [
+  { id: 'customer', label: 'Vevő' },
+  { id: 'productName', label: 'Termék neve' },
+  { id: 'designation', label: 'Megnevezése' },
+  { id: 'notes', label: 'Megjegyzés', sortable: false },
+  { id: 'pos', label: 'Pos' },
+  { id: 'ownOrderNumber', label: 'Saját rendelési szám' },
+  { id: 'material', label: 'Anyag' },
+  { id: 'orderNumber', label: 'Vevő rendelési száma' },
+  { id: 'amountPc', label: 'Mennyiség (db)' },
+  { id: 'orderDate', label: 'Rendelés dátuma' },
+  { id: 'requiredDate', label: 'Szükséges szállítási dátum' },
+  { id: 'pickupDate', label: 'CMR / Szállítólevél dátuma' },
+  { id: 'invoiced', label: 'Számlázva' },
+  { id: 'ready', label: 'Szállításra kész' },
+  { id: 'surfaceTreatment', label: 'Felületkezelés' },
+  { id: 'boxesCount', label: 'Dobozok száma' },
+  { id: 'palletsCount', label: 'Össz raklapok száma' },
+  { id: 'grossWeightKg', label: 'Össz bruttó súly' },
+  { id: 'requiredMaterialKg', label: 'Szükséges anyagmennyiség' },
+  { id: 'plannedProductionHours', label: 'Tervezett gyártási idő' },
+  { id: 'deliveryNote', label: 'Szállítólevél' },
+  { id: 'cmr', label: 'CMR' },
+  { id: 'status', label: 'Státusz', sortable: false, headClass: 'min-w-[200px]' },
+]
+
+function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onStatusChange, selectedIds, onSelectionChange, visibleColumns, materialEstimateKg }: OrdersTableProps) {
   const [sortField, setSortField] = useState<keyof Order | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   /**
@@ -58,10 +94,42 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
    */
   const [showAll, setShowAll] = useState(false)
 
+  /**
+   * Rögzített oszlopok: vízszintes görgetésnél a bal szélre tapadnak
+   * (CSS: .pinned-col az index.css-ben), több oszlop egymás mellé áll.
+   * Perzisztens, gépenként. A korábbi egy-oszlopos beállítást
+   * ('orders-pinned-product-column') első futáskor átvesszük.
+   */
+  const [pinnedCols, setPinnedCols] = useKV<string[]>(
+    'orders-pinned-columns',
+    kvStore.get<boolean>('orders-pinned-product-column') ? ['productName'] : []
+  )
+  const pinnedSet = useMemo(() => new Set(pinnedCols), [pinnedCols])
+
   const isColumnVisible = (columnId: string) => {
     if (!visibleColumns || visibleColumns.length === 0) return true
     return visibleColumns.includes(columnId)
   }
+
+  const togglePin = (id: string) =>
+    setPinnedCols((cur) => (cur.includes(id) ? cur.filter((c) => c !== id) : [...cur, id]))
+
+  /** Rögzített ÉS látható oszlopok, megjelenítési sorrendben. */
+  const pinnedVisible = COLUMNS.filter((c) => pinnedSet.has(c.id) && isColumnVisible(c.id)).map((c) => c.id)
+  const lastPinnedId = pinnedVisible[pinnedVisible.length - 1]
+
+  const pinCls = (id: string) =>
+    pinnedSet.has(id) ? (id === lastPinnedId ? 'pinned-col pinned-col-last' : 'pinned-col') : undefined
+  const pinStyle = (id: string): CSSProperties | undefined =>
+    pinnedSet.has(id) ? { left: `var(--pin-l-${id}, 0px)` } : undefined
+
+  // Termék-térkép id szerint — a megnevezést/rajzszámot az ÉLŐ termékből
+  // olvassuk (mint a címke), nem a rendelésbe régen bemásolt értékből, így a
+  // termék szerkesztése azonnal helyesen látszik a táblázatban is.
+  const productById = useMemo(
+    () => new Map((products ?? []).map((p) => [p.id, p])),
+    [products]
+  )
 
   const sortedOrders = useMemo(() => {
     if (!sortField) return orders
@@ -103,6 +171,35 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
   }, [sortedOrders, showAll])
 
   const hasMoreRows = sortedOrders.length > visibleOrders.length
+
+  /**
+   * A rögzített oszlopok bal-offszetjei: mindegyik annyival beljebb tapad,
+   * amekkora az előtte rögzített oszlopok összszélessége. A szélességeket a
+   * fejléc-cellákról mérjük, és CSS-változóként tesszük a táblázat köré —
+   * így soronként nem kell semmit számolni. ResizeObserver követi, ha a
+   * tartalom miatt változik egy oszlop szélessége; a `visibleOrders` függőség
+   * pedig azt fedi le, amikor a táblázat (újra) felépül az adatok érkezésekor.
+   */
+  const tableWrapRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const wrap = tableWrapRef.current
+    if (!wrap || pinnedVisible.length === 0) return
+    const ths = pinnedVisible
+      .map((id) => [id, wrap.querySelector<HTMLElement>(`th[data-col="${id}"]`)] as const)
+      .filter((pair): pair is [string, HTMLElement] => !!pair[1])
+    const update = () => {
+      let acc = 0
+      for (const [id, th] of ths) {
+        wrap.style.setProperty(`--pin-l-${id}`, `${acc}px`)
+        acc += th.getBoundingClientRect().width
+      }
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ths.forEach(([, th]) => ro.observe(th))
+    return () => ro.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinnedVisible.join('|'), visibleColumns, visibleOrders])
 
   const handleSort = (field: keyof Order) => {
     if (sortField === field) {
@@ -181,8 +278,8 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
     <>
 
 
-      <div className="border rounded-lg mb-4">
-        <ScrollArea className="w-full whitespace-nowrap">
+      <div className="border rounded-lg mb-4" ref={tableWrapRef}>
+        <ScrollArea className="w-full whitespace-nowrap pin-scroll-host">
           <Table>
             <TableHeader>
               <TableRow>
@@ -192,38 +289,49 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
                     onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
-                {isColumnVisible('customer') && <TableHead className="cursor-pointer" onClick={() => handleSort('customer')}>Vevő</TableHead>}
-                {isColumnVisible('productName') && <TableHead className="cursor-pointer" onClick={() => handleSort('productName')}>Termék neve</TableHead>}
-                {isColumnVisible('designation') && <TableHead className="cursor-pointer" onClick={() => handleSort('designation')}>Megnevezése</TableHead>}
-                {isColumnVisible('notes') && <TableHead>Megjegyzés</TableHead>}
-                {isColumnVisible('pos') && <TableHead className="cursor-pointer" onClick={() => handleSort('pos')}>Pos</TableHead>}
-                {isColumnVisible('ownOrderNumber') && <TableHead className="cursor-pointer" onClick={() => handleSort('ownOrderNumber')}>Saját rendelési szám</TableHead>}
-                {isColumnVisible('material') && <TableHead className="cursor-pointer" onClick={() => handleSort('material')}>Anyag</TableHead>}
-                {isColumnVisible('orderNumber') && <TableHead className="cursor-pointer" onClick={() => handleSort('orderNumber')}>Vevő rendelési száma</TableHead>}
-                {isColumnVisible('amountPc') && <TableHead className="cursor-pointer" onClick={() => handleSort('amountPc')}>Mennyiség (db)</TableHead>}
-                {isColumnVisible('orderDate') && <TableHead className="cursor-pointer" onClick={() => handleSort('orderDate')}>Rendelés dátuma</TableHead>}
-                {isColumnVisible('requiredDate') && <TableHead className="cursor-pointer" onClick={() => handleSort('requiredDate')}>Szükséges szállítási dátum</TableHead>}
-                {isColumnVisible('pickupDate') && <TableHead className="cursor-pointer" onClick={() => handleSort('pickupDate')}>CMR / Szállítólevél dátuma</TableHead>}
-                {isColumnVisible('invoiced') && <TableHead className="cursor-pointer" onClick={() => handleSort('invoiced')}>Számlázva</TableHead>}
-                {isColumnVisible('ready') && <TableHead className="cursor-pointer" onClick={() => handleSort('ready')}>Szállításra kész</TableHead>}
-                {isColumnVisible('surfaceTreatment') && <TableHead className="cursor-pointer" onClick={() => handleSort('surfaceTreatment')}>Felületkezelés</TableHead>}
-                {isColumnVisible('boxesCount') && <TableHead className="cursor-pointer" onClick={() => handleSort('boxesCount')}>Dobozok száma</TableHead>}
-                {isColumnVisible('palletsCount') && <TableHead className="cursor-pointer" onClick={() => handleSort('palletsCount')}>Össz raklapok száma</TableHead>}
-                {isColumnVisible('grossWeightKg') && <TableHead className="cursor-pointer" onClick={() => handleSort('grossWeightKg')}>Össz bruttó súly</TableHead>}
-                {isColumnVisible('requiredMaterialKg') && <TableHead className="cursor-pointer" onClick={() => handleSort('requiredMaterialKg')}>Szükséges anyagmennyiség</TableHead>}
-                {isColumnVisible('plannedProductionHours') && <TableHead className="cursor-pointer" onClick={() => handleSort('plannedProductionHours')}>Tervezett gyártási idő</TableHead>}
-                {isColumnVisible('deliveryNote') && <TableHead className="cursor-pointer" onClick={() => handleSort('deliveryNote')}>Szállítólevél</TableHead>}
-                {isColumnVisible('cmr') && <TableHead className="cursor-pointer" onClick={() => handleSort('cmr')}>CMR</TableHead>}
-                {isColumnVisible('status') && <TableHead className="min-w-[200px]">Státusz</TableHead>}
+                {COLUMNS.map((col) => {
+                  if (!isColumnVisible(col.id)) return null
+                  const pinned = pinnedSet.has(col.id)
+                  return (
+                    <TableHead
+                      key={col.id}
+                      data-col={col.id}
+                      className={cn('group', col.headClass, col.sortable !== false && 'cursor-pointer', pinCls(col.id))}
+                      style={pinStyle(col.id)}
+                      onClick={col.sortable !== false ? () => handleSort(col.id as keyof Order) : undefined}
+                    >
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                        {col.label}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn('h-6 w-6 p-0 shrink-0', !pinned && 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}
+                          title={pinned ? 'Oszlop rögzítésének feloldása' : 'Oszlop rögzítése görgetéskor'}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            togglePin(col.id)
+                          }}
+                        >
+                          <PushPin
+                            className={pinned ? 'w-4 h-4 text-accent' : 'w-4 h-4 text-muted-foreground'}
+                            weight={pinned ? 'fill' : 'regular'}
+                          />
+                        </Button>
+                      </span>
+                    </TableHead>
+                  )
+                })}
                 <TableHead className="w-[120px]">Műveletek</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {visibleOrders.map((order) => {
+                // Élő termék a megnevezés/rajzszám kijelzéséhez (fallback: tárolt érték)
+                const liveProduct = order.productId ? productById.get(order.productId) : undefined
                 return (
                   <TableRow
                     key={order.id}
-                    className="even:bg-[oklch(0.94_0.015_250)] hover:bg-[oklch(0.88_0.02_250)]"
+                    className="even:bg-[var(--row-stripe)] hover:bg-[var(--row-hover)]"
                     style={VIRTUAL_ROW_STYLE}
                   >
                     <TableCell>
@@ -232,31 +340,31 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
                         onCheckedChange={() => toggleSelection(order.id)}
                       />
                     </TableCell>
-                    {isColumnVisible('customer') && <TableCell className="font-medium">{order.customer}</TableCell>}
-                    {isColumnVisible('productName') && <TableCell>{order.productName}</TableCell>}
-                    {isColumnVisible('designation') && <TableCell>{order.designation}</TableCell>}
-                  {isColumnVisible('notes') && <TableCell className="max-w-[200px]">
+                    {isColumnVisible('customer') && <TableCell className={cn('font-medium', pinCls('customer'))} style={pinStyle('customer')}>{order.customer}</TableCell>}
+                    {isColumnVisible('productName') && <TableCell className={pinCls('productName')} style={pinStyle('productName')}>{liveProduct?.drawingNumber || order.productName}</TableCell>}
+                    {isColumnVisible('designation') && <TableCell className={pinCls('designation')} style={pinStyle('designation')}>{liveProduct?.productName || order.designation}</TableCell>}
+                  {isColumnVisible('notes') && <TableCell className={cn('max-w-[200px]', pinCls('notes'))} style={pinStyle('notes')}>
                     <div className="truncate" title={order.notes}>{order.notes}</div>
                   </TableCell>}
-                  {isColumnVisible('pos') && <TableCell className="text-center font-mono">{order.pos ?? ''}</TableCell>}
-                  {isColumnVisible('ownOrderNumber') && <TableCell>{order.ownOrderNumber}</TableCell>}
-                  {isColumnVisible('material') && <TableCell>{order.material}</TableCell>}
-                  {isColumnVisible('orderNumber') && <TableCell className="font-mono text-sm">{order.orderNumber}</TableCell>}
-                  {isColumnVisible('amountPc') && <TableCell className="font-mono">{order.amountPc != null ? order.amountPc.toLocaleString('hu-HU') : ''}</TableCell>}
-                  {isColumnVisible('orderDate') && <TableCell>{order.orderDate}</TableCell>}
-                  {isColumnVisible('requiredDate') && <TableCell>{order.requiredDate}</TableCell>}
-                  {isColumnVisible('pickupDate') && <TableCell>{order.pickupDate}</TableCell>}
-                  {isColumnVisible('invoiced') && <TableCell>{order.invoiced}</TableCell>}
-                  {isColumnVisible('ready') && <TableCell>{order.ready}</TableCell>}
-                  {isColumnVisible('surfaceTreatment') && <TableCell>{order.surfaceTreatment}</TableCell>}
-                  {isColumnVisible('boxesCount') && <TableCell>{order.boxesCount}</TableCell>}
-                  {isColumnVisible('palletsCount') && <TableCell>{order.palletsCount}</TableCell>}
-                  {isColumnVisible('grossWeightKg') && <TableCell>{order.grossWeightKg}</TableCell>}
-                  {isColumnVisible('requiredMaterialKg') && <TableCell>{order.requiredMaterialKg}</TableCell>}
-                  {isColumnVisible('plannedProductionHours') && <TableCell>{getPlannedHoursForOrder(order, products ?? [])}</TableCell>}
-                  {isColumnVisible('deliveryNote') && <TableCell>{order.deliveryNote}</TableCell>}
-                  {isColumnVisible('cmr') && <TableCell>{order.cmr}</TableCell>}
-                  {isColumnVisible('status') && <TableCell>
+                  {isColumnVisible('pos') && <TableCell className={cn('text-center font-mono', pinCls('pos'))} style={pinStyle('pos')}>{order.pos ?? ''}</TableCell>}
+                  {isColumnVisible('ownOrderNumber') && <TableCell className={pinCls('ownOrderNumber')} style={pinStyle('ownOrderNumber')}>{order.ownOrderNumber}</TableCell>}
+                  {isColumnVisible('material') && <TableCell className={pinCls('material')} style={pinStyle('material')}>{order.material}</TableCell>}
+                  {isColumnVisible('orderNumber') && <TableCell className={cn('font-mono text-sm', pinCls('orderNumber'))} style={pinStyle('orderNumber')}>{order.orderNumber}</TableCell>}
+                  {isColumnVisible('amountPc') && <TableCell className={cn('font-mono', pinCls('amountPc'))} style={pinStyle('amountPc')}>{order.amountPc != null ? order.amountPc.toLocaleString('hu-HU') : ''}</TableCell>}
+                  {isColumnVisible('orderDate') && <TableCell className={pinCls('orderDate')} style={pinStyle('orderDate')}>{order.orderDate}</TableCell>}
+                  {isColumnVisible('requiredDate') && <TableCell className={pinCls('requiredDate')} style={pinStyle('requiredDate')}>{order.requiredDate}</TableCell>}
+                  {isColumnVisible('pickupDate') && <TableCell className={pinCls('pickupDate')} style={pinStyle('pickupDate')}>{order.pickupDate}</TableCell>}
+                  {isColumnVisible('invoiced') && <TableCell className={pinCls('invoiced')} style={pinStyle('invoiced')}>{order.invoiced}</TableCell>}
+                  {isColumnVisible('ready') && <TableCell className={pinCls('ready')} style={pinStyle('ready')}>{order.ready}</TableCell>}
+                  {isColumnVisible('surfaceTreatment') && <TableCell className={pinCls('surfaceTreatment')} style={pinStyle('surfaceTreatment')}>{order.surfaceTreatment}</TableCell>}
+                  {isColumnVisible('boxesCount') && <TableCell className={pinCls('boxesCount')} style={pinStyle('boxesCount')}>{order.boxesCount}</TableCell>}
+                  {isColumnVisible('palletsCount') && <TableCell className={pinCls('palletsCount')} style={pinStyle('palletsCount')}>{order.palletsCount}</TableCell>}
+                  {isColumnVisible('grossWeightKg') && <TableCell className={pinCls('grossWeightKg')} style={pinStyle('grossWeightKg')}>{order.grossWeightKg}</TableCell>}
+                  {isColumnVisible('requiredMaterialKg') && <TableCell className={pinCls('requiredMaterialKg')} style={pinStyle('requiredMaterialKg')}>{order.requiredMaterialKg}</TableCell>}
+                  {isColumnVisible('plannedProductionHours') && <TableCell className={pinCls('plannedProductionHours')} style={pinStyle('plannedProductionHours')}>{getPlannedHoursForOrder(order, products ?? [])}</TableCell>}
+                  {isColumnVisible('deliveryNote') && <TableCell className={pinCls('deliveryNote')} style={pinStyle('deliveryNote')}>{order.deliveryNote}</TableCell>}
+                  {isColumnVisible('cmr') && <TableCell className={pinCls('cmr')} style={pinStyle('cmr')}>{order.cmr}</TableCell>}
+                  {isColumnVisible('status') && <TableCell className={pinCls('status')} style={pinStyle('status')}>
                     <Select
                       value={order.status}
                       onValueChange={(value) => onStatusChange(order.id, value as OrderStatus)}
@@ -326,39 +434,34 @@ function OrdersTableImpl({ orders, products, onEdit, onDelete, onDuplicate, onSt
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-accent/30 border-t-2 border-accent/50 backdrop-blur-sm z-10">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-base font-semibold">
-              Összesítés - {selectedIds.length > 0 ? `${summary.count} kijelölt rendelés` : `${summary.count} szűrt rendelés`}
-            </h3>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Összes darab</p>
-              <p className="text-xl font-bold font-mono">{summary.totalAmount}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Dobozok száma</p>
-              <p className="text-xl font-bold font-mono">{summary.totalBoxes}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Raklapok száma</p>
-              <p className="text-xl font-bold font-mono">{summary.totalPallets}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Bruttó súly</p>
-              <p className="text-xl font-bold font-mono">{summary.totalGrossWeight}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Szükséges anyag</p>
-              <p className="text-xl font-bold font-mono">{summary.totalRequiredMaterial}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Gyártási idő</p>
-              <p className="text-xl font-bold font-mono">{summary.totalPlannedHours}</p>
-            </div>
-          </div>
+      {/* Térköz, hogy a táblázat utolsó sorai a lebegő összesítő sáv fölé
+          görgethetők legyenek (telefonon a sáv 2 sorba törhet → nagyobb). */}
+      <div aria-hidden className="h-20 md:h-12" />
+
+      {/* Kompakt, egysoros összesítő sáv ("A" variáció) — mindig látszik,
+          de csak ~40px magas, így nem takarja el a táblázat alját. */}
+      <div className="fixed bottom-0 left-0 right-0 bg-card/95 border-t border-accent/50 backdrop-blur-sm z-10">
+        <div className="container mx-auto px-3 md:px-6 py-1.5 flex items-center gap-x-4 gap-y-0.5 flex-wrap text-sm leading-tight">
+          <span className="font-semibold whitespace-nowrap">
+            {selectedIds.length > 0 ? `${summary.count} kijelölt` : `${summary.count} szűrt`}:
+          </span>
+          <span className="whitespace-nowrap"><b className="font-mono">{summary.totalAmount}</b> <span className="text-muted-foreground">db</span></span>
+          <span className="whitespace-nowrap"><b className="font-mono">{summary.totalBoxes}</b> <span className="text-muted-foreground">doboz</span></span>
+          <span className="whitespace-nowrap"><b className="font-mono">{summary.totalPallets}</b> <span className="text-muted-foreground">raklap</span></span>
+          <span className="whitespace-nowrap"><b className="font-mono">{summary.totalGrossWeight}</b> <span className="text-muted-foreground">bruttó</span></span>
+          <span className="whitespace-nowrap">
+            <b className="font-mono">{summary.totalRequiredMaterial}</b>{' '}
+            <span className="text-muted-foreground">anyag</span>
+            {typeof materialEstimateKg === 'number' && (
+              // Anyag-fedezet: a szűrt/kijelölt rendelések igénye vs. a becsült
+              // alapanyag-készlet (a MaterialPanel élő becslése alapján).
+              <span className={parseFloat(summary.totalRequiredMaterial) <= materialEstimateKg ? 'text-success' : 'text-destructive font-semibold'}>
+                {' '}/ ~{materialEstimateKg.toLocaleString('hu-HU', { maximumFractionDigits: 1 })} kg készleten{' '}
+                {parseFloat(summary.totalRequiredMaterial) <= materialEstimateKg ? '✓' : '✗'}
+              </span>
+            )}
+          </span>
+          <span className="whitespace-nowrap"><b className="font-mono">{summary.totalPlannedHours}</b> <span className="text-muted-foreground">gyártás</span></span>
         </div>
       </div>
     </>

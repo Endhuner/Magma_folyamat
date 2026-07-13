@@ -37,6 +37,11 @@ interface DefectEntryDialogProps {
   editing?: ProductionDefect | null
   onSave: (defect: ProductionDefect) => void
   userId?: string
+  /**
+   * Maximálisan rögzíthető selejt (gyártott db − többi selejt). Ha megadott,
+   * ennél több nem menthető — a selejt nem haladhatja meg a gyártott mennyiséget.
+   */
+  maxQuantity?: number
 }
 
 function toISODate(d: Date): string {
@@ -54,6 +59,7 @@ export function DefectEntryDialog({
   editing,
   onSave,
   userId,
+  maxQuantity,
 }: DefectEntryDialogProps) {
   const [date, setDate] = useState<string>(toISODate(new Date()))
   const [quantity, setQuantity] = useState<string>('')
@@ -73,11 +79,16 @@ export function DefectEntryDialog({
   }, [open, editing])
 
   const qtyNum = parseFloatSafe(quantity, 0, { allowNegative: false })
+  const overMax = maxQuantity !== undefined && qtyNum > maxQuantity
 
   const handleSubmit = () => {
     if (!orderId) return
     if (qtyNum <= 0) {
       toast.error('A selejt mennyiségnek 0-nál nagyobbnak kell lennie')
+      return
+    }
+    if (overMax) {
+      toast.error(`A selejt nem haladhatja meg a gyártott mennyiséget (max. ${maxQuantity} db)`)
       return
     }
     if (!reason.trim()) {
@@ -138,12 +149,18 @@ export function DefectEntryDialog({
               id="defect-qty"
               type="number"
               min={1}
+              max={maxQuantity}
               inputMode="numeric"
               value={quantity}
               placeholder="pl. 5"
               onChange={(e) => setQuantity(e.target.value)}
               autoFocus
             />
+            {overMax && (
+              <p className="text-xs text-destructive">
+                Legfeljebb {maxQuantity} db rögzíthető (gyártott mennyiség − többi selejt).
+              </p>
+            )}
           </div>
 
           <div className="grid gap-1.5">
@@ -164,7 +181,7 @@ export function DefectEntryDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={qtyNum <= 0 || !reason.trim()}
+            disabled={qtyNum <= 0 || overMax || !reason.trim()}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             <CheckCircle className="w-4 h-4 mr-1.5" weight="fill" />

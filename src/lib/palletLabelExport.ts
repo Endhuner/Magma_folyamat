@@ -1,5 +1,8 @@
 import { Order, Customer, Product } from './types'
 import { buildPrintPageCss, DEFAULT_LABEL_MARGINS, type PrintMargins } from './printConfig'
+import { parseIntSafe, parseFloatSafe } from './helpers'
+import { esc } from './htmlSafe'
+import { findProductForOrder } from './productionHelpers'
 
 interface PalletLabelData {
   palletIndex: number
@@ -22,11 +25,13 @@ interface PalletLabelData {
 function buildPalletLabels(order: Order, customer: Customer, product: Product): PalletLabelData[] {
   const totalPallets = order.palletsCount || 1
   const totalBoxes = order.boxesCount || 1
-  const boxesPerPallet = parseInt(product.boxesPerPallet || '1') || 1
-  const piecesPerBox = parseInt(product.piecesPerBox || '1') || 1
+  // parseIntSafe/parseFloatSafe: a magyar "12,5" és "1 500" formátumot is kezeli
+  // (a nyers parseInt("2 500") = 2 → hibás címke-mennyiségek)
+  const boxesPerPallet = parseIntSafe(product.boxesPerPallet, 0) || 1
+  const piecesPerBox = parseIntSafe(product.piecesPerBox, 0) || 1
   // weightPerPiece gramm-ban van tárolva → kg-ba konvertálás
-  const weightPerPieceG = parseFloat(product.weightPerPiece || '0') || 0
-  const grossWeightKg = parseFloat(order.grossWeightKg || '0') || 0
+  const weightPerPieceG = parseFloatSafe(product.weightPerPiece)
+  const grossWeightKg = parseFloatSafe(order.grossWeightKg)
 
   const labels: PalletLabelData[] = []
 
@@ -66,10 +71,10 @@ function renderLabel(d: PalletLabelData): string {
       <div class="header-row">
         <div class="header-cell">
           <div class="header-title">Vevő / Kaufer</div>
-          <div class="address-name">${d.customerName}</div>
-          <div class="address-line">${d.customerCity}</div>
-          <div class="address-line">${d.customerStreet}</div>
-          <div class="address-line">${d.customerPostalCode}</div>
+          <div class="address-name">${esc(d.customerName)}</div>
+          <div class="address-line">${esc(d.customerCity)}</div>
+          <div class="address-line">${esc(d.customerStreet)}</div>
+          <div class="address-line">${esc(d.customerPostalCode)}</div>
         </div>
         <div class="header-cell right-cell">
           <div class="header-title">Feladó / Absender</div>
@@ -83,11 +88,11 @@ function renderLabel(d: PalletLabelData): string {
       <!-- Rendelési azonosítók -->
       <div class="info-row">
         <div class="info-label">Order No.:</div>
-        <div class="info-value order-no">${d.orderNo}</div>
+        <div class="info-value order-no">${esc(d.orderNo)}</div>
       </div>
       <div class="info-row">
         <div class="info-label">Cikkszám / Artikelnummer:</div>
-        <div class="info-value bold">${d.drawingNumber}</div>
+        <div class="info-value bold">${esc(d.drawingNumber)}</div>
       </div>
 
       <!-- Mennyiség sor -->
@@ -285,12 +290,12 @@ ${rendered}
 
 function applyPalletTemplate(templateHtml: string, templateCss: string, d: PalletLabelData): string {
   const vars: Record<string, string> = {
-    customerName: d.customerName,
-    customerCity: d.customerCity,
-    customerStreet: d.customerStreet,
-    customerPostalCode: d.customerPostalCode,
-    orderNo: d.orderNo,
-    drawingNumber: d.drawingNumber,
+    customerName: esc(d.customerName),
+    customerCity: esc(d.customerCity),
+    customerStreet: esc(d.customerStreet),
+    customerPostalCode: esc(d.customerPostalCode),
+    orderNo: esc(d.orderNo),
+    drawingNumber: esc(d.drawingNumber),
     boxesOnPallet: String(d.boxesOnPallet),
     piecesPerBox: String(d.piecesPerBox),
     totalPieces: String(d.totalPieces),
@@ -346,9 +351,9 @@ export function generatePalletLabels(
 
   for (const order of orders) {
     const customer = customers.find(c => c.name === order.customer)
-    const product = order.productId
-      ? products.find(p => p.id === order.productId)
-      : products.find(p => p.customer.trim().toLowerCase() === order.customer.trim().toLowerCase())
+    // productId → rajzszám/név egyezés fallback-kel; korábban productId nélkül
+    // a vevő BÁRMELYIK terméke találatnak számított → rossz termékadatok a címkén.
+    const product = findProductForOrder(order, products)
     if (!customer || !product) continue
 
     allLabels.push(...buildPalletLabels(order, customer, product))

@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jelenléti ív</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: #f4f5f7; color: #1f2328; }
+  header { background: #fff; border-bottom: 1px solid #d9dde3; padding: 10px 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; }
+  nav { display: flex; gap: 4px; flex: 1; }
+  nav button { border: none; background: none; padding: 8px 14px; border-radius: 6px; font-size: 14px; cursor: pointer; color: #444; }
+  nav button.active { background: #1f6feb; color: #fff; }
+  nav button:not(.active):hover { background: #eceef1; }
+  #adminBtn { border: 1px solid #d9dde3; background: #fff; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  #adminBtn.on { background: #b42318; border-color: #b42318; color: #fff; }
+  main { padding: 16px; max-width: 1400px; margin: 0 auto; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  .card { background: #fff; border: 1px solid #d9dde3; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  button.primary { background: #1f6feb; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+  button.danger { background: #fff; color: #b42318; border: 1px solid #e6b3ae; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  button.ghost { background: #fff; border: 1px solid #d9dde3; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  button:disabled { opacity: .5; cursor: default; }
+  input, select, textarea { border: 1px solid #c7ccd4; border-radius: 6px; padding: 7px 10px; font-size: 14px; font-family: inherit; }
+  label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .hint { color: #667085; font-size: 14px; }
+
+  /* Kioszk */
+  .kiosk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .kiosk-card { background: #fff; border: 1px solid #d9dde3; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .kiosk-card .name { font-weight: 600; font-size: 15px; }
+  .kiosk-card .times { font-size: 13px; color: #555; }
+  .kiosk-card button { padding: 10px; font-size: 15px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+  .b-green { background: #d1f0d9; color: #05603a; }
+  .b-amber { background: #fdf0c9; color: #93590a; }
+  .b-red   { background: #fbdcd9; color: #912018; }
+  .b-gray  { background: #e9ebee; color: #475467; }
+
+  /* Havi ív */
+  .sheet-wrap { overflow-x: auto; background: #fff; border: 1px solid #d9dde3; border-radius: 8px; }
+  table.sheet { border-collapse: collapse; font-size: 12px; width: 100%; }
+  table.sheet th, table.sheet td { border: 1px solid #e2e5ea; padding: 3px 5px; text-align: center; white-space: nowrap; }
+  table.sheet th.emp, table.sheet td.emp { position: sticky; left: 0; background: #fff; text-align: left; font-weight: 600; min-width: 130px; z-index: 1; border-right: 2px solid #c7ccd4; }
+  table.sheet .off { background: #f0f1f4; color: #98a2b3; }
+  table.sheet td.leave { background: #d1f0d9; color: #05603a; font-weight: 700; }
+  table.sheet td.pending { background: #fdf0c9; color: #93590a; font-weight: 700; }
+  table.sheet td.editable { cursor: pointer; }
+  table.sheet td.editable:hover { outline: 2px solid #1f6feb; outline-offset: -2px; }
+  table.sheet td .t { display: block; line-height: 1.25; }
+  table.sheet td.total { font-weight: 700; background: #f8f9fb; }
+  .sign-col { display: none; }
+
+  /* Szabadságok */
+  table.list { border-collapse: collapse; width: 100%; font-size: 14px; }
+  table.list th, table.list td { border-bottom: 1px solid #e2e5ea; padding: 8px 10px; text-align: left; }
+  table.list th { font-size: 12px; text-transform: uppercase; color: #667085; }
+
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1f2328; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 10; }
+  #toast.show { opacity: 1; }
+
+  dialog { border: 1px solid #c7ccd4; border-radius: 10px; padding: 20px; min-width: 280px; }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  dialog h3 { margin: 0 0 12px; font-size: 15px; }
+  dialog .row { margin-bottom: 12px; }
+
+  @page { size: A4 landscape; margin: 10mm; }
+  @media print {
+    header, .no-print, #toast { display: none !important; }
+    body { background: #fff; }
+    main { padding: 0; max-width: none; }
+    .sheet-wrap { border: none; overflow: visible; }
+    table.sheet { font-size: 10px; }
+    table.sheet th.emp, table.sheet td.emp { position: static; }
+    .sign-col { display: table-cell; min-width: 90px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Jelenléti ív</h1>
+  <nav>
+    <button data-action="tab" data-tab="kiosk">Kioszk</button>
+    <button data-action="tab" data-tab="sheet">Havi ív</button>
+    <button data-action="tab" data-tab="leave">Szabadságok</button>
+    <button data-action="tab" data-tab="emp">Dolgozók</button>
+  </nav>
+  <button id="adminBtn" data-action="admin-toggle">Admin mód</button>
+</header>
+<main id="view"></main>
+<div id="toast"></div>
+
+<dialog id="cellDlg">
+  <h3 id="cellDlgTitle"></h3>
+  <form method="dialog">
+    <div class="row">
+      <div><label>Érkezés</label><input type="time" id="cellIn"></div>
+      <div><label>Távozás</label><input type="time" id="cellOut"></div>
+    </div>
+    <div class="row">
+      <button type="button" class="danger" id="cellClear">Törlés</button>
+      <button type="button" class="ghost" id="cellCancel">Mégse</button>
+      <button type="submit" class="primary">Mentés</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+'use strict';
+
+// ---------- Állapot ----------
+// ponytail: localStorage = egy gépen él az adat (kioszk-gép); több gépes/éles használathoz a fő rendszer API-jába kell átemelni.
+const LS_KEY = 'jelenleti-iv-v1';
+const ADMIN_PIN = '1234';
+
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_KEY));
+    if (s && Array.isArray(s.employees)) return s;
+  } catch (e) {}
+  return { employees: [], attendance: {}, leaves: [] };
+}
+let state = load();
+function save() { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+// ---------- Dátum-segédek ----------
+const pad = n => String(n).padStart(2, '0');
+const isoDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const isoMonthOf = d => isoDate(d).slice(0, 7);
+function isoMonth(d) { return isoMonthOf(d); }
+// Helyi időzóna szerint értelmezett dátum (a new Date("YYYY-MM-DD") UTC-t adna)
+function dateFromISO(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+const nowHHMM = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const minutes = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const hoursBetween = (tIn, tOut) => Math.max(0, (minutes(tOut) - minutes(tIn)) / 60);
+const WEEKDAYS = ['V', 'H', 'K', 'Sze', 'Cs', 'P', 'Szo'];
+const MONTH_FMT = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'long' });
+const DAY_FMT = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+
+let admin = false;
+let tab = 'kiosk';
+let month = isoMonth(new Date()); // "YYYY-MM"
+
+// Húsvétvasárnap (gregorián, anonymous algoritmus) — bármely évre helyes
+function easter(year) {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mo = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, mo - 1, day);
+}
+const holidayCache = {};
+function holidays(year) {
+  if (holidayCache[year]) return holidayCache[year];
+  const set = new Set([`${year}-01-01`, `${year}-03-15`, `${year}-05-01`, `${year}-08-20`,
+    `${year}-10-23`, `${year}-11-01`, `${year}-12-25`, `${year}-12-26`]);
+  const e = easter(year);
+  const plus = days => { const d = new Date(e); d.setDate(d.getDate() + days); return isoDate(d); };
+  set.add(plus(-2)); // nagypéntek
+  set.add(plus(1));  // húsvéthétfő
+  set.add(plus(50)); // pünkösdhétfő
+  return holidayCache[year] = set;
+}
+// ponytail: a munkanap-áthelyezéseket (dolgozós szombatok) nem kezeli; ha kell, egy kézi kivétel-lista bővíthető ide.
+function isWorkday(dateStr) {
+  const wd = dateFromISO(dateStr).getDay();
+  if (wd === 0 || wd === 6) return false;
+  return !holidays(Number(dateStr.slice(0, 4))).has(dateStr);
+}
+function workdaysBetween(from, to) {
+  let n = 0;
+  for (let d = dateFromISO(from); isoDate(d) <= to; d.setDate(d.getDate() + 1)) if (isWorkday(isoDate(d))) n++;
+  return n;
+}
+
+// ---------- Adat-segédek ----------
+const attKey = (empId, dateStr) => `${empId}|${dateStr}`;
+const getAtt = (empId, dateStr) => state.attendance[attKey(empId, dateStr)];
+function leaveOn(empId, dateStr, status) {
+  return state.leaves.find(l => l.empId === empId && l.status === status && l.from <= dateStr && dateStr <= l.to);
+}
+const empName = id => (state.employees.find(e => e.id === id) || { name: '(törölt dolgozó)' }).name;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtH = h => h.toLocaleString('hu-HU', { maximumFractionDigits: 1 });
+
+// ---------- Nézetek ----------
+function kioskView() {
+  const today = isoDate(new Date());
+  if (!state.employees.length) {
+    return `<div class="card"><h2>Üdv!</h2><p class="hint">Még nincsenek dolgozók felvéve. Kapcsold be az Admin módot (PIN: a fő rendszer admin PIN-je), majd a „Dolgozók" fülön add hozzá a névsort.</p></div>`;
+  }
+  const cards = state.employees.map(e => {
+    const att = getAtt(e.id, today) || {};
+    const onLeave = leaveOn(e.id, today, 'approved');
+    let action, times;
+    if (onLeave) {
+      action = `<span class="badge b-gray">Szabadságon</span>`;
+      times = '';
+    } else if (!att.in) {
+      action = `<button class="primary" data-action="kiosk-in" data-emp="${e.id}">Érkezés rögzítése</button>`;
+      times = `<span class="badge b-amber">Még nem érkezett</span>`;
+    } else if (!att.out) {
+      action = `<button class="ghost" data-action="kiosk-out" data-emp="${e.id}">Távozás rögzítése</button>`;
+      times = `<span class="badge b-green">Bent van</span> <span class="times">Érkezett: ${att.in}</span>`;
+    } else {
+      action = '';
+      times = `<span class="badge b-gray">Végzett</span> <span class="times">${att.in} – ${att.out}</span>`;
+    }
+    return `<div class="kiosk-card"><div class="name">${esc(e.name)}</div><div>${times}</div>${action}</div>`;
+  }).join('');
+  return `<h2>${DAY_FMT.format(new Date())}</h2><div class="kiosk-grid">${cards}</div>`;
+}
+
+function sheetView() {
+  const [y, m] = month.split('-').map(Number);
+  const days = new Date(y, m, 0).getDate();
+  const dates = Array.from({ length: days }, (_, i) => `${month}-${pad(i + 1)}`);
+
+  let head = `<tr><th class="emp">Dolgozó</th>`;
+  for (const ds of dates) {
+    const d = dateFromISO(ds);
+    head += `<th class="${isWorkday(ds) ? '' : 'off'}">${d.getDate()}<br>${WEEKDAYS[d.getDay()]}</th>`;
+  }
+  head += `<th>Óra</th><th>Szab.</th><th class="sign-col">Aláírás</th></tr>`;
+
+  const rows = state.employees.map(e => {
+    let cells = '', hours = 0, leaveDays = 0;
+    for (const ds of dates) {
+      const work = isWorkday(ds);
+      const att = getAtt(e.id, ds);
+      const appr = leaveOn(e.id, ds, 'approved');
+      const pend = leaveOn(e.id, ds, 'pending');
+      let cls = work ? '' : 'off', content = '';
+      if (appr && work) { cls = 'leave'; content = 'SZ'; leaveDays++; }
+      else if (pend && work) { cls = 'pending'; content = 'SZ?'; }
+      else if (att) {
+        content = `<span class="t">${att.in || '–'}</span><span class="t">${att.out || '–'}</span>`;
+        if (att.in && att.out) hours += hoursBetween(att.in, att.out);
+      }
+      if (admin) cls += ' editable';
+      cells += `<td class="${cls}" ${admin ? `data-action="cell" data-emp="${e.id}" data-date="${ds}"` : ''}>${content}</td>`;
+    }
+    return `<tr><td class="emp">${esc(e.name)}</td>${cells}<td class="total">${fmtH(hours)}</td><td class="total">${leaveDays}</td><td class="sign-col"></td></tr>`;
+  }).join('');
+
+  return `
+    <div class="row no-print" style="margin-bottom:12px">
+      <button class="ghost" data-action="month-prev">‹</button>
+      <input type="month" id="monthInput" value="${month}">
+      <button class="ghost" data-action="month-next">›</button>
+      <span style="flex:1"></span>
+      <button class="ghost" data-action="print">Nyomtatás</button>
+    </div>
+    <h2>Jelenléti ív — ${MONTH_FMT.format(dateFromISO(month + '-01'))}</h2>
+    ${admin ? '<p class="hint no-print">Admin mód: kattints egy cellára a kézi javításhoz.</p>' : ''}
+    <div class="sheet-wrap"><table class="sheet"><thead>${head}</thead><tbody>${rows ||
+      `<tr><td class="emp hint">Nincs dolgozó</td></tr>`}</tbody></table></div>`;
+}
+
+const STATUS = {
+  pending: '<span class="badge b-amber">Függőben</span>',
+  approved: '<span class="badge b-green">Jóváhagyva</span>',
+  rejected: '<span class="badge b-red">Elutasítva</span>',
+};
+
+function leaveView() {
+  const opts = state.employees.map(e => `<option value="${e.id}">${esc(e.name)}</option>`).join('');
+  const rows = [...state.leaves].sort((a, b) => b.requestedAt.localeCompare(a.requestedAt)).map(l => `
+    <tr>
+      <td>${esc(empName(l.empId))}</td>
+      <td>${l.from} – ${l.to}</td>
+      <td>${workdaysBetween(l.from, l.to)} nap</td>
+      <td>${esc(l.note || '')}</td>
+      <td>${STATUS[l.status]}</td>
+      <td>${admin ? (l.status === 'pending'
+        ? `<button class="primary" data-action="leave-approve" data-id="${l.id}">Jóváhagy</button>
+           <button class="danger" data-action="leave-reject" data-id="${l.id}">Elutasít</button>`
+        : `<button class="danger" data-action="leave-delete" data-id="${l.id}">Töröl</button>`) : ''}</td>
+    </tr>`).join('');
+  return `
+    <div class="card">
+      <h2>Szabadság kérelem beadása</h2>
+      <form id="leaveForm" class="row">
+        <div><label>Dolgozó</label><select name="emp" required>${opts}</select></div>
+        <div><label>Első nap</label><input type="date" name="from" required></div>
+        <div><label>Utolsó nap</label><input type="date" name="to" required></div>
+        <div style="flex:1"><label>Megjegyzés</label><input type="text" name="note" style="width:100%" placeholder="pl. családi program"></div>
+        <button class="primary" type="submit" ${state.employees.length ? '' : 'disabled'}>Beadás</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Kérelmek</h2>
+      ${state.leaves.length ? `<table class="list">
+        <thead><tr><th>Dolgozó</th><th>Időszak</th><th>Munkanap</th><th>Megjegyzés</th><th>Állapot</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table>` : '<p class="hint">Még nincs kérelem.</p>'}
+    </div>`;
+}
+
+function empView() {
+  const rows = state.employees.map(e => `
+    <tr><td>${esc(e.name)}</td>
+    <td>${admin ? `<button class="danger" data-action="emp-del" data-id="${e.id}">Töröl</button>` : ''}</td></tr>`).join('');
+  return `
+    <div class="card">
+      <h2>Dolgozók</h2>
+      ${admin ? `<form id="empForm" class="row" style="margin-bottom:12px">
+        <div style="flex:1"><label>Név</label><input type="text" name="name" required style="width:100%" placeholder="Új dolgozó neve"></div>
+        <button class="primary" type="submit">Hozzáadás</button>
+      </form>` : '<p class="hint">A névsor módosításához Admin mód szükséges.</p>'}
+      ${state.employees.length ? `<table class="list"><tbody>${rows}</tbody></table>` : '<p class="hint">Még nincs dolgozó.</p>'}
+    </div>
+    <div class="card">
+      <h2>Adatmentés</h2>
+      <p class="hint">Az adatok ezen a gépen, a böngészőben tárolódnak. Mentéshez / másik gépre vitelhez használd az exportot.</p>
+      <div class="row">
+        <button class="ghost" data-action="export">Export (JSON)</button>
+        <label class="ghost" style="padding:6px 12px;border:1px solid #d9dde3;border-radius:6px;cursor:pointer;font-size:13px;margin:0">
+          Import (JSON) <input type="file" id="importFile" accept=".json" style="display:none">
+        </label>
+      </div>
+    </div>`;
+}
+
+// ---------- Renderelés + események ----------
+function render() {
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  const ab = document.getElementById('adminBtn');
+  ab.classList.toggle('on', admin);
+  ab.textContent = admin ? 'Admin mód: BE' : 'Admin mód';
+  const v = document.getElementById('view');
+  v.innerHTML = { kiosk: kioskView, sheet: sheetView, leave: leaveView, emp: empView }[tab]();
+
+  const mi = document.getElementById('monthInput');
+  if (mi) mi.onchange = () => { if (mi.value) { month = mi.value; render(); } };
+  const lf = document.getElementById('leaveForm');
+  if (lf) lf.onsubmit = ev => {
+    ev.preventDefault();
+    const f = new FormData(lf);
+    const from = f.get('from'), to = f.get('to');
+    if (from > to) return toast('Az első nap nem lehet később, mint az utolsó.');
+    state.leaves.push({ id: crypto.randomUUID(), empId: f.get('emp'), from, to,
+      note: (f.get('note') || '').trim(), status: 'pending', requestedAt: new Date().toISOString() });
+    save(); render(); toast('Kérelem beadva, jóváhagyásra vár.');
+  };
+  const ef = document.getElementById('empForm');
+  if (ef) ef.onsubmit = ev => {
+    ev.preventDefault();
+    const name = new FormData(ef).get('name').trim();
+    if (!name) return;
+    state.employees.push({ id: crypto.randomUUID(), name });
+    save(); render(); toast(`${name} hozzáadva.`);
+  };
+  const imp = document.getElementById('importFile');
+  if (imp) imp.onchange = () => {
+    const file = imp.files[0];
+    if (!file) return;
+    file.text().then(txt => {
+      const s = JSON.parse(txt);
+      if (!s || !Array.isArray(s.employees) || !Array.isArray(s.leaves) || typeof s.attendance !== 'object')
+        throw new Error('rossz formátum');
+      if (!confirm('Az import felülírja a jelenlegi adatokat. Folytatod?')) return;
+      state = s; save(); render(); toast('Adatok importálva.');
+    }).catch(() => toast('Hibás vagy sérült JSON fájl.'));
+  };
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function shiftMonth(delta) {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  month = isoMonthOf(d);
+}
+
+const cellDlg = document.getElementById('cellDlg');
+let cellCtx = null;
+function openCell(empId, dateStr) {
+  cellCtx = { empId, dateStr };
+  const att = getAtt(empId, dateStr) || {};
+  document.getElementById('cellDlgTitle').textContent = `${empName(empId)} — ${dateStr}`;
+  document.getElementById('cellIn').value = att.in || '';
+  document.getElementById('cellOut').value = att.out || '';
+  cellDlg.showModal();
+}
+cellDlg.querySelector('form').onsubmit = () => {
+  const tIn = document.getElementById('cellIn').value, tOut = document.getElementById('cellOut').value;
+  const key = attKey(cellCtx.empId, cellCtx.dateStr);
+  if (!tIn && !tOut) delete state.attendance[key];
+  else state.attendance[key] = { ...(tIn && { in: tIn }), ...(tOut && { out: tOut }) };
+  save(); render();
+};
+document.getElementById('cellClear').onclick = () => {
+  delete state.attendance[attKey(cellCtx.empId, cellCtx.dateStr)];
+  save(); cellDlg.close(); render();
+};
+document.getElementById('cellCancel').onclick = () => cellDlg.close();
+
+document.addEventListener('click', ev => {
+  const el = ev.target.closest('[data-action]');
+  if (!el) return;
+  const a = el.dataset.action, today = isoDate(new Date());
+  switch (a) {
+    case 'tab': tab = el.dataset.tab; render(); break;
+    case 'admin-toggle':
+      if (admin) { admin = false; render(); toast('Admin mód kikapcsolva.'); }
+      else if (prompt('Admin PIN:') === ADMIN_PIN) { admin = true; render(); toast('Admin mód bekapcsolva.'); }
+      else toast('Hibás PIN.');
+      break;
+    case 'kiosk-in': {
+      const t = nowHHMM();
+      if (!confirm(`${empName(el.dataset.emp)} — érkezés rögzítése: ${t}?`)) break;
+      state.attendance[attKey(el.dataset.emp, today)] = { in: t };
+      save(); render(); toast(`Érkezés rögzítve: ${t}`);
+      break;
+    }
+    case 'kiosk-out': {
+      const t = nowHHMM();
+      if (!confirm(`${empName(el.dataset.emp)} — távozás rögzítése: ${t}?`)) break;
+      state.attendance[attKey(el.dataset.emp, today)].out = t;
+      save(); render(); toast(`Távozás rögzítve: ${t}`);
+      break;
+    }
+    case 'cell': if (admin) openCell(el.dataset.emp, el.dataset.date); break;
+    case 'month-prev': shiftMonth(-1); render(); break;
+    case 'month-next': shiftMonth(1); render(); break;
+    case 'print': window.print(); break;
+    case 'leave-approve': case 'leave-reject': {
+      const l = state.leaves.find(x => x.id === el.dataset.id);
+      l.status = a === 'leave-approve' ? 'approved' : 'rejected';
+      l.decidedAt = new Date().toISOString();
+      save(); render(); toast(a === 'leave-approve' ? 'Kérelem jóváhagyva.' : 'Kérelem elutasítva.');
+      break;
+    }
+    case 'leave-delete':
+      if (!confirm('Biztosan törlöd a kérelmet?')) break;
+      state.leaves = state.leaves.filter(x => x.id !== el.dataset.id);
+      save(); render(); break;
+    case 'emp-del': {
+      const e = state.employees.find(x => x.id === el.dataset.id);
+      if (!confirm(`Biztosan törlöd: ${e.name}? A jelenléti adatai megmaradnak az íven, de a kioszkban már nem jelenik meg.`)) break;
+      state.employees = state.employees.filter(x => x.id !== el.dataset.id);
+      save(); render(); break;
+    }
+    case 'export': {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const aEl = document.createElement('a');
+      aEl.href = URL.createObjectURL(blob);
+      aEl.download = `jelenleti-iv-adatok-${isoDate(new Date())}.json`;
+      aEl.click();
+      URL.revokeObjectURL(aEl.href);
+      break;
+    }
+  }
+});
+
+// ---------- Önteszt ----------
+(function selfTest() {
+  const ok = (cond, msg) => { console.assert(cond, 'Önteszt HIBA: ' + msg); return cond; };
+  const all = [
+    ok(hoursBetween('08:00', '16:30') === 8.5, 'hoursBetween'),
+    ok(hoursBetween('16:00', '08:00') === 0, 'hoursBetween fordított'),
+    ok(isoDate(easter(2026)) === '2026-04-05', 'húsvét 2026'),
+    ok(holidays(2026).has('2026-04-06'), 'húsvéthétfő 2026'),
+    ok(holidays(2026).has('2026-05-25'), 'pünkösdhétfő 2026'),
+    ok(!isWorkday('2026-01-03'), 'szombat nem munkanap'),
+    ok(!isWorkday('2026-08-20'), 'ünnepnap nem munkanap'),
+    ok(isWorkday('2026-01-05'), 'hétfő munkanap'),
+    ok(workdaysBetween('2026-01-02', '2026-01-05') === 2, 'workdaysBetween'),
+  ].every(Boolean);
+  if (all) console.log('Önteszt OK');
+})();
+
+render();
+</script>
+</body>
+</html>

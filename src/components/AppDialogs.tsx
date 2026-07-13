@@ -9,11 +9,8 @@ import { InventoryDeductionDialog } from '@/components/InventoryDeductionDialog'
 import { InventoryHistoryDialog } from '@/components/InventoryHistoryDialog'
 import { WarehouseAddDialog } from '@/components/WarehouseAddDialog'
 import { OrderDialog } from '@/components/OrderDialog'
-import { OrderBulkImportDialog } from '@/components/OrderBulkImportDialog'
 import { CustomerDialog } from '@/components/CustomerDialog'
-import { BulkImportDialog } from '@/components/BulkImportDialog'
 import { ProductDialog } from '@/components/ProductDialog'
-import { ProductBulkImportDialog } from '@/components/ProductBulkImportDialog'
 import { ValidationDialog } from '@/components/ValidationDialog'
 import { DocumentFilterDialog } from '@/components/DocumentFilterDialog'
 import { OrderColumnFilterDialog } from '@/components/OrderColumnFilterDialog'
@@ -22,6 +19,11 @@ import {
   CmrSettingsDialog,
   DeliverySettingsDialog,
   LabelTemplateDialog,
+  // Az import-dialógusok az exceljs-t (~250 KB) is behúzzák — lazy-vel
+  // csak akkor töltődnek, amikor a felhasználó megnyitja őket.
+  OrderBulkImportDialog,
+  BulkImportDialog,
+  ProductBulkImportDialog,
 } from '@/components/lazy'
 import type {
   Order,
@@ -322,11 +324,15 @@ export function AppDialogs({
         orders={orders || []}
       />
 
-      <OrderBulkImportDialog
-        open={orderBulkImportDialogOpen}
-        onClose={() => setOrderBulkImportDialogOpen(false)}
-        onImport={handleOrderBulkImport}
-      />
+      {orderBulkImportDialogOpen && (
+        <Suspense fallback={null}>
+          <OrderBulkImportDialog
+            open={orderBulkImportDialogOpen}
+            onClose={() => setOrderBulkImportDialogOpen(false)}
+            onImport={handleOrderBulkImport}
+          />
+        </Suspense>
+      )}
 
       <CustomerDialog
         open={customerDialogOpen}
@@ -337,11 +343,15 @@ export function AppDialogs({
         labelTemplates={labelTemplates || []}
       />
 
-      <BulkImportDialog
-        open={bulkImportDialogOpen}
-        onClose={() => setBulkImportDialogOpen(false)}
-        onImport={handleBulkImport}
-      />
+      {bulkImportDialogOpen && (
+        <Suspense fallback={null}>
+          <BulkImportDialog
+            open={bulkImportDialogOpen}
+            onClose={() => setBulkImportDialogOpen(false)}
+            onImport={handleBulkImport}
+          />
+        </Suspense>
+      )}
 
       <ProductDialog
         open={productDialogOpen}
@@ -353,11 +363,15 @@ export function AppDialogs({
         materials={materials || []}
       />
 
-      <ProductBulkImportDialog
-        open={productBulkImportDialogOpen}
-        onClose={() => setProductBulkImportDialogOpen(false)}
-        onImport={handleProductBulkImport}
-      />
+      {productBulkImportDialogOpen && (
+        <Suspense fallback={null}>
+          <ProductBulkImportDialog
+            open={productBulkImportDialogOpen}
+            onClose={() => setProductBulkImportDialogOpen(false)}
+            onImport={handleProductBulkImport}
+          />
+        </Suspense>
+      )}
 
       {cmrSettingsDialogOpen && (
         <Suspense fallback={null}>

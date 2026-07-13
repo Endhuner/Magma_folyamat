@@ -77,6 +77,11 @@ self.addEventListener('fetch', (event) => {
   // Only handle same-origin
   if (url.origin !== self.location.origin) return;
 
+  // API-forgalom: soha ne cache-eljük és ne fogjuk el.
+  //  - Az adatok frissessége kritikus (a lokális Dexie tükör az offline forrás).
+  //  - Az SSE stream (/api/v1/events) cache.put-ja végtelen bufferelést okozna.
+  if (url.pathname.startsWith('/api/')) return;
+
   // Navigation: network-first → fallback to cached app shell (offline support)
   if (request.mode === 'navigate') {
     event.respondWith(

@@ -111,6 +111,15 @@ export function QuickShiftEntryDialog({
     onClose()
   }
 
+  // Enter a lövésszám-mezőkben azonnal rögzít — érintőképernyőn/gyorsan
+  // dolgozó gépkezelőnek kevesebb koppintás.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSubmit()
+    }
+  }
+
   if (!order) return null
 
   return (
@@ -164,6 +173,7 @@ export function QuickShiftEntryDialog({
                 value={startShots}
                 placeholder="pl. 12 500"
                 onChange={(e) => setStartShots(e.target.value)}
+                onKeyDown={handleKeyDown}
                 autoFocus
               />
             </div>
@@ -182,6 +192,7 @@ export function QuickShiftEntryDialog({
                 value={endShots}
                 placeholder="pl. 12 620"
                 onChange={(e) => setEndShots(e.target.value)}
+                onKeyDown={handleKeyDown}
               />
             </div>
           </div>

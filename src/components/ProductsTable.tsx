@@ -63,6 +63,12 @@ function ProductsTableImpl({ products, orders, onEdit, onDelete, onBulkDelete, s
     [selectedIds, products]
   )
 
+  // Címkesablon-térkép egyszer, hogy soronként ne O(n) find fusson.
+  const templateById = useMemo(
+    () => new Map((savedTemplates || []).map((t) => [t.id, t])),
+    [savedTemplates]
+  )
+
   const allVisibleSelected = products.length > 0 && visibleSelected.length === products.length
   const someVisibleSelected = visibleSelected.length > 0 && !allVisibleSelected
 
@@ -270,7 +276,7 @@ function ProductsTableImpl({ products, orders, onEdit, onDelete, onBulkDelete, s
                   const rowCls = [
                     isSelected
                       ? 'bg-primary/10 hover:bg-primary/15'
-                      : 'even:bg-[oklch(0.94_0.015_250)] hover:bg-[oklch(0.88_0.02_250)]',
+                      : 'even:bg-[var(--row-stripe)] hover:bg-[var(--row-hover)]',
                   ].join(' ')
                   return (
                     <TableRow key={product.id} className={rowCls} data-state={isSelected ? 'selected' : undefined}>
@@ -313,7 +319,7 @@ function ProductsTableImpl({ products, orders, onEdit, onDelete, onBulkDelete, s
                       <TableCell className="min-w-[120px]">{product.spruWeight}</TableCell>
                       <TableCell className="min-w-[160px]">
                         {product.labelTemplateId && (() => {
-                          const tpl = savedTemplates?.find(t => t.id === product.labelTemplateId)
+                          const tpl = templateById.get(product.labelTemplateId)
                           return tpl ? (
                             <Badge variant="outline" className="text-xs font-normal max-w-[150px] truncate" title={tpl.name}>
                               {tpl.name}

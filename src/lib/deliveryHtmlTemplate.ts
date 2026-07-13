@@ -1,5 +1,5 @@
-import { Order, Customer, Product, DeliveryNote } from '@/lib/types'
-import { generateDeliveryNoteSequenceNumber } from '@/lib/helpers'
+import { Order, Customer, Product, DeliveryNote, ExtraDeliveryItem } from '@/lib/types'
+import { generateDeliveryNoteSequenceNumber, parseFloatSafe } from '@/lib/helpers'
 import { kvStore } from '@/lib/kvStore'
 import { esc } from '@/lib/htmlSafe'
 import { toast } from 'sonner'
@@ -55,7 +55,9 @@ export function generateDeliveryHtmlTemplate(
   products: Product[],
   deliveryNotes: DeliveryNote[],
   customStyles?: Partial<TemplateStyles>,
-  overrideSequenceNumber?: string
+  overrideSequenceNumber?: string,
+  /** Kiegészítő tételek (szerszám/anyag/szabad sor) — a rendelés-sorok után. */
+  extraItems?: ExtraDeliveryItem[]
 ): string {
   const styles = { ...DEFAULT_DELIVERY_STYLES, ...customStyles }
   const sequenceNumber = overrideSequenceNumber || generateDeliveryNoteSequenceNumber(deliveryNotes, 'delivery')
@@ -69,7 +71,7 @@ export function generateDeliveryHtmlTemplate(
   const totalQuantity = orders.reduce((sum, order) => sum + (order.amountPc || 0), 0)
   const totalBoxes = orders.reduce((sum, order) => sum + (order.boxesCount || 0), 0)
   const totalPallets = orders.reduce((sum, order) => sum + (order.palletsCount || 0), 0)
-  const totalGrossWeight = orders.reduce((sum, order) => sum + (parseFloat(String(order.grossWeightKg || 0)) || 0), 0)
+  const totalGrossWeight = orders.reduce((sum, order) => sum + parseFloatSafe(order.grossWeightKg), 0)
 
   const html = `
 <!DOCTYPE html>
@@ -325,6 +327,17 @@ export function generateDeliveryHtmlTemplate(
               <td class="right">${esc(order.grossWeightKg || '-')}</td>
             </tr>
           `).join('')}
+          ${(extraItems ?? []).map(item => `
+            <tr>
+              <td class="center">-</td>
+              <td class="center">-</td>
+              <td>${esc(item.name)}${item.notes ? ` <span style="color:#666;font-size:0.85em;">(${esc(item.notes)})</span>` : ''}</td>
+              <td class="center">${item.quantity} ${esc(item.unit)}</td>
+              <td class="center">-</td>
+              <td class="center">-</td>
+              <td class="right">-</td>
+            </tr>
+          `).join('')}
         </tbody>
         <tfoot>
           <tr>
@@ -384,6 +397,7 @@ function applyDeliveryTemplateData(
   customStyles?: Partial<TemplateStyles>,
   margins?: { top: string, right: string, bottom: string, left: string },
   issueDate?: string,
+  extraItems?: ExtraDeliveryItem[],
   documentMargins: PrintMargins = DEFAULT_DOCUMENT_MARGINS
 ): string {
   const firstCustomer = orders[0]?.customer || ''
@@ -395,7 +409,7 @@ function applyDeliveryTemplateData(
   const totalQuantity = orders.reduce((sum, order) => sum + (order.amountPc || 0), 0)
   const totalBoxes = orders.reduce((sum, order) => sum + (order.boxesCount || 0), 0)
   const totalPallets = orders.reduce((sum, order) => sum + (order.palletsCount || 0), 0)
-  const totalGrossWeight = orders.reduce((sum, order) => sum + (parseFloat(String(order.grossWeightKg || 0)) || 0), 0)
+  const totalGrossWeight = orders.reduce((sum, order) => sum + parseFloatSafe(order.grossWeightKg), 0)
   const ownOrderNumber = orders[0]?.ownOrderNumber || ''
   const orderNumber = orders[0]?.orderNumber || ''
 
@@ -453,8 +467,25 @@ function applyDeliveryTemplateData(
       console.log(`    - quantity: ${order.amountPc || 0}`)
     })
 
-    html = html.replace(/{{#items}}[\s\S]*?{{\/items}}/g, itemsHtml);
-    
+    // Kiegészítő tételek (szerszám/anyag/szabad sor) — ugyanazzal a
+    // sor-sablonnal, a rendelés-specifikus mezők kötőjellel.
+    const extrasHtml = (extraItems ?? []).map((item, i) => itemTemplate
+      .replace(/{{index}}/g, String(orders.length + i + 1))
+      .replace(/{{productName}}/g, esc(item.name) + (item.notes ? ` (${esc(item.notes)})` : ''))
+      .replace(/{{quantity}}/g, `${item.quantity} ${esc(item.unit)}`)
+      .replace(/{{boxes}}/g, '-')
+      .replace(/{{pallets}}/g, '-')
+      .replace(/{{weight}}/g, '-')
+      .replace(/{{ownOrderNumber}}/g, '-')
+      .replace(/{{referenceNumber}}/g, '-')
+      .replace(/{{orderNumber}}/g, '-')
+      .replace(/{{designation}}/g, '-')
+      .replace(/{{material}}/g, '-')
+      .replace(/{{surfaceTreatment}}/g, '-')
+    ).join('')
+
+    html = html.replace(/{{#items}}[\s\S]*?{{\/items}}/g, itemsHtml + extrasHtml);
+
     console.log('\n=== ITEMS CIKLUS BEHELYETTESÍTVE ===')
     console.log('Items blokk hossza:', itemsHtml.length)
   } else {
@@ -549,7 +580,9 @@ export async function exportDeliveryAsHtml(
   /** Kiállítás dátuma (YYYY-MM-DD). Ha nincs megadva, az aktuális nap. */
   issueDate?: string,
   /** Ha megadva, ezt a sorszámot használja új generálás helyett (előnézetnél). */
-  overrideSequenceNumber?: string
+  overrideSequenceNumber?: string,
+  /** Kiegészítő tételek — a nyomtatott dokumentumon a rendelés-sorok után. */
+  extraItems?: ExtraDeliveryItem[]
 ) {
   if (!orders.length) {
     toast.error('Nincsenek exportálandó rendelések')
@@ -597,7 +630,8 @@ export async function exportDeliveryAsHtml(
           sequenceNumber,
           customStyles,
           templateToUse.data.margins,
-          issueDate
+          issueDate,
+          extraItems
         )
       }
     }
@@ -623,7 +657,8 @@ export async function exportDeliveryAsHtml(
           sequenceNumber,
           customStyles,
           activeTemplate.data.margins,
-          issueDate
+          issueDate,
+          extraItems
         )
       }
     }
@@ -650,17 +685,18 @@ export async function exportDeliveryAsHtml(
           sequenceNumber,
           customStyles,
           defaultTemplate.data.margins,
-          issueDate
+          issueDate,
+          extraItems
         )
       } else {
         console.log('=== Szállítólevél Export - Nincs mentett sablon ===')
         console.log('Sablon forrás: src/lib/deliveryHtmlTemplate.ts (beégetett sablon)')
-        html = generateDeliveryHtmlTemplate(orders, customers, products, deliveryNotes, customStyles)
+        html = generateDeliveryHtmlTemplate(orders, customers, products, deliveryNotes, customStyles, undefined, extraItems)
       }
     }
   } catch (error) {
     console.warn('Nem sikerült betölteni a mentett sablont, beégetett sablon használata', error)
-    html = generateDeliveryHtmlTemplate(orders, customers, products, deliveryNotes, customStyles)
+    html = generateDeliveryHtmlTemplate(orders, customers, products, deliveryNotes, customStyles, undefined, extraItems)
   }
 
   console.log('Rendelések száma:', orders.length)
@@ -725,7 +761,8 @@ export function getDeliveryHtml(
   sequenceNumber?: string,
   savedTemplatesOverride?: any[],
   activeTemplatesOverride?: { cmr?: string; delivery?: string },
-  issueDate?: string
+  issueDate?: string,
+  extraItems?: ExtraDeliveryItem[]
 ): string {
   const seqNum = sequenceNumber || generateDeliveryNoteSequenceNumber(deliveryNotes, 'delivery')
 
@@ -740,7 +777,7 @@ export function getDeliveryHtml(
     if (customer?.deliveryTemplateId) {
       const t = savedTemplates?.find((s: any) => s.id === customer.deliveryTemplateId)
       if (t?.data?.html) {
-        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate)
+        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate, extraItems)
       }
     }
 
@@ -748,7 +785,7 @@ export function getDeliveryHtml(
     if (activeTemplates?.delivery) {
       const t = savedTemplates?.find((s: any) => s.id === activeTemplates.delivery)
       if (t?.data?.html) {
-        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate)
+        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate, extraItems)
       }
     }
 
@@ -757,7 +794,7 @@ export function getDeliveryHtml(
     if (deliveryTemplates.length > 0) {
       const t = deliveryTemplates[0]
       if (t?.data?.html) {
-        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate)
+        return applyDeliveryTemplateData(t.data.html, t.data.css, orders, customers, products, deliveryNotes, seqNum, customStyles, t.data.margins, issueDate, extraItems)
       }
     }
   } catch (err) {
@@ -765,5 +802,5 @@ export function getDeliveryHtml(
   }
 
   // 4. Beégetett sablon (fallback)
-  return generateDeliveryHtmlTemplate(orders, customers, products, deliveryNotes, customStyles, seqNum)
+  return generateDeliveryHtmlTemplate(orders, customers, products, deliveryNotes, customStyles, seqNum, extraItems)
 }
