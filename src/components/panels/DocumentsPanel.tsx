@@ -102,7 +102,7 @@ export function DocumentsPanel({
   const [templateSaved, setTemplateSaved] = useState(false)
 
   return (
-    <TabsContent value="documents" className="space-y-6">
+    <section className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight mb-1">Dokumentumok</h2>
         <p className="text-muted-foreground">Szállítólevelek, CMR-ek és változásnapló</p>
@@ -315,6 +315,6 @@ export function DocumentsPanel({
           <AuditLogView entries={auditLog || []} />
         </TabsContent>
       </Tabs>
-    </TabsContent>
+    </section>
   )
 }

@@ -39,6 +39,10 @@ export interface Order {
   plannedProductionHours: string
   deliveryNote: string
   cmr: string
+  /** Etikett (termékcímke) elkészültének dátuma — üres = még nincs. */
+  labelDoneAt?: string
+  /** Raklapcímke elkészültének dátuma — üres = még nincs. */
+  palletLabelDoneAt?: string
   status: OrderStatus
   /** Pozíció / prioritás szám — opcionális egész. */
   pos?: number | null
@@ -128,6 +132,17 @@ export interface ExtraDeliveryItem {
   notes?: string
 }
 
+/** Egyéni (rendelés nélküli) szállítólevél címzettje — bárki, aki nincs a
+ *  vevőtörzsben. Csak a `name` kötelező; a cím opcionális. */
+export interface DeliveryRecipient {
+  name: string
+  address?: string
+  city?: string
+  postalCode?: string
+  country?: string
+  taxNumber?: string
+}
+
 export interface DeliveryNote {
   id: string
   type: 'delivery' | 'cmr'
@@ -140,6 +155,8 @@ export interface DeliveryNote {
   exportData?: Record<string, string | number | null | undefined>[]
   /** Kiegészítő tételek — a nyomtatott dokumentumon a rendelés-sorok után. */
   extraItems?: ExtraDeliveryItem[]
+  /** Egyéni szállítólevélnél a címzett (orderIds ilyenkor üres). */
+  recipient?: DeliveryRecipient
   createdAt: string
   updatedAt: string
 }
@@ -384,6 +401,8 @@ export interface User {
   pinHash?: string | null
   /** false esetén a user nem tud belépni (zárolt). Default: true. */
   active?: boolean
+  /** Felhasználónkénti megjelenés (skin) — '' = alap. */
+  skin?: string
   /** Utolsó sikeres belépés ISO timestamp-je, ha volt. */
   lastLoginAt?: string | null
   createdAt: string
@@ -433,6 +452,13 @@ export type AuditEntityType =
   | 'defect'
   | 'inventory'
   | 'inventoryTransaction'
+  | 'quote'
+  | 'priceList'
+  | 'employee'
+  | 'attendance'
+  | 'leave'
+  | 'datasheet'
+  | 'filledForm'
 
 /** Az audit-log műveletek. */
 export type AuditAction =
@@ -468,4 +494,140 @@ export interface AuditLogEntry {
   userId?: string
   userName?: string
   createdAt: string
+}
+
+/** Árajánlat tételsor — a Quotation PDF táblázatának egy sora. */
+export interface QuoteItem {
+  drawingNumber: string
+  cavityCount?: number | null
+  weightG?: number | null
+  dieCastingFeeEur?: number | null
+  materialCostEur?: number | null
+  totalPieceEur?: number | null
+  mouldPriceEur?: number | null
+}
+
+/** Árajánlat — nyilvántartási sor + a Quotation PDF fejléc-mezői. */
+export interface Quote {
+  id: string
+  /** A<év><sorszám>, pl. A202601. */
+  number: string
+  customerName: string
+  customerId?: string
+  contactName?: string
+  rfqNumber?: string
+  emailDate?: string
+  deadline?: string
+  quantityNote?: string
+  notes?: string
+  /** Elkészült / Kiküldve / Megrendelve dátumok (üres = nincs pipálva). */
+  doneAt?: string
+  sentAt?: string
+  orderedAt?: string
+  material?: string
+  yearlyAmount?: string
+  moq?: string
+  mouldLeadtimeWeeks?: string
+  mpb?: string
+  paymentTerms?: string
+  incoterms?: string
+  additionalNotes?: string
+  validityDays?: number
+  items: QuoteItem[]
+  /** A kalkulátor mentett bemenetei (újranyitáshoz), vagy üres. */
+  calc?: unknown
+  pdfFileName?: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Árlista-tételsor (mozgó anyagáras vevői árlista). */
+export interface PriceListItem {
+  partNumber: string
+  name: string
+  lotSize?: string
+  weightG?: number | null
+  basePricePer100Eur?: number | null
+}
+
+/** MP-előzmény bejegyzés (mikor milyen aktuális anyagár volt beállítva). */
+export interface MpHistoryEntry {
+  label: string
+  mp: number
+  setAt: string
+}
+
+/** Vevőnkénti mozgó anyagáras árlista. */
+export interface PriceList {
+  id: string
+  customerName: string
+  customerId?: string
+  burnRate: number
+  mpbEurPerKg: number
+  currentMpEurPerKg: number
+  mpHistory: MpHistoryEntry[]
+  items: PriceListItem[]
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Napi jelenlét — operátoronként naponta egy.
+ * Az employeeId a felhasználó (User) id-ját tárolja. */
+export interface AttendanceEntry {
+  id: string
+  employeeId: string
+  date: string
+  inTime: string
+  outTime: string
+  note?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type LeaveStatus = 'pending' | 'approved' | 'rejected'
+
+/** Szabadság-kérelem. */
+export interface LeaveRequest {
+  id: string
+  employeeId: string
+  fromDate: string
+  toDate: string
+  note?: string
+  status: LeaveStatus
+  requestedAt: string
+  decidedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Termék Információs Adatlap — termékenként egy. */
+export interface ProductDatasheet {
+  id: string
+  productId: string
+  docId: string
+  effectiveDate: string
+  preparedBy: string
+  checkedBy: string
+  approvedBy: string
+  photoUrl: string
+  machineSettings: Array<{ label: string; value: string }>
+  castingChecks: Array<{ operation: string; responsible: string; tool: string }>
+  postOperations: Array<{ operation: string; place: string; time: string }>
+  finalInspection: string
+  packagingInstructions: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type FilledFormType = 'mohu' | 'intermetal'
+
+/** Kitöltött űrlap (dokumentum-kitöltő történet). */
+export interface FilledForm {
+  id: string
+  formType: FilledFormType
+  title: string
+  data: Record<string, string>
+  createdAt: string
+  updatedAt: string
 }

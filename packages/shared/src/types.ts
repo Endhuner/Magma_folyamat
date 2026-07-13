@@ -97,6 +97,15 @@ export interface Product {
   updatedAt: string
 }
 
+export interface DeliveryRecipient {
+  name: string
+  address?: string
+  city?: string
+  postalCode?: string
+  country?: string
+  taxNumber?: string
+}
+
 export interface DeliveryNote {
   id: string
   type: 'delivery' | 'cmr'
@@ -105,7 +114,11 @@ export interface DeliveryNote {
   orderIds: string[]
   fileName: string
   exportDate: string
+  issueDate?: string
   exportData?: Record<string, string | number | null | undefined>[]
+  extraItems?: { name: string; quantity: number; unit: 'db' | 'kg'; notes?: string }[]
+  /** Egyéni szállítólevélnél a címzett (orderIds ilyenkor üres). */
+  recipient?: DeliveryRecipient
   createdAt: string
   updatedAt: string
 }
@@ -278,6 +291,7 @@ export interface User {
   /** Csak backend-belső; a /me / /users válaszokból kihagyjuk. */
   pinHash?: string | null
   active?: boolean
+  skin?: string
   lastLoginAt?: string | null
   createdAt: string
   updatedAt: string
@@ -335,6 +349,13 @@ export type AuditEntityType =
   | 'inventoryTransaction'
   | 'maintenance'
   | 'message'
+  | 'quote'
+  | 'priceList'
+  | 'employee'
+  | 'attendance'
+  | 'leave'
+  | 'datasheet'
+  | 'filledForm'
 
 /** Az audit-log műveletek. */
 export type AuditAction =

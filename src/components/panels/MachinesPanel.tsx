@@ -29,7 +29,7 @@ export function MachinesPanel({ machines, orders, auth, onSave, onDelete }: Mach
   const [detailMachineTab, setDetailMachineTab] = useState<'photo' | 'oils' | 'accessories' | 'repairs'>('photo')
 
   return (
-    <TabsContent value="machines">
+    <section>
       <Tabs defaultValue="machine-list" className="space-y-4">
         <TabsList>
           <TabsTrigger value="machine-list">Gépek listája</TabsTrigger>
@@ -91,6 +91,6 @@ export function MachinesPanel({ machines, orders, auth, onSave, onDelete }: Mach
           />
         </TabsContent>
       </Tabs>
-    </TabsContent>
+    </section>
   )
 }

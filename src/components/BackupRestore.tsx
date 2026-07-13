@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Order, Customer, Product, DeliveryNote } from '@/lib/types'
-import { FloppyDisk, Upload, ArrowCounterClockwise, Warning, CheckCircle, CloudArrowDown, Trash, DownloadSimple, Info, Database } from '@phosphor-icons/react'
+import { FloppyDisk, Upload, ArrowCounterClockwise, Warning, CheckCircle, CloudArrowDown, Trash, DownloadSimple, Info } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { hu } from 'date-fns/locale'
@@ -82,37 +82,6 @@ export function BackupRestore() {
   const [isExporting, setIsExporting] = useState(false)
   const [isRestoring, setIsRestoring] = useState(false)
   const [isServerBackingUp, setIsServerBackingUp] = useState(false)
-  const [isDownloadingDb, setIsDownloadingDb] = useState(false)
-
-  /**
-   * Teljes adatbázis (élő SQLite fájl) letöltése a szerverről. A JSON
-   * exporttal szemben ez MINDEN táblát tartalmaz, bitre pontosan — csak
-   * admin (a végpont: GET /api/v1/backup/download, requireRole('admin')).
-   */
-  const handleDatabaseDownload = async () => {
-    setIsDownloadingDb(true)
-    try {
-      const res = await fetch('/api/v1/backup/download', { credentials: 'include' })
-      if (res.status === 401 || res.status === 403) {
-        toast.error('Az adatbázis letöltéséhez admin jogosultság szükséges')
-        return
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `produktivpro-adatbazis-${format(new Date(), 'yyyy-MM-dd-HHmm', { locale: hu })}.sqlite`
-      link.click()
-      URL.revokeObjectURL(url)
-      toast.success('Teljes adatbázis letöltve')
-    } catch (err) {
-      console.error('Adatbázis letöltés hiba:', err)
-      toast.error('Az adatbázis letöltése sikertelen')
-    } finally {
-      setIsDownloadingDb(false)
-    }
-  }
 
   const handleServerBackup = async () => {
     setIsServerBackingUp(true)
@@ -391,18 +360,11 @@ export function BackupRestore() {
           <FloppyDisk className="w-5 h-5" />
           {isServerBackingUp ? 'Mentés...' : 'Szerver mentés most'}
         </Button>
-
-        <Button variant="outline" onClick={handleDatabaseDownload} disabled={isDownloadingDb} className="gap-2">
-          <Database className="w-5 h-5" />
-          {isDownloadingDb ? 'Letöltés...' : 'Teljes adatbázis letöltése'}
-        </Button>
       </div>
 
       <p className="text-xs text-muted-foreground">
         A szerver naponta automatikusan is menti az adatbázist (30 napos megőrzés).
         A „Szerver mentés most" azonnali pillanatképet készít.
-        A „Teljes adatbázis letöltése" a teljes élő SQLite fájlt tölti le (minden tábla,
-        nem csak a JSON-exportban szereplő adatok) — admin jogosultsághoz kötött.
       </p>
 
       {(savedBackups || []).length > 0 && (

@@ -120,6 +120,7 @@ export function LabelPrintSettingsDialog({
               <Input
                 id="copies"
                 type="number"
+                inputMode="decimal"
                 min="1"
                 max="999"
                 value={copies}

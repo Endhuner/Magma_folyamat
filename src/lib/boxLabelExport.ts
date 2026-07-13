@@ -1,5 +1,4 @@
 import { Order, Customer, Product } from './types'
-import { buildPrintPageCss } from './printConfig'
 import { parseFloatSafe } from './helpers'
 import { esc } from './htmlSafe'
 import { findProductForOrder } from './productionHelpers'
@@ -98,6 +97,7 @@ function buildHTMLFull(groups: PageGroup[]): string {
   groups.forEach((group, gi) => {
     const cls = `tpl${gi}`
     const { margins, cols, rows, cellPaddingH, cellPaddingV, templateCss, cellHtml } = group
+    const pageMargin = `${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm`
     const gridH = 297 - parseFloat(margins.top) - parseFloat(margins.bottom)
     const gridW = 210 - parseFloat(margins.left) - parseFloat(margins.right)
 
@@ -120,19 +120,19 @@ function buildHTMLFull(groups: PageGroup[]): string {
     ${scopeCSS(templateCss, cls)}
     `
 
-    group.pages.forEach((page) => {
+    group.pages.forEach((page, pi) => {
+      const isLast = gi === groups.length - 1 && pi === group.pages.length - 1
       const cells = page.map(d => `<div class="label-cell">${applyTemplate(cellHtml, d)}</div>`).join('')
       pageBlocks += `
-    <div class="${cls} label-page">
+    <div class="${cls} label-page" style="@page{margin:${pageMargin}}${isLast ? '' : ''}">
       <div class="label-grid">${cells}</div>
     </div>`
     })
   })
 
-  // Az Etikett a SAJÁT (sablon-szintű) margóit tartja — az első csoportét
-  // használjuk az @page-hez (a leggyakoribb eset: egyetlen sablon), a közös
-  // segéddel egységes szerkezetben kibocsátva.
+  // Use the first group's margins for @page (most common case: single template)
   const firstMargins = groups[0].margins
+  const pageMargin = `${firstMargins.top}mm ${firstMargins.right}mm ${firstMargins.bottom}mm ${firstMargins.left}mm`
 
   return `<!DOCTYPE html>
 <html lang="hu">
@@ -140,12 +140,13 @@ function buildHTMLFull(groups: PageGroup[]): string {
   <meta charset="UTF-8">
   <title>Etiketta</title>
   <style>
-    ${buildPrintPageCss({ size: 'A4', margins: firstMargins })}
+    @page { size: A4; margin: ${pageMargin}; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; }
     .label-page { page-break-after: always; }
     .label-page:last-child { page-break-after: avoid; }
     ${cssBlocks}
+    @media print { body { margin: 0; } }
   </style>
 </head>
 <body>
@@ -202,7 +203,7 @@ export function generateBoxLabels(
       margins?: { top: string; right: string; bottom: string; left: string }
     }
   }>
-): void {
+): boolean {
   const activeBoxTemplate = savedTemplatesOverride?.find(t => t.data?.type === 'box-label' && t.data?.active)
     ?? savedTemplatesOverride?.find(t => t.data?.type === 'box-label')
 
@@ -245,14 +246,15 @@ export function generateBoxLabels(
 
   if (groupMap.size === 0) {
     alert('Nincsenek generálható etikettáák — ellenőrizd a kijelölt rendeléseket.')
-    return
+    return false
   }
 
   const html = buildHTMLFull(Array.from(groupMap.values()))
   const win = window.open('', '_blank')
-  if (!win) return
+  if (!win) return false
   win.document.write(html)
   win.document.close()
   win.focus()
   setTimeout(() => win.print(), 400)
+  return true
 }

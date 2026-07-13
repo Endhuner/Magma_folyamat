@@ -246,6 +246,7 @@ function ItemSection({ items, onAdd, onEdit, onDelete, emptyText }: ItemSectionP
               <Label>Mennyiség</Label>
               <Input
                 type="number"
+                inputMode="decimal"
                 min={0}
                 value={form.quantity}
                 onChange={(e) => setForm((f) => ({ ...f, quantity: Number(e.target.value) }))}
@@ -471,6 +472,7 @@ function RepairSection({ repairs, onAdd, onEdit, onDelete }: RepairSectionProps)
               <Label>Mennyiség</Label>
               <Input
                 type="number"
+                inputMode="decimal"
                 min={0}
                 value={form.quantity}
                 onChange={(e) => setForm((f) => ({ ...f, quantity: Number(e.target.value) }))}

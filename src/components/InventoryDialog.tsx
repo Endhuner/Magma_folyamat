@@ -30,6 +30,7 @@ export function InventoryDialog({ open, onClose, onSave, item, products }: Inven
     location: '',
     notes: '',
   })
+  const [nameError, setNameError] = useState('')
 
   useEffect(() => {
     if (item) {
@@ -46,6 +47,7 @@ export function InventoryDialog({ open, onClose, onSave, item, products }: Inven
         notes: '',
       })
     }
+    setNameError('')
   }, [item, open])
 
   const handleProductSelect = (productId: string) => {
@@ -82,6 +84,12 @@ export function InventoryDialog({ open, onClose, onSave, item, products }: Inven
   }, [products, productQuery])
 
   const handleSubmit = () => {
+    // Legalább rajzszám VAGY terméknév kell — enélkül azonosíthatatlan,
+    // üres sor születne a készlettáblában.
+    if (!formData.drawingNumber && !formData.productName) {
+      setNameError('Add meg a rajzszámot vagy a termék nevét!')
+      return
+    }
     onSave({
       ...formData,
       lastUpdated: new Date().toISOString(),
@@ -171,6 +179,9 @@ export function InventoryDialog({ open, onClose, onSave, item, products }: Inven
               />
             </div>
           </div>
+          {nameError && !formData.drawingNumber && !formData.productName && (
+            <p className="text-sm text-destructive" role="alert">{nameError}</p>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">

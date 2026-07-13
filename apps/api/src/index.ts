@@ -21,6 +21,11 @@ import { inventoryRoutes } from './routes/inventory.js'
 import { productionRoutes } from './routes/production.js'
 import { deliveryRoutes } from './routes/delivery.js'
 import { masterDataRoutes } from './routes/masterData.js'
+import { quotesRoutes } from './routes/quotes.js'
+import { priceListsRoutes } from './routes/priceLists.js'
+import { attendanceRoutes } from './routes/attendance.js'
+import { datasheetsRoutes } from './routes/datasheets.js'
+import { filledFormsRoutes } from './routes/filledForms.js'
 import { auditLogRoutes } from './routes/auditLog.js'
 import { eventsRoutes } from './routes/events.js'
 import { authRoutes } from './routes/auth.js'
@@ -137,6 +142,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     await api.register(productionRoutes)
     await api.register(deliveryRoutes)
     await api.register(masterDataRoutes)
+    await api.register(quotesRoutes)
+    await api.register(priceListsRoutes)
+    await api.register(attendanceRoutes)
+    await api.register(datasheetsRoutes)
+    await api.register(filledFormsRoutes)
     await api.register(auditLogRoutes)
     await api.register(eventsRoutes)
     await api.register(backupRoutes)

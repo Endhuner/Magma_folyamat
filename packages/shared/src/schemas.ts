@@ -55,6 +55,8 @@ export const orderCreateSchema = z.object({
   plannedProductionHours: z.string().default(''),
   deliveryNote: z.string().default(''),
   cmr: z.string().default(''),
+  labelDoneAt: z.string().default(''),
+  palletLabelDoneAt: z.string().default(''),
   status: orderStatusSchema.default('Felvéve'),
   /** Pozíció / prioritás szám — opcionális egész. */
   pos: z.number().int().nullable().optional(),
@@ -137,6 +139,16 @@ export const deliveryNoteCreateSchema = z.object({
         notes: z.string().optional(),
       })
     )
+    .optional(),
+  recipient: z
+    .object({
+      name: z.string(),
+      address: z.string().optional(),
+      city: z.string().optional(),
+      postalCode: z.string().optional(),
+      country: z.string().optional(),
+      taxNumber: z.string().optional(),
+    })
     .optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
@@ -251,10 +263,15 @@ export const userCreateSchema = z.object({
   /** Cleartext PIN — backend bcrypt-eli. 4–8 számjegy. */
   pin: z.string().regex(/^\d{4,8}$/, '4–8 számjegyű PIN szükséges').optional(),
   active: z.boolean().default(true),
+  /** Felhasználónkénti megjelenés (skin) — '' = alap. */
+  skin: z.string().default(''),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 })
 export const userUpdateSchema = userCreateSchema.partial()
+
+/** Az aktuális user saját skin-módosítása (POST /auth/me/skin). */
+export const skinUpdateSchema = z.object({ skin: z.string().max(32) })
 
 /** Login-payload — a frontend ezt küldi POST /auth/login-ra. */
 export const loginInputSchema = z.object({
@@ -267,6 +284,7 @@ export const currentUserSchema = z.object({
   id: z.string(),
   name: z.string(),
   role: userRoleSchema,
+  skin: z.string().default(''),
 })
 
 export const materialCreateSchema = z.object({
@@ -427,3 +445,122 @@ export const auditLogQuerySchema = z.object({
   // ISO-string vagy YYYY-MM-DD
   since: z.string().optional(),
 })
+
+/** Árajánlat tételsor — a Quotation táblázat egy sora. */
+export const quoteItemSchema = z.object({
+  drawingNumber: z.string().default(''),
+  cavityCount: z.number().nullable().optional(),
+  weightG: z.number().nullable().optional(),
+  dieCastingFeeEur: z.number().nullable().optional(),
+  materialCostEur: z.number().nullable().optional(),
+  totalPieceEur: z.number().nullable().optional(),
+  mouldPriceEur: z.number().nullable().optional(),
+})
+
+export const quoteCreateSchema = z.object({
+  id: z.string().optional(),
+  number: z.string().default(''),
+  customerName: z.string().default(''),
+  customerId: z.string().default(''),
+  contactName: z.string().default(''),
+  rfqNumber: z.string().default(''),
+  emailDate: z.string().default(''),
+  deadline: z.string().default(''),
+  quantityNote: z.string().default(''),
+  notes: z.string().default(''),
+  doneAt: z.string().default(''),
+  sentAt: z.string().default(''),
+  orderedAt: z.string().default(''),
+  material: z.string().default(''),
+  yearlyAmount: z.string().default(''),
+  moq: z.string().default(''),
+  mouldLeadtimeWeeks: z.string().default(''),
+  mpb: z.string().default(''),
+  paymentTerms: z.string().default(''),
+  incoterms: z.string().default(''),
+  additionalNotes: z.string().default(''),
+  validityDays: z.number().default(30),
+  items: z.array(quoteItemSchema).optional(),
+  calc: z.any().optional(),
+  pdfFileName: z.string().default(''),
+})
+export const quoteUpdateSchema = quoteCreateSchema.partial()
+
+export const priceListItemSchema = z.object({
+  partNumber: z.string().default(''),
+  name: z.string().default(''),
+  lotSize: z.string().default(''),
+  weightG: z.number().nullable().optional(),
+  basePricePer100Eur: z.number().nullable().optional(),
+})
+
+export const priceListCreateSchema = z.object({
+  id: z.string().optional(),
+  customerName: z.string().default(''),
+  customerId: z.string().default(''),
+  burnRate: z.number().default(0.06),
+  mpbEurPerKg: z.number().default(0),
+  currentMpEurPerKg: z.number().default(0),
+  mpHistory: z.array(z.object({
+    label: z.string(),
+    mp: z.number(),
+    setAt: z.string(),
+  })).optional(),
+  items: z.array(priceListItemSchema).optional(),
+  notes: z.string().default(''),
+})
+export const priceListUpdateSchema = priceListCreateSchema.partial()
+
+export const employeeCreateSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1),
+  active: z.number().default(1),
+})
+export const employeeUpdateSchema = employeeCreateSchema.partial()
+
+export const attendanceEntryCreateSchema = z.object({
+  id: z.string().optional(),
+  employeeId: z.string().min(1),
+  date: z.string().min(1),
+  inTime: z.string().default(''),
+  outTime: z.string().default(''),
+  note: z.string().default(''),
+})
+export const attendanceEntryUpdateSchema = attendanceEntryCreateSchema.partial()
+
+export const leaveRequestCreateSchema = z.object({
+  id: z.string().optional(),
+  employeeId: z.string().min(1),
+  fromDate: z.string().min(1),
+  toDate: z.string().min(1),
+  note: z.string().default(''),
+  status: z.enum(['pending', 'approved', 'rejected']).default('pending'),
+  requestedAt: z.string().default(''),
+  decidedAt: z.string().default(''),
+})
+export const leaveRequestUpdateSchema = leaveRequestCreateSchema.partial()
+
+export const datasheetCreateSchema = z.object({
+  id: z.string().optional(),
+  productId: z.string().min(1),
+  docId: z.string().default(''),
+  effectiveDate: z.string().default(''),
+  preparedBy: z.string().default(''),
+  checkedBy: z.string().default(''),
+  approvedBy: z.string().default(''),
+  photoUrl: z.string().default(''),
+  machineSettings: z.array(z.object({ label: z.string(), value: z.string() })).optional(),
+  castingChecks: z.array(z.object({ operation: z.string(), responsible: z.string(), tool: z.string() })).optional(),
+  postOperations: z.array(z.object({ operation: z.string(), place: z.string(), time: z.string() })).optional(),
+  finalInspection: z.string().default(''),
+  packagingInstructions: z.string().default(''),
+})
+export const datasheetUpdateSchema = datasheetCreateSchema.partial()
+
+export const filledFormCreateSchema = z.object({
+  id: z.string().optional(),
+  formType: z.enum(['mohu', 'intermetal']),
+  title: z.string().default(''),
+  data: z.any().optional(),
+})
+export const filledFormUpdateSchema = filledFormCreateSchema.partial()

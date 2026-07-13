@@ -1,5 +1,5 @@
 import { generateId } from '@/lib/generateId'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Machine, Order, Product, ProductionShift } from '@/lib/types'
 import {
   Dialog,
@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberStepper } from '@/components/ui/number-stepper'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { parseFloatSafe } from '@/lib/helpers'
+import { SUGGESTED_SHIFT_SHOTS, previousShiftFor } from '@/lib/productionHelpers'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ArrowRight, CheckCircle, Info } from '@phosphor-icons/react'
 import { toast } from 'sonner'
@@ -39,6 +41,8 @@ interface QuickShiftEntryDialogProps {
   machines?: Machine[]
   /** Utolsó gép ID auto-kitöltéshez */
   lastMachineId?: string
+  /** A rendelés műszakai — a Kezdő lövésszám előtöltéséhez (mint a Gyártásban). */
+  orderShifts?: ProductionShift[]
 }
 
 /**
@@ -56,24 +60,82 @@ export function QuickShiftEntryDialog({
   userId,
   machines = [],
   lastMachineId,
+  orderShifts = [],
 }: QuickShiftEntryDialogProps) {
   const [startShots, setStartShots] = useState<string>('')
   const [endShots, setEndShots] = useState<string>('')
+  const [endEdited, setEndEdited] = useState(false)
   const [notes, setNotes] = useState<string>('')
   const [machineId, setMachineId] = useState<string>('')
+  // A dátum módosítható; ha a választott dátumra már van műszak, azt szerkesztjük.
+  const [dateLocal, setDateLocal] = useState<string>(date)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const startShotsRef = useRef<HTMLInputElement>(null)
+  const endShotsRef = useRef<HTMLInputElement>(null)
+
+  // Nyitáskor a dátumot a propból vesszük (mai nap); utána szabadon módosítható.
+  useEffect(() => {
+    if (open) setDateLocal(date)
+  }, [open, date, order?.id])
 
   const nestCountNum = useMemo(() => {
     const n = parseFloatSafe(product?.nestCount, 1, { allowNegative: false })
     return n > 0 ? n : 1
   }, [product])
 
+  // Nyitáskor / dátum-váltáskor:
+  //  - ha a választott dátumra + műszakra MÁR van rögzítés → betöltjük (szerkesztés),
+  //  - különben a Kezdő lövésszámot az előző műszak vég-számlálójából töltjük ki
+  //    (mint a Gyártásban), a Vég üres marad (jön a javaslat).
   useEffect(() => {
     if (!open) return
-    setStartShots('')
+    const existing = orderShifts.find((s) => s.date === dateLocal && s.shift === shift)
+    if (existing) {
+      setEditingId(existing.id)
+      if (existing.endShotsAbsolute != null) {
+        setStartShots(String(existing.endShotsAbsolute - existing.shotsCount))
+        setEndShots(String(existing.endShotsAbsolute))
+      } else {
+        setStartShots('0')
+        setEndShots(String(existing.shotsCount))
+      }
+      setEndEdited(true)   // meglévő érték — ne írja felül a javaslat
+      setNotes(existing.notes ?? '')
+      setMachineId(existing.machineId ?? '')
+      return
+    }
+    setEditingId(null)
+    const prevShift = previousShiftFor(orderShifts, dateLocal, shift)
+    setStartShots(prevShift?.endShotsAbsolute != null ? String(prevShift.endShotsAbsolute) : '')
     setEndShots('')
+    setEndEdited(false)
     setNotes('')
     setMachineId(lastMachineId ?? '')
-  }, [open, order?.id, date, shift, lastMachineId])
+  }, [open, order?.id, dateLocal, shift, lastMachineId, orderShifts])
+
+  // Vég lövésszám JAVASLAT: Kezdő + egy műszaknyi lövés (1440). Amíg a gépkezelő
+  // kézzel bele nem ír, a Kezdő változásait is követi.
+  useEffect(() => {
+    if (!open || endEdited) return
+    const n = Number.parseInt(startShots, 10)
+    setEndShots(startShots.trim() !== '' && Number.isFinite(n) ? String(n + SUGGESTED_SHIFT_SHOTS) : '')
+  }, [open, startShots, endEdited])
+
+  // A kurzor a Vég lövésszám mezőbe (ott a következő beírandó szám); ha még
+  // nincs Kezdő, oda visszük — a tablet-billentyűzetet az autoFocus hozza fel.
+  useEffect(() => {
+    if (!open) return
+    const t = setTimeout(() => {
+      const hasStart = (startShotsRef.current?.value ?? '').trim() !== ''
+      if (hasStart) {
+        endShotsRef.current?.select()
+      } else {
+        startShotsRef.current?.focus()
+        startShotsRef.current?.select()
+      }
+    }, 60)
+    return () => clearTimeout(t)
+  }, [open])
 
   const startNum = parseFloatSafe(startShots, 0, { allowNegative: false })
   const endNum = parseFloatSafe(endShots, 0, { allowNegative: false })
@@ -93,21 +155,23 @@ export function QuickShiftEntryDialog({
       return
     }
     const now = new Date().toISOString()
+    const existing = editingId ? orderShifts.find((s) => s.id === editingId) : undefined
     const newShift: ProductionShift = {
-      id: generateId(),
+      id: editingId ?? generateId(),
       orderId: order.id,
-      date,
+      date: dateLocal,
       shift,
       shotsCount: Math.round(shotsNum),
+      endShotsAbsolute: Math.round(endNum),
       producedQuantity: producedPreview,
       notes: notes.trim(),
       userId,
       machineId: machineId || undefined,
-      createdAt: now,
+      createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     }
     onSave(newShift)
-    toast.success(`Műszak rögzítve: ${producedPreview} db`)
+    toast.success(editingId ? `Műszak módosítva: ${producedPreview} db` : `Műszak rögzítve: ${producedPreview} db`)
     onClose()
   }
 
@@ -124,9 +188,9 @@ export function QuickShiftEntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-lg">Hiányzó műszak pótlása</DialogTitle>
+          <DialogTitle className="text-lg">Műszak gyártás</DialogTitle>
           <DialogDescription className="text-base">
             {order.productName} · {order.customer}
           </DialogDescription>
@@ -134,12 +198,24 @@ export function QuickShiftEntryDialog({
 
         <div className="space-y-5 py-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="font-mono text-base px-3 py-1">
-              {date}
-            </Badge>
-            <Badge variant="secondary" className="text-base px-3 py-1">
+            <div className="grid gap-1">
+              <Label htmlFor="qs-date" className="text-sm text-muted-foreground">Dátum</Label>
+              <Input
+                id="qs-date"
+                type="date"
+                value={dateLocal}
+                onChange={(e) => e.target.value && setDateLocal(e.target.value)}
+                className="font-mono text-base h-10 w-44"
+              />
+            </div>
+            <Badge variant="secondary" className="text-base px-3 py-1 self-end mb-1">
               {shiftLabel(shift)}
             </Badge>
+            {editingId && (
+              <Badge variant="outline" className="text-sm self-end mb-1 border-accent/50 text-accent">
+                Meglévő műszak — szerkesztés
+              </Badge>
+            )}
           </div>
 
           {machines.length > 0 && (
@@ -165,16 +241,15 @@ export function QuickShiftEntryDialog({
               <Label htmlFor="qs-start" className="text-base font-medium">
                 Kezdő lövésszám
               </Label>
-              <Input
+              <NumberStepper
                 id="qs-start"
-                type="number"
-                min={0}
-                className="text-xl font-mono h-13 text-center"
+                inputRef={startShotsRef}
                 value={startShots}
+                onChange={setStartShots}
                 placeholder="pl. 12 500"
-                onChange={(e) => setStartShots(e.target.value)}
                 onKeyDown={handleKeyDown}
-                autoFocus
+                inputClassName="font-mono font-bold h-20 text-[2.8rem] md:text-[2.8rem] coarse:text-[2.8rem]"
+                buttonClassName="h-20 px-4"
               />
             </div>
             <div className="flex items-center justify-center pb-1">
@@ -184,15 +259,16 @@ export function QuickShiftEntryDialog({
               <Label htmlFor="qs-end" className="text-base font-medium">
                 Vég lövésszám
               </Label>
-              <Input
+              <NumberStepper
                 id="qs-end"
-                type="number"
-                min={0}
-                className="text-xl font-mono h-13 text-center"
+                inputRef={endShotsRef}
                 value={endShots}
-                placeholder="pl. 12 620"
-                onChange={(e) => setEndShots(e.target.value)}
+                onChange={(v) => { setEndShots(v); setEndEdited(true) }}
+                placeholder="Kezdő + 1440"
                 onKeyDown={handleKeyDown}
+                autoFocus
+                inputClassName="font-mono font-bold h-20 text-[2.8rem] md:text-[2.8rem] coarse:text-[2.8rem]"
+                buttonClassName="h-20 px-4"
               />
             </div>
           </div>
@@ -241,7 +317,7 @@ export function QuickShiftEntryDialog({
           </Button>
           <Button size="lg" className="text-base" onClick={handleSubmit} disabled={shotsNum <= 0}>
             <CheckCircle className="w-5 h-5 mr-2" weight="fill" />
-            Rögzítés
+            {editingId ? 'Módosítás mentése' : 'Rögzítés'}
           </Button>
         </DialogFooter>
       </DialogContent>

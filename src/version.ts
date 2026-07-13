@@ -6,4 +6,4 @@
  * olvassa ki és injektálja (VITE_APP_VERSION); git-tag push esetén a tag írja
  * felül. Így a fejlécben mindig tiszta verziószám van (nem dev-<sha>).
  */
-export const APP_VERSION = 'v2.7.0'
+export const APP_VERSION = 'v3.0.0'

@@ -4,7 +4,6 @@
  * Csak prop-okon át kap adatot — a CRUD műveleteket a hívó (App.tsx) végzi.
  */
 import { Button } from '@/components/ui/button'
-import { TabsContent } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Plus, Upload, MagnifyingGlass } from '@phosphor-icons/react'
 import { CustomersTable } from '@/components/CustomersTable'
@@ -32,7 +31,7 @@ export function CustomersPanel({
   handleDeleteCustomer,
 }: CustomersPanelProps) {
   return (
-    <TabsContent value="customers" className="space-y-6">
+    <section className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight mb-1">Vevők</h2>
@@ -66,6 +65,6 @@ export function CustomersPanel({
         onEdit={handleEditCustomer}
         onDelete={handleDeleteCustomer}
       />
-    </TabsContent>
+    </section>
   )
 }

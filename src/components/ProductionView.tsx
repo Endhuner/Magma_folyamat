@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
-import {
+import { Plus,
   Package,
   Clock,
   CheckCircle,
@@ -41,6 +41,8 @@ import {
 import { ShiftValidationBanner } from '@/components/ShiftValidationBanner'
 import { ProductionDetailDialog } from '@/components/production/ProductionDetailDialog'
 import { QuickShiftEntryDialog } from '@/components/QuickShiftEntryDialog'
+import { useKV } from '@/hooks/useKV'
+import { cn } from '@/lib/utils'
 import { useAppSetting } from '@/hooks/useAppSetting'
 import { DEFAULT_WORK_CALENDAR, type WorkCalendarSettings } from '@/lib/workCalendar'
 import {
@@ -53,6 +55,10 @@ import {
   buildShiftsByOrder,
   groupOrdersByStatus,
   type PriorityFilter,
+  deadlineUrgency,
+  URGENCY_BORDER,
+  currentShiftNow,
+  lastMachineIdForProduct,
 } from '@/lib/productionHelpers'
 
 interface ProductionViewProps {
@@ -69,6 +75,8 @@ interface ProductionViewProps {
   onDeleteDefect?: (defectId: string) => void
   userId?: string
   machines?: import('@/lib/types').Machine[]
+  /** Operátornak egyszerűsített nézet: nincs mai-összesítő sáv. */
+  isOperator?: boolean
 }
 
 export function ProductionView({
@@ -84,9 +92,17 @@ export function ProductionView({
   onDeleteDefect,
   userId,
   machines,
+  isOperator,
 }: ProductionViewProps) {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
+  // Perzisztens szűrők: újratöltés/visszatérés után ugyanott folytatod (kv:production-filters).
+  const [prodFilters, setProdFilters] = useKV<{ q: string; priority: PriorityFilter }>(
+    'production-filters',
+    { q: '', priority: 'all' },
+  )
+  const searchQuery = prodFilters.q
+  const priorityFilter = prodFilters.priority
+  const setSearchQuery = (q: string) => setProdFilters((f) => ({ ...f, q }))
+  const setPriorityFilter = (priority: PriorityFilter) => setProdFilters((f) => ({ ...f, priority }))
   const [summaryOpen, setSummaryOpen] = useState(false)
 
   // Dialógus-állapotok a nézeten belül — egyszerűbb így, mint prop-ban felhúzni az App.tsx-ig.
@@ -189,7 +205,6 @@ export function ProductionView({
   }
 
   const renderOrderCard = (order: Order) => {
-    const product = findProduct(order)
     const orderShifts = shiftsByOrder.get(order.id) ?? []
     const producedQty = orderShifts.reduce(
       (sum, s) => sum + (s.producedQuantity || 0),
@@ -206,11 +221,13 @@ export function ProductionView({
         : 0
 
     return (
-      <Card key={order.id} className="hover:border-primary/50 transition-colors">
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-[19px] font-bold truncate">
+      <Card key={order.id} className={cn("border-l-4 transition-shadow hover:shadow-md", URGENCY_BORDER[deadlineUrgency(order.requiredDate)])}>
+        <CardHeader className="pb-2">
+          {/* A megnevezés a maradék helyre (a státusz-badge-ek mellé) van
+              középre igazítva — a státusz valódi helyet foglal, nem takarja. */}
+          <div className="flex items-start gap-2">
+            <div className="flex-1 min-w-0 text-center">
+              <CardTitle className="text-[46px] leading-tight font-bold truncate">
                 {order.productName}
               </CardTitle>
               <p className="text-sm text-muted-foreground truncate">{order.customer}</p>
@@ -227,6 +244,10 @@ export function ProductionView({
                 </Badge>
               )}
               {getPriorityBadge(order)}
+              {getStatusIcon(order.status)}
+              <Badge className={getStatusColor(order.status)} variant="secondary">
+                {order.status}
+              </Badge>
             </div>
           </div>
         </CardHeader>
@@ -244,12 +265,6 @@ export function ProductionView({
               <span className="text-muted-foreground">Mennyiség:</span>
               <span className="font-semibold">{fmtInt(order.amountPc)} db</span>
             </div>
-            {product && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Rajzszám:</span>
-                <span className="font-mono text-xs">{product.drawingNumber}</span>
-              </div>
-            )}
 
             {/* Gyártási haladás — csak akkor, ha van műszakadat */}
             {(orderShifts.length > 0 || order.amountPc > 0) && (
@@ -289,19 +304,28 @@ export function ProductionView({
             ) : null })()}
           </div>
 
-          <div className="flex items-center gap-1 pt-2">
-            {getStatusIcon(order.status)}
-            <Badge className={getStatusColor(order.status)} variant="secondary">
-              {order.status}
-            </Badge>
-          </div>
-
-          <div className="pt-2">
+          <div className="pt-2 flex gap-2">
+            <Button
+              size="lg"
+              variant="secondary"
+              onClick={() => setQuickEntry({
+                orderId: order.id,
+                customer: order.customer,
+                productName: order.productName,
+                date: new Date().toISOString().slice(0, 10),
+                shift: currentShiftNow(),
+              })}
+              title="Mai műszakadat gyors rögzítése"
+              className="flex-1 min-w-0 h-12 text-base font-semibold"
+            >
+              <Plus className="w-5 h-5 mr-2" weight="bold" />
+              Munkafelvétel
+            </Button>
             <Button
               size="lg"
               onClick={() => setDetailOrderId(order.id)}
               title="Gyártási műszakadatok rögzítése"
-              className="w-full h-12 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+              className="flex-1 min-w-0 h-12 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-md"
             >
               <Hammer className="w-5 h-5 mr-2" weight="fill" />
               Gyártás
@@ -504,7 +528,37 @@ export function ProductionView({
         )}
       </div>
 
-      <div className="bg-card border rounded-lg p-4 space-y-3">
+      {!isOperator && (() => {
+        const todayISO = new Date().toISOString().slice(0, 10)
+        const todayShifts = (shifts || []).filter((sh) => sh.date === todayISO)
+        const todayShots = todayShifts.reduce((a, sh) => a + (sh.shotsCount || 0), 0)
+        const todayQty = todayShifts.reduce((a, sh) => a + (sh.producedQuantity || 0), 0)
+        const todayDefects = (defects || []).filter((d) => d.date === todayISO)
+          .reduce((a, d) => a + (d.quantity || 0), 0)
+        const activeMachines = new Set(todayShifts.map((sh) => sh.machineId).filter(Boolean)).size
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="bg-muted rounded-lg px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Mai lövések</div>
+              <div className="text-2xl font-bold font-mono tabular-nums">{todayShots.toLocaleString('hu-HU')}</div>
+            </div>
+            <div className="bg-muted rounded-lg px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Mai darab</div>
+              <div className="text-2xl font-bold font-mono tabular-nums">{todayQty.toLocaleString('hu-HU')}</div>
+            </div>
+            <div className={`rounded-lg px-3 py-2 ${todayDefects > 0 ? 'bg-destructive/10' : 'bg-muted'}`}>
+              <div className={`text-[11px] uppercase tracking-wide ${todayDefects > 0 ? 'text-destructive/80' : 'text-muted-foreground'}`}>Mai selejt</div>
+              <div className={`text-2xl font-bold font-mono tabular-nums ${todayDefects > 0 ? 'text-destructive' : ''}`}>{todayDefects.toLocaleString('hu-HU')}</div>
+            </div>
+            <div className="bg-muted rounded-lg px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Aktív gépek ma</div>
+              <div className="text-2xl font-bold font-mono tabular-nums">{activeMachines}</div>
+            </div>
+          </div>
+        )
+      })()}
+
+      <div className="bg-card border rounded-lg p-4 space-y-3 sticky top-14 z-10 shadow-sm">
         <div className="flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
             <MagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -613,6 +667,9 @@ export function ProductionView({
           setQuickEntry(null)
         }}
         userId={userId}
+        machines={machines}
+        orderShifts={quickEntryOrder ? (shiftsByOrder.get(quickEntryOrder.id) ?? []) : []}
+        lastMachineId={lastMachineIdForProduct(quickEntryOrder, orders, shifts)}
       />
     </div>
   )

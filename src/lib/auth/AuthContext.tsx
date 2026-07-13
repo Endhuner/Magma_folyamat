@@ -63,6 +63,8 @@ interface AuthContextValue extends AuthState {
   hasRole: (...allowed: UserRole[]) => boolean
   /** Frissíti a `me` állapotot — pl. PIN-csere után. */
   refresh: () => Promise<void>
+  /** A bejelentkezett user SAJÁT skin-jének mentése + helyi frissítése. */
+  setUserSkin: (skin: string) => Promise<void>
   /** Megengedi a usernek, hogy backend nélkül is folytassa (csak fejlesztéshez). */
   bypassAuth: () => void
 }
@@ -218,6 +220,19 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
     void refreshPublicUsers()
   }, [refresh, refreshPublicUsers])
 
+  // A bejelentkezett user megjelenése (skin) — a <html data-skin> beállítása,
+  // és boot-flash ellen a localStorage-ba is elmentjük.
+  useEffect(() => {
+    if (state.status !== 'authenticated') return
+    const skin = state.user?.skin ?? ''
+    if (skin) document.documentElement.dataset.skin = skin
+    else delete document.documentElement.dataset.skin
+    try {
+      if (skin) localStorage.setItem('pp-skin', skin)
+      else localStorage.removeItem('pp-skin')
+    } catch { /* privát mód stb. */ }
+  }, [state.status, state.user?.skin])
+
   // ---------------------------------------------------------------------------
   // Lejárt szerver-munkamenet figyelése (8 órás SESSION_TTL után 401)
   // ---------------------------------------------------------------------------
@@ -247,6 +262,11 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
     setState((s) => ({ ...s, status: 'bypass', user: null, error: null }))
   }, [])
 
+  const setUserSkin = useCallback(async (skin: string) => {
+    await authApi.updateMySkin(skin)
+    setState((s) => (s.user ? { ...s, user: { ...s.user, skin } } : s))
+  }, [])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       ...state,
@@ -255,6 +275,7 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
       refresh,
       refreshPublicUsers,
       bypassAuth,
+      setUserSkin,
       hasRole: (...allowed: UserRole[]) => {
         // Bypass módban (offline / dev) mindenki "admin" — különben az
         // admin-only gombok eltűnnének és a UI használhatatlanná válna.
@@ -264,7 +285,7 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
         return allowed.includes(state.user.role)
       },
     }),
-    [state, doLogin, doLogout, refresh, refreshPublicUsers, bypassAuth]
+    [state, doLogin, doLogout, refresh, refreshPublicUsers, bypassAuth, setUserSkin]
   )
 
   return (

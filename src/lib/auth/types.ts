@@ -10,6 +10,8 @@ export interface CurrentUser {
   id: string
   name: string
   role: UserRole
+  /** Felhasználónkénti megjelenés (skin) — '' = alap. */
+  skin?: string
 }
 
 export interface PublicUser {

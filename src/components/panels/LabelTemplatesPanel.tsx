@@ -14,7 +14,6 @@
 import { useRef, type RefObject } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { TabsContent } from '@/components/ui/tabs'
 import { Plus, Upload, Download, FileText } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import {
@@ -61,7 +60,7 @@ export function LabelTemplatesPanel({
   const labelImportInputRef = importInputRef ?? internalImportRef
 
   return (
-    <TabsContent value="label-templates" className="space-y-6">
+    <section className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight mb-1">Címke Sablonok</h2>
@@ -279,6 +278,6 @@ export function LabelTemplatesPanel({
           </p>
         </div>
       )}
-    </TabsContent>
+    </section>
   )
 }

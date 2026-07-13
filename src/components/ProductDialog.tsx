@@ -44,6 +44,8 @@ export function ProductDialog({ open, onClose, onSave, product, savedTemplates, 
     spruWeight: '',
   })
   const [labelTemplateId, setLabelTemplateId] = useState<string>('__active__')
+  // Mező melletti hibaüzenetek a kötelező mezőkhöz (submit-őr tölti).
+  const [fieldErrors, setFieldErrors] = useState<{ customer?: string; name?: string }>({})
 
   useEffect(() => {
     if (product) {
@@ -89,10 +91,25 @@ export function ProductDialog({ open, onClose, onSave, product, savedTemplates, 
       })
       setLabelTemplateId('__active__')
     }
+    setFieldErrors({})
   }, [product, open])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Kötelező: ügyfél + (rajzszám VAGY megnevezés). Ügyfél nélkül a termék
+    // sosem jelenne meg az Új rendelés termékválasztójában (vevőre szűr),
+    // a felhasználó számára némán "eltűnne".
+    const errors: { customer?: string; name?: string } = {}
+    if (!formData.customer) errors.customer = 'Válassz ügyfelet!'
+    if (!formData.drawingNumber && !formData.productName) {
+      errors.name = 'Add meg a rajzszámot vagy a megnevezést!'
+    }
+    if (errors.customer || errors.name) {
+      setFieldErrors(errors)
+      return
+    }
+
     const productData: Partial<Product> = {
       ...formData,
       labelTemplateId: labelTemplateId === '__active__' ? null : labelTemplateId,
@@ -107,6 +124,10 @@ export function ProductDialog({ open, onClose, onSave, product, savedTemplates, 
 
   const handleChange = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+    if (field === 'customer') setFieldErrors((prev) => ({ ...prev, customer: undefined }))
+    if (field === 'drawingNumber' || field === 'productName') {
+      setFieldErrors((prev) => ({ ...prev, name: undefined }))
+    }
   }
 
   return (
@@ -118,7 +139,7 @@ export function ProductDialog({ open, onClose, onSave, product, savedTemplates, 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="customer">Ügyfél</Label>
+              <Label htmlFor="customer">Ügyfél *</Label>
               <Select value={formData.customer} onValueChange={(v) => handleChange('customer', v)}>
                 <SelectTrigger id="customer">
                   <SelectValue placeholder="Válassz ügyfelet…" />
@@ -129,19 +150,25 @@ export function ProductDialog({ open, onClose, onSave, product, savedTemplates, 
                   ))}
                 </SelectContent>
               </Select>
+              {fieldErrors.customer && (
+                <p className="text-sm text-destructive" role="alert">{fieldErrors.customer}</p>
+              )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="drawingNumber">Termék rajzszáma</Label>
+              <Label htmlFor="drawingNumber">Termék rajzszáma *</Label>
               <Input
                 id="drawingNumber"
                 value={formData.drawingNumber}
                 onChange={(e) => handleChange('drawingNumber', e.target.value)}
               />
+              {fieldErrors.name && (
+                <p className="text-sm text-destructive" role="alert">{fieldErrors.name}</p>
+              )}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="productName">Termék megnevezés</Label>
+            <Label htmlFor="productName">Termék megnevezés (rajzszám helyett is elég)</Label>
             <Input
               id="productName"
               value={formData.productName}

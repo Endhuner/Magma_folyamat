@@ -11,7 +11,7 @@
  */
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { eq } from 'drizzle-orm'
-import { loginInputSchema } from '@produktivpro/shared'
+import { loginInputSchema, skinUpdateSchema } from '@produktivpro/shared'
 import { getDb } from '../db/connection.js'
 import { users } from '../db/schema.js'
 import { verifyPin } from '../lib/passwords.js'
@@ -113,6 +113,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       id: user.id,
       name: user.name,
       role: user.role,
+      skin: user.skin ?? '',
     }
   })
 
@@ -125,14 +126,39 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   // ---------- ME ----------
   app.get('/auth/me', async (req, reply) => {
     if (config.disableAuth) {
-      return { sub: 'dev-admin', name: 'Dev Admin', role: 'admin' }
+      return { id: 'dev-admin', name: 'Dev Admin', role: 'admin', skin: '' }
     }
     try {
       await req.jwtVerify()
     } catch {
       return reply.code(401).send({ error: 'Nincs bejelentkezve' })
     }
-    return req.user
+    // A friss skin-t (és a helyes id-t) a DB-ből olvassuk — a JWT csak `sub`-ot tárol.
+    const uid = (req.user as unknown as { sub: string }).sub
+    const db = getDb()
+    const row = db.select().from(users).where(eq(users.id, uid)).get()
+    if (!row) return reply.code(401).send({ error: 'Nincs bejelentkezve' })
+    return { id: row.id, name: row.name, role: row.role, skin: row.skin ?? '' }
+  })
+
+  // ---------- SAJÁT SKIN MÓDOSÍTÁS ----------
+  // Bármely bejelentkezett user állíthatja a SAJÁT megjelenését (nem admin-only).
+  app.post('/auth/me/skin', async (req, reply) => {
+    if (config.disableAuth) return { skin: (req.body as { skin?: string })?.skin ?? '' }
+    try {
+      await req.jwtVerify()
+    } catch {
+      return reply.code(401).send({ error: 'Nincs bejelentkezve' })
+    }
+    const parsed = skinUpdateSchema.safeParse(req.body)
+    if (!parsed.success) return reply.code(400).send({ error: 'Érvénytelen skin' })
+    const uid = (req.user as unknown as { sub: string }).sub
+    const db = getDb()
+    db.update(users)
+      .set({ skin: parsed.data.skin, updatedAt: new Date().toISOString() })
+      .where(eq(users.id, uid))
+      .run()
+    return { skin: parsed.data.skin }
   })
 
   // ---------- PUBLIC USER LIST (login-screenhez) ----------

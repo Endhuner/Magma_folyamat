@@ -1,0 +1,31 @@
+CREATE TABLE IF NOT EXISTS `quotes` (
+	`id` text PRIMARY KEY NOT NULL,
+	`number` text DEFAULT '' NOT NULL,
+	`customer_name` text DEFAULT '' NOT NULL,
+	`customer_id` text DEFAULT '' NOT NULL,
+	`contact_name` text DEFAULT '' NOT NULL,
+	`rfq_number` text DEFAULT '' NOT NULL,
+	`email_date` text DEFAULT '' NOT NULL,
+	`deadline` text DEFAULT '' NOT NULL,
+	`quantity_note` text DEFAULT '' NOT NULL,
+	`notes` text DEFAULT '' NOT NULL,
+	`done_at` text DEFAULT '' NOT NULL,
+	`sent_at` text DEFAULT '' NOT NULL,
+	`ordered_at` text DEFAULT '' NOT NULL,
+	`material` text DEFAULT '' NOT NULL,
+	`yearly_amount` text DEFAULT '' NOT NULL,
+	`moq` text DEFAULT '' NOT NULL,
+	`mould_leadtime_weeks` text DEFAULT '' NOT NULL,
+	`mpb` text DEFAULT '' NOT NULL,
+	`payment_terms` text DEFAULT '' NOT NULL,
+	`incoterms` text DEFAULT '' NOT NULL,
+	`additional_notes` text DEFAULT '' NOT NULL,
+	`validity_days` integer DEFAULT 30 NOT NULL,
+	`items` text DEFAULT '[]' NOT NULL,
+	`calc` text DEFAULT '' NOT NULL,
+	`pdf_file_name` text DEFAULT '' NOT NULL,
+	`created_at` text DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+	`updated_at` text DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `quotes_number_idx` ON `quotes` (`number`);

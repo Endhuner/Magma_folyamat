@@ -152,6 +152,10 @@ export const orders = sqliteTable('orders', {
   plannedProductionHours: text('planned_production_hours').notNull().default(''),
   deliveryNote: text('delivery_note').notNull().default(''),
   cmr: text('cmr').notNull().default(''),
+  /** Etikett (termékcímke) elkészültének dátuma — üres = még nincs. */
+  labelDoneAt: text('label_done_at').notNull().default(''),
+  /** Raklapcímke elkészültének dátuma — üres = még nincs. */
+  palletLabelDoneAt: text('pallet_label_done_at').notNull().default(''),
   status: text('status', { enum: ORDER_STATUSES }).notNull().default('Felvéve'),
   /** Pozíció / prioritás szám — opcionális egész, a rendelések rendezéséhez. */
   pos: integer('pos'),
@@ -181,6 +185,8 @@ export const deliveryNotes = sqliteTable('delivery_notes', {
   exportData: text('export_data'),
   // JSON: ExtraDeliveryItem[] — kiegészítő tételek (szerszám/anyag/szabad sor)
   extraItems: text('extra_items').notNull().default('[]'),
+  // JSON: DeliveryRecipient — egyéni (rendelés nélküli) szállítólevél címzettje
+  recipient: text('recipient'),
   createdAt: text('created_at').notNull().default(nowDefault),
   updatedAt: text('updated_at').notNull().default(nowDefault),
 }, (t) => ({
@@ -319,6 +325,9 @@ export const users = sqliteTable('users', {
   pinHash: text('pin_hash'),
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
   lastLoginAt: text('last_login_at'),
+  // Felhasználónkénti megjelenés (skin) — a fejlécből vagy a Felhasználók
+  // oldalról állítható; '' = alap.
+  skin: text('skin').notNull().default(''),
   createdAt: text('created_at').notNull().default(nowDefault),
   updatedAt: text('updated_at').notNull().default(nowDefault),
 }, (t) => ({
@@ -540,3 +549,129 @@ export const messages = sqliteTable('messages', {
 // (pl. súlyok), itt egy hint:
 // example: weightKg: real('weight_kg').notNull().default(0),
 export const _realPlaceholder = real // re-export, hogy a tooling ne ráncigálja ki
+
+/**
+ * Árajánlatok — nyilvántartás + a Quotation PDF fejléc-mezői.
+ * Az `items` a tételsorok JSON-tömbje, a `calc` a kalkulátor mentett
+ * bemenetei (újranyitáshoz/másoláshoz).
+ */
+export const quotes = sqliteTable('quotes', {
+  id: text('id').primaryKey(),
+  number: text('number').notNull().default(''),
+  customerName: text('customer_name').notNull().default(''),
+  customerId: text('customer_id').notNull().default(''),
+  contactName: text('contact_name').notNull().default(''),
+  rfqNumber: text('rfq_number').notNull().default(''),
+  emailDate: text('email_date').notNull().default(''),
+  deadline: text('deadline').notNull().default(''),
+  quantityNote: text('quantity_note').notNull().default(''),
+  notes: text('notes').notNull().default(''),
+  doneAt: text('done_at').notNull().default(''),
+  sentAt: text('sent_at').notNull().default(''),
+  orderedAt: text('ordered_at').notNull().default(''),
+  material: text('material').notNull().default(''),
+  yearlyAmount: text('yearly_amount').notNull().default(''),
+  moq: text('moq').notNull().default(''),
+  mouldLeadtimeWeeks: text('mould_leadtime_weeks').notNull().default(''),
+  mpb: text('mpb').notNull().default(''),
+  paymentTerms: text('payment_terms').notNull().default(''),
+  incoterms: text('incoterms').notNull().default(''),
+  additionalNotes: text('additional_notes').notNull().default(''),
+  validityDays: integer('validity_days').notNull().default(30),
+  /** JSON tömb: QuoteItem[] */
+  items: text('items').notNull().default('[]'),
+  /** JSON objektum: a kalkulátor bemenetei (vagy üres string). */
+  calc: text('calc').notNull().default(''),
+  pdfFileName: text('pdf_file_name').notNull().default(''),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+})
+
+/**
+ * Vevőnkénti mozgó anyagáras árlisták — az Ela/Seidel/Systec Excelek kiváltása.
+ * items: tételsorok JSON-ban; mpHistory: időszakonkénti MP-előzmény.
+ */
+export const priceLists = sqliteTable('price_lists', {
+  id: text('id').primaryKey(),
+  customerName: text('customer_name').notNull().default(''),
+  customerId: text('customer_id').notNull().default(''),
+  burnRate: real('burn_rate').notNull().default(0.06),
+  mpbEurPerKg: real('mpb_eur_per_kg').notNull().default(0),
+  currentMpEurPerKg: real('current_mp_eur_per_kg').notNull().default(0),
+  /** JSON tömb: [{label, mp, setAt}] */
+  mpHistory: text('mp_history').notNull().default('[]'),
+  /** JSON tömb: [{partNumber, name, lotSize, weightG, basePricePer100Eur}] */
+  items: text('items').notNull().default('[]'),
+  notes: text('notes').notNull().default(''),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+})
+
+/** HASZNÁLATON KÍVÜL — a jelenlét a felhasználókhoz kötött (users tábla).
+ * A tábla a 0020-as migráció miatt marad a sémában. */
+export const employees = sqliteTable('employees', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull().default(''),
+  active: integer('active').notNull().default(1),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+})
+
+/** Napi jelenlét — dolgozónként naponta egy sor (app-szinten biztosítva). */
+export const attendanceEntries = sqliteTable('attendance_entries', {
+  id: text('id').primaryKey(),
+  employeeId: text('employee_id').notNull().default(''),
+  date: text('date').notNull().default(''),
+  inTime: text('in_time').notNull().default(''),
+  outTime: text('out_time').notNull().default(''),
+  note: text('note').notNull().default(''),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+}, (t) => [index('attendance_emp_date_idx').on(t.employeeId, t.date)])
+
+/** Szabadság-kérelmek. */
+export const leaveRequests = sqliteTable('leave_requests', {
+  id: text('id').primaryKey(),
+  employeeId: text('employee_id').notNull().default(''),
+  fromDate: text('from_date').notNull().default(''),
+  toDate: text('to_date').notNull().default(''),
+  note: text('note').notNull().default(''),
+  status: text('status').notNull().default('pending'),
+  requestedAt: text('requested_at').notNull().default(''),
+  decidedAt: text('decided_at').notNull().default(''),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+})
+
+/** Termék Információs Adatlap — termékenként egy (app-szinten biztosítva). */
+export const productDatasheets = sqliteTable('product_datasheets', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull().default(''),
+  docId: text('doc_id').notNull().default(''),
+  effectiveDate: text('effective_date').notNull().default(''),
+  preparedBy: text('prepared_by').notNull().default(''),
+  checkedBy: text('checked_by').notNull().default(''),
+  approvedBy: text('approved_by').notNull().default(''),
+  photoUrl: text('photo_url').notNull().default(''),
+  /** JSON: [{label, value}] */
+  machineSettings: text('machine_settings').notNull().default('[]'),
+  /** JSON: [{operation, responsible, tool}] */
+  castingChecks: text('casting_checks').notNull().default('[]'),
+  /** JSON: [{operation, place, time}] */
+  postOperations: text('post_operations').notNull().default('[]'),
+  finalInspection: text('final_inspection').notNull().default(''),
+  packagingInstructions: text('packaging_instructions').notNull().default(''),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+}, (t) => [index('datasheet_product_idx').on(t.productId)])
+
+/** Kitöltött űrlapok (MOHU szállítólevél, Intermetal nyilatkozat) — történet. */
+export const filledForms = sqliteTable('filled_forms', {
+  id: text('id').primaryKey(),
+  formType: text('form_type').notNull().default(''),
+  title: text('title').notNull().default(''),
+  /** JSON: az űrlap változó mezői. */
+  data: text('data').notNull().default('{}'),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+})

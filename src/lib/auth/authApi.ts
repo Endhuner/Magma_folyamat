@@ -106,6 +106,18 @@ export async function me(): Promise<CurrentUser | null> {
   return parseJsonOrThrow<CurrentUser>(res, 'Nem sikerült lekérni a felhasználót')
 }
 
+/** A bejelentkezett user SAJÁT skin-jét menti a szerverre. */
+export async function updateMySkin(skin: string): Promise<string> {
+  const res = await safeFetch(url('/auth/me/skin'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ skin }),
+  })
+  const body = await parseJsonOrThrow<{ skin: string }>(res, 'A megjelenés mentése nem sikerült')
+  return body.skin
+}
+
 export async function getPublicUsers(): Promise<PublicUser[]> {
   const res = await safeFetch(url('/auth/users-public'))
   return parseJsonOrThrow<PublicUser[]>(res, 'Nem sikerült betölteni a felhasználókat')

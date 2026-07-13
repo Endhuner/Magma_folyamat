@@ -246,7 +246,7 @@ export function InventoryHistoryDialog({
             <Button variant="ghost" onClick={resetFilters} className="flex-1">
               Szűrők törlése
             </Button>
-            <Button variant="outline" onClick={handleExportCsv} title="Export CSV">
+            <Button variant="outline" onClick={handleExportCsv} title="CSV exportálása">
               <Download className="w-4 h-4" />
             </Button>
           </div>

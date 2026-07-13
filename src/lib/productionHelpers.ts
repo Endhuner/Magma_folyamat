@@ -168,3 +168,96 @@ export function groupOrdersByStatus(orders: Order[]): Record<string, Order[]> {
     done: orders.filter((o) => o.status === 'Elkészült'),
   }
 }
+
+/** Határidő-sürgősség a gyártás-kártyák színsávjához (küszöbök a
+ *  filterByPriority-val és a kártya-badge-dzsel egyezők). */
+export type DeadlineUrgency = 'late' | 'urgent' | 'soon' | 'normal'
+
+export function deadlineUrgency(
+  deadline: string | Date | null | undefined,
+  today: Date = new Date(),
+): DeadlineUrgency {
+  if (!deadline) return 'normal'
+  const d = new Date(deadline)
+  if (isNaN(d.getTime())) return 'normal'
+  d.setHours(0, 0, 0, 0)
+  const t = new Date(today)
+  t.setHours(0, 0, 0, 0)
+  const days = Math.round((d.getTime() - t.getTime()) / 86_400_000)
+  if (days < 0) return 'late'
+  if (days <= 3) return 'urgent'
+  if (days <= 7) return 'soon'
+  return 'normal'
+}
+
+/** Bal-szegély szín kategóriánként (piros=késés/sürgős, sárga=7 napon belül, zöld=normál). */
+export const URGENCY_BORDER: Record<DeadlineUrgency, string> = {
+  late: 'border-l-destructive',
+  urgent: 'border-l-destructive',
+  soon: 'border-l-warning',
+  normal: 'border-l-success',
+}
+
+/** Aktuális műszak becslése a gyorsrögzítéshez: 14:00 előtt délelőtt, utána délután. */
+export function currentShiftNow(now: Date = new Date()): 'de' | 'du' {
+  return now.getHours() < 14 ? 'de' : 'du'
+}
+
+/** Egy műszakra javasolt lövésszám — a Vég lövésszám mező alapértelmezett
+ *  javaslata: Kezdő + ennyi. A gépkezelő felülírhatja. */
+export const SUGGESTED_SHIFT_SHOTS = 1440
+
+/** Kronológiai kulcs egy műszakhoz: dátum + de/du sorrend (de < du egy napon). */
+const shiftChronoKey = (date: string, shift: 'de' | 'du') => `${date}${shift === 'du' ? '1' : '0'}`
+
+/**
+ * A LEGUTOLSÓ korábbi műszak egy adott (dátum, műszak) ELŐTT — a folytonos
+ * kezdő lövésszám előtöltéséhez. Nem az első találat: a kronológiailag
+ * legutolsó megelőző műszakot adja, így egy korábbi napra UTÓLAG rögzített
+ * műszak is helyesen frissíti a következő kezdő lövésszámot. undefined, ha nincs.
+ */
+export function previousShiftFor(
+  shifts: ProductionShift[],
+  date: string,
+  shift: 'de' | 'du',
+): ProductionShift | undefined {
+  const cur = shiftChronoKey(date, shift)
+  let best: ProductionShift | undefined
+  for (const s of shifts) {
+    const k = shiftChronoKey(s.date, s.shift)
+    if (k < cur && (!best || k > shiftChronoKey(best.date, best.shift))) best = s
+  }
+  return best
+}
+
+/**
+ * Az utolsó gép ID, amelyet ennél a TERMÉKNÉL használtak — productId alapján az
+ * ÖSSZES rendelés között (nem csak az aktuálisnál). Ha a rendelésnek nincs
+ * productId-ja, csak az aktuális rendelés műszakait nézi. Üres string, ha még
+ * sosem állítottak gépet. A műszakrögzítők ebből töltik elő a Gép mezőt.
+ */
+export function lastMachineIdForProduct(
+  order: Order | null | undefined,
+  orders: Order[],
+  shifts: ProductionShift[],
+): string {
+  if (!order) return ''
+  let candidates: ProductionShift[]
+  if (order.productId) {
+    const sameProductOrderIds = new Set(
+      orders.filter((o) => o.productId === order.productId).map((o) => o.id),
+    )
+    candidates = shifts.filter((s) => sameProductOrderIds.has(s.orderId) && s.machineId)
+  } else {
+    candidates = shifts.filter((s) => s.orderId === order.id && s.machineId)
+  }
+  // Legutolsó: dátum + műszak (de/du), majd createdAt szerint.
+  return (
+    [...candidates].sort((a, b) => {
+      const da = a.date + (a.shift === 'du' ? '1' : '0')
+      const db = b.date + (b.shift === 'du' ? '1' : '0')
+      if (da !== db) return da > db ? -1 : 1
+      return a.createdAt > b.createdAt ? -1 : 1
+    })[0]?.machineId ?? ''
+  )
+}

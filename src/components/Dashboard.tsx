@@ -244,7 +244,7 @@ export function Dashboard({ metrics, productionKPIs, lowStockItems = [], overdue
           <h2 className="text-2xl font-bold tracking-tight mb-1">Gyártás – Elmúlt 7 nap</h2>
           <p className="text-sm text-muted-foreground mb-4">Gyártott darabszám és selejt arány</p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
             <MetricCard
               title="Ma gyártva"
               value={productionKPIs.todayProduced.toLocaleString('hu-HU')}
