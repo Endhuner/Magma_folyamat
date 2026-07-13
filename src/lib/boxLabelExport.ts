@@ -1,4 +1,5 @@
 import { Order, Customer, Product } from './types'
+import { buildPrintPageCss } from './printConfig'
 import { parseFloatSafe } from './helpers'
 import { esc } from './htmlSafe'
 import { findProductForOrder } from './productionHelpers'
@@ -97,7 +98,6 @@ function buildHTMLFull(groups: PageGroup[]): string {
   groups.forEach((group, gi) => {
     const cls = `tpl${gi}`
     const { margins, cols, rows, cellPaddingH, cellPaddingV, templateCss, cellHtml } = group
-    const pageMargin = `${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm`
     const gridH = 297 - parseFloat(margins.top) - parseFloat(margins.bottom)
     const gridW = 210 - parseFloat(margins.left) - parseFloat(margins.right)
 
@@ -120,19 +120,19 @@ function buildHTMLFull(groups: PageGroup[]): string {
     ${scopeCSS(templateCss, cls)}
     `
 
-    group.pages.forEach((page, pi) => {
-      const isLast = gi === groups.length - 1 && pi === group.pages.length - 1
+    group.pages.forEach((page) => {
       const cells = page.map(d => `<div class="label-cell">${applyTemplate(cellHtml, d)}</div>`).join('')
       pageBlocks += `
-    <div class="${cls} label-page" style="@page{margin:${pageMargin}}${isLast ? '' : ''}">
+    <div class="${cls} label-page">
       <div class="label-grid">${cells}</div>
     </div>`
     })
   })
 
-  // Use the first group's margins for @page (most common case: single template)
+  // Az Etikett a SAJÁT (sablon-szintű) margóit tartja — az első csoportét
+  // használjuk az @page-hez (a leggyakoribb eset: egyetlen sablon), a közös
+  // segéddel egységes szerkezetben kibocsátva.
   const firstMargins = groups[0].margins
-  const pageMargin = `${firstMargins.top}mm ${firstMargins.right}mm ${firstMargins.bottom}mm ${firstMargins.left}mm`
 
   return `<!DOCTYPE html>
 <html lang="hu">
@@ -140,13 +140,12 @@ function buildHTMLFull(groups: PageGroup[]): string {
   <meta charset="UTF-8">
   <title>Etiketta</title>
   <style>
-    @page { size: A4; margin: ${pageMargin}; }
+    ${buildPrintPageCss({ size: 'A4', margins: firstMargins })}
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; }
     .label-page { page-break-after: always; }
     .label-page:last-child { page-break-after: avoid; }
     ${cssBlocks}
-    @media print { body { margin: 0; } }
   </style>
 </head>
 <body>

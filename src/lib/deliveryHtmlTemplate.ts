@@ -3,6 +3,7 @@ import { generateDeliveryNoteSequenceNumber, parseFloatSafe } from '@/lib/helper
 import { kvStore } from '@/lib/kvStore'
 import { esc } from '@/lib/htmlSafe'
 import { toast } from 'sonner'
+import { DEFAULT_DOCUMENT_MARGINS, resolveMargins, type PrintMargins } from '@/lib/printConfig'
 
 export interface TemplateStyles {
   primaryColor: string
@@ -396,7 +397,8 @@ function applyDeliveryTemplateData(
   customStyles?: Partial<TemplateStyles>,
   margins?: { top: string, right: string, bottom: string, left: string },
   issueDate?: string,
-  extraItems?: ExtraDeliveryItem[]
+  extraItems?: ExtraDeliveryItem[],
+  documentMargins: PrintMargins = DEFAULT_DOCUMENT_MARGINS
 ): string {
   const firstCustomer = orders[0]?.customer || ''
   const customerInfo = customers.find(c => c.name === firstCustomer)
@@ -521,19 +523,22 @@ function applyDeliveryTemplateData(
   console.log('Használt ownOrderNumber (vevő rendelési szám, csak cikluson KÍVÜL):', ownOrderNumber)
 
   let finalCss = cssTemplate || ''
-  
-  if (margins) {
+
+  // A sablon saját margói nyernek; ha nincsenek, a közös „dokumentum margó".
+  // Mindig injektáljuk, hogy minden szállítólevél azonos margóval nyomtasson.
+  {
+    const m = resolveMargins(margins, documentMargins)
     const marginStyle = `
     @page {
-      margin: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm !important;
+      margin: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm !important;
     }
     body {
       margin: 0 !important;
-      padding: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm !important;
+      padding: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm !important;
     }
     .cmr-document, .delivery-document {
       margin: 0 !important;
-      padding: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm !important;
+      padding: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm !important;
     }
     `
     finalCss = marginStyle + '\n' + finalCss
