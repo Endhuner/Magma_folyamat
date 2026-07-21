@@ -459,6 +459,7 @@ export type AuditEntityType =
   | 'leave'
   | 'datasheet'
   | 'filledForm'
+  | 'tool'
 
 /** Az audit-log műveletek. */
 export type AuditAction =
@@ -628,6 +629,36 @@ export interface FilledForm {
   formType: FilledFormType
   title: string
   data: Record<string, string>
+  createdAt: string
+  updatedAt: string
+}
+
+/** Egy beszerzési hely egy eszközhöz — eszközönként több is lehet. */
+export interface ToolSupplier {
+  name: string
+  website: string
+  email: string
+  contact: string
+}
+
+/** Eszköz mértékegysége. */
+export type ToolUnit = 'db' | 'kg'
+
+/** Eszköz (Készlet → Eszközlista). */
+export interface Tool {
+  id: string
+  partNumber: string
+  name: string
+  manufacturer: string
+  size: string
+  location: string
+  stock: number
+  unit: ToolUnit
+  price: number
+  purchasePrice: number
+  /** ISO dátum (YYYY-MM-DD) vagy üres. */
+  purchasedAt: string
+  suppliers: ToolSupplier[]
   createdAt: string
   updatedAt: string
 }

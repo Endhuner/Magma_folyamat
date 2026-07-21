@@ -356,6 +356,7 @@ export type AuditEntityType =
   | 'leave'
   | 'datasheet'
   | 'filledForm'
+  | 'tool'
 
 /** Az audit-log műveletek. */
 export type AuditAction =

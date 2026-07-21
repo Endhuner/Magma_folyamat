@@ -12,7 +12,7 @@ import type {
   MachineMaintenance, Order, OrderStatus, Product, ProductionDefect,
   ProductionKPIs, ProductionShift,
 } from '@/lib/types'
-import type { AttendanceEntry, DeliveryNote, LeaveRequest, Material, FilledForm, PriceList, ProductDatasheet, Quote } from '@/lib/types'
+import type { AttendanceEntry, DeliveryNote, LeaveRequest, Material, FilledForm, PriceList, ProductDatasheet, Quote, Tool } from '@/lib/types'
 
 /** A MaterialPanel onApply-jának eredmény-alakja (anyag-művelet). */
 type MaterialApply = (result: {
@@ -105,6 +105,9 @@ export interface AppShellValue extends
   materials: Material[]
   handleSaveMaterial: (m: Material) => void
   handleDeleteMaterial: (id: string) => void
+  tools: Tool[]
+  handleSaveTool: (t: Tool) => void
+  handleDeleteTool: (id: string) => void
   deliveryNotes: DeliveryNote[]
   // A Dokumentumok-panel szigorúbb (kötelező) típusait használjuk — a
   // DeliveryNotesTable opcionális propjai ezeket gond nélkül elfogadják.

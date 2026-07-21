@@ -18,12 +18,16 @@ interface NumberStepperProps {
   buttonClassName?: string
   /** A belső <input>-ra mutató ref — célzott fókuszáláshoz. */
   inputRef?: Ref<HTMLInputElement>
+  /** Beviteli mód. 'none' → nem jön fel a rendszer-billentyűzet (saját numpadhoz). */
+  inputMode?: 'numeric' | 'decimal' | 'none'
+  /** A mezőre fókuszáláskor/koppintáskor hívódik — pl. saját numpad megnyitásához. */
+  onInputFocus?: () => void
 }
 
 /** Szám-mező −/+ léptető gombokkal — üzemi (kesztyűs/érintő) bevitelhez. */
 export function NumberStepper({
   value, onChange, step = 1, min = 0, id, placeholder, autoFocus, onKeyDown,
-  inputClassName, buttonClassName, inputRef,
+  inputClassName, buttonClassName, inputRef, inputMode = 'numeric', onInputFocus,
 }: NumberStepperProps) {
   const n = Number.parseInt(value || '0', 10) || 0
   return (
@@ -39,13 +43,15 @@ export function NumberStepper({
         ref={inputRef}
         id={id}
         type="number"
-        inputMode="numeric"
+        inputMode={inputMode}
         min={min}
         value={value}
         placeholder={placeholder}
         autoFocus={autoFocus}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
+        onFocus={onInputFocus}
+        onClick={onInputFocus}
         className={cn('text-center', inputClassName)}
       />
       <Button

@@ -84,6 +84,8 @@ export function entityLabelFor(type: AuditEntityType): string {
       return 'Felhasználó'
     case 'material':
       return 'Anyag'
+    case 'tool':
+      return 'Eszköz'
     case 'shift':
       return 'Műszak'
     case 'defect':
@@ -125,6 +127,19 @@ export function actionLabelFor(action: AuditAction): string {
 
 /** Magyar címkék az ismert mezőkhöz, entitás-típus szerint. */
 const FIELD_LABELS: Record<string, Record<string, string>> = {
+  tool: {
+    partNumber: 'Cikkszám',
+    name: 'Termék megnevezése',
+    manufacturer: 'Gyártó',
+    size: 'Méret',
+    location: 'Elhelyezés',
+    stock: 'Készlet',
+    unit: 'Egység',
+    price: 'Ár',
+    purchasePrice: 'Beszerzési ár',
+    purchasedAt: 'Beszerzés ideje',
+    suppliers: 'Beszerzési helyek',
+  },
   order: {
     customer: 'Vevő',
     productName: 'Termék / rajzszám',

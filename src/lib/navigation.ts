@@ -53,6 +53,7 @@ export const NAV: NavGroup[] = [
     key: 'keszlet', label: 'Készlet', icon: Package, roles: ALL, items: [
       { path: '/keszlet', label: 'Készlet', roles: ALL },
       { path: '/keszlet/anyaglista', label: 'Anyaglista', roles: AO },
+      { path: '/keszlet/eszkozlista', label: 'Eszközlista', roles: AO },
     ],
   },
   { key: 'szallitas', label: 'Szállítás', icon: Truck, roles: ALL, path: '/szallitas' },

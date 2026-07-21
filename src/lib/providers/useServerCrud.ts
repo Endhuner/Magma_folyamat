@@ -238,7 +238,12 @@ export function useServerCrud<T extends { id: string }>(
       method: 'PATCH',
       headers,
       body: patchBody,
-    }).then(() => { inFlightCount.current-- })
+    }).then((saved) => {
+      inFlightCount.current--
+      // Ld. replace(): a szerver friss `updatedAt`-ja nélkül a következő mentés
+      // hamis 409-et kapna, és a módosítás visszaállna.
+      if (saved) setItems(cur => cur.map(it => (it.id === saved.id ? saved : it)))
+    })
       .catch((err: unknown) => {
         inFlightCount.current--
         if (isNetworkError(err)) {
@@ -265,7 +270,15 @@ export function useServerCrud<T extends { id: string }>(
       method: 'PUT',
       headers,
       body: JSON.stringify(item),
-    }).then(() => { inFlightCount.current-- })
+    }).then((saved) => {
+      inFlightCount.current--
+      // A szerver válaszát VISSZAOLVASZTJUK a lokális állapotba — ahogy az add() is teszi.
+      // Enélkül a lokális `updatedAt` a kliens által gyártott érték maradna, a KÖVETKEZŐ
+      // mentés `x-if-unmodified-since` fejléce sosem egyezne a szerverével → 409 → az app
+      // újratölt, a módosítás VISSZAÁLL, és a többi gépre sem jut el. (Élő gyártás:
+      // státusz-váltás "visszaugrott" és a másik gépen nem jelent meg.)
+      if (saved) setItems(cur => cur.map(it => (it.id === saved.id ? saved : it)))
+    })
       .catch((err: unknown) => {
         inFlightCount.current--
         reloadRef.current()

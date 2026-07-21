@@ -133,8 +133,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     } catch {
       return reply.code(401).send({ error: 'Nincs bejelentkezve' })
     }
-    // A friss skin-t (és a helyes id-t) a DB-ből olvassuk — a JWT csak `sub`-ot tárol.
-    const uid = (req.user as unknown as { sub: string }).sub
+    // A friss skin-t a DB-ből olvassuk. FONTOS: az authPlugin `formatUser`-e a JWT
+    // payloadból `{ id, name, role }`-t csinál — a `req.user`-en NINCS `sub` mező.
+    // A korábbi `.sub` olvasás miatt az uid mindig undefined volt, a lekérdezés nem
+    // talált sort, és ez az endpoint érvényes munkamenet mellett is 401-et adott —
+    // ettől lépett ki a felhasználó MINDEN oldal-újratöltéskor.
+    const uid = req.user.id
     const db = getDb()
     const row = db.select().from(users).where(eq(users.id, uid)).get()
     if (!row) return reply.code(401).send({ error: 'Nincs bejelentkezve' })
@@ -152,7 +156,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
     const parsed = skinUpdateSchema.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: 'Érvénytelen skin' })
-    const uid = (req.user as unknown as { sub: string }).sub
+    const uid = req.user.id
     const db = getDb()
     db.update(users)
       .set({ skin: parsed.data.skin, updatedAt: new Date().toISOString() })

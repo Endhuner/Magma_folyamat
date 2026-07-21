@@ -23,6 +23,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NumberStepper } from '@/components/ui/number-stepper'
+import { TouchNumpad, useIsTouch } from '@/components/ui/touch-numpad'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -127,6 +128,12 @@ export function ProductionDetailDialog({
   const endShotsRef = useRef<HTMLInputElement>(null)
   const [endShots, setEndShots] = useState<string>('')
   const [endEdited, setEndEdited] = useState(false)
+  /**
+   * Tableten a lövésszám-mezők NEM hívják fel a rendszer-billentyűzetet
+   * (`inputMode='none'`) — helyette a saját numpad jelenik meg alattuk.
+   */
+  const isTouch = useIsTouch()
+  const [numpadField, setNumpadField] = useState<'start' | 'end' | null>(null)
   const [notes, setNotes] = useState<string>('')
   const [machineId, setMachineId] = useState<string>('')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -200,7 +207,14 @@ export function ProductionDetailDialog({
   // lövésszám, oda visszük a fókuszt (a Kezdő mezőt a fenti effekt tölti ki,
   // ezért a DOM-értéket olvassuk 60 ms után).
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      setNumpadField(null)
+      return
+    }
+    // Érintős eszközön NEM fókuszálunk automatikusan: pont ez hozta fel a
+    // tablet-billentyűzetet. A felhasználó a mezőre koppintva a saját
+    // numpadot kapja.
+    if (isTouch) return
     const t = setTimeout(() => {
       const hasStart = (startShotsRef.current?.value ?? '').trim() !== ''
       if (hasStart) {
@@ -211,7 +225,7 @@ export function ProductionDetailDialog({
       }
     }, 60)
     return () => clearTimeout(t)
-  }, [open])
+  }, [open, isTouch])
 
   const totalShots = useMemo(
     () => orderShifts.reduce((sum, s) => sum + (s.shotsCount || 0), 0),
@@ -541,6 +555,8 @@ export function ProductionDetailDialog({
                 inputRef={startShotsRef}
                 value={startShots}
                 onChange={setStartShots}
+                inputMode={isTouch ? 'none' : 'numeric'}
+                onInputFocus={isTouch ? () => setNumpadField('start') : undefined}
                 placeholder="pl. 12 500"
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit() } }}
                 inputClassName="font-mono h-20 font-bold text-[2.8rem] md:text-[2.8rem] coarse:text-[2.8rem]"
@@ -557,9 +573,11 @@ export function ProductionDetailDialog({
               <NumberStepper
                 id="end-shots"
                 inputRef={endShotsRef}
-                autoFocus
+                autoFocus={!isTouch}
                 value={endShots}
                 onChange={(v) => { setEndShots(v); setEndEdited(true) }}
+                inputMode={isTouch ? 'none' : 'numeric'}
+                onInputFocus={isTouch ? () => setNumpadField('end') : undefined}
                 placeholder="Kezdő + 1440"
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit() } }}
                 inputClassName="font-mono h-20 font-bold text-[2.8rem] md:text-[2.8rem] coarse:text-[2.8rem]"
@@ -567,6 +585,23 @@ export function ProductionDetailDialog({
               />
             </div>
           </div>
+
+          {/* Érintő-numpad a rendszer-billentyűzet helyett (csak tableten). */}
+          {isTouch && numpadField && (
+            <TouchNumpad
+              label={numpadField === 'end' ? 'Vég lövésszám' : 'Kezdő lövésszám'}
+              value={numpadField === 'end' ? endShots : startShots}
+              onChange={(next) => {
+                if (numpadField === 'end') {
+                  setEndShots(next)
+                  setEndEdited(true)
+                } else {
+                  setStartShots(next)
+                }
+              }}
+              onDone={() => setNumpadField(null)}
+            />
+          )}
 
           {/* Kalkuláció előnézet */}
           <div className="bg-muted/40 rounded-lg p-4 space-y-1">

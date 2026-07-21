@@ -36,6 +36,7 @@ import TermekekPage from '@/pages/rendelesek/TermekekPage'
 import AdatlapPage from '@/pages/rendelesek/AdatlapPage'
 import KeszletPage from '@/pages/keszlet/KeszletPage'
 import AnyaglistaPage from '@/pages/keszlet/AnyaglistaPage'
+import EszkozlistaPage from '@/pages/keszlet/EszkozlistaPage'
 import SzallitasPage from '@/pages/SzallitasPage'
 import SzallitolevelPage from '@/pages/dokumentumok/SzallitolevelPage'
 import EtikettPage from '@/pages/dokumentumok/EtikettPage'
@@ -50,7 +51,7 @@ import LomtarPage from '@/pages/beallitasok/LomtarPage'
 import { useIsTouchLayout } from '@/hooks/useMediaQuery'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { OfflineBanner } from '@/components/OfflineBanner'
-import { AttendanceEntry, LeaveRequest, Order, OrderStatus, FilledForm, PriceList, ProductDatasheet, Quote, Customer, Product, DeliveryNote, DeliveryRecipient, ExtraDeliveryItem, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, MachineMaintenance, AppMessage, User, Material, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
+import { AttendanceEntry, LeaveRequest, Order, OrderStatus, FilledForm, PriceList, ProductDatasheet, Quote, Customer, Product, DeliveryNote, DeliveryRecipient, ExtraDeliveryItem, InventoryItem, InventoryTransaction, ProductionShift, ProductionLog, ProductionDefect, Machine, MachineMaintenance, AppMessage, User, Material, Tool, AuditLogEntry, AuditEntityType, AuditAction, AuditFieldChange } from '@/lib/types'
 import { diffObjects, buildAuditEntry, pruneAuditLog, AUDIT_LOG_MAX_ENTRIES } from '@/lib/auditLog'
 import { calculateDashboardMetrics, calculateProductionKPIs, parseYear, stripDiacritics, isDelivered, isInvoiced, isOverdue, generateDeliveryNoteSequenceNumber, parseFloatSafe } from '@/lib/helpers'
 import { producedForOrder, autoStatusForShift, ordersToAutoPause, nextSameProductOrder, splitOverProduction } from '@/lib/productionAutomation'
@@ -240,6 +241,7 @@ function App() {
     // bypass-módban marad amit a user lát (üres) — bypass csak dev/offline.
   }, [auth.status])
   const materialsApi = useServerCrud<Material>('materials', ['material'])
+  const toolsApi = useServerCrud<Tool>('tools', ['tool'])
   // customerSequences: szerver-alapú (megosztott sorszámok minden felhasználónak)
   const [customerSequences, setCustomerSequences] = useCustomerSequences()
   const savedTemplatesApi = useServerCrud<any>('saved-templates', ['order'])
@@ -1766,6 +1768,30 @@ function App() {
     }
   }
 
+  const handleSaveTool = (t: Tool) => {
+    const before = toolsApi.items.find((x) => x.id === t.id)
+    if (before) {
+      toolsApi.replace(t)
+      const changes = diffObjects(
+        before as unknown as Record<string, unknown>,
+        t as unknown as Record<string, unknown>
+      )
+      if (changes.length > 0) {
+        appendAudit('tool', 'Eszköz', t.id, t.name || t.id, 'update', { changes })
+      }
+    } else {
+      toolsApi.add(t)
+      appendAudit('tool', 'Eszköz', t.id, t.name || t.id, 'create', { notes: t.size })
+    }
+  }
+  const handleDeleteTool = (id: string) => {
+    const existing = toolsApi.items.find((x) => x.id === id)
+    toolsApi.remove(id)
+    if (existing) {
+      appendAudit('tool', 'Eszköz', id, existing.name || id, 'delete', { notes: existing.size })
+    }
+  }
+
 
   const handleNewProduct = () => {
     setSelectedProduct(null)
@@ -2558,6 +2584,9 @@ function App() {
     materials: materialsApi.items,
     handleSaveMaterial,
     handleDeleteMaterial,
+    tools: toolsApi.items,
+    handleSaveTool,
+    handleDeleteTool,
     deliveryNotes: deliveryNotes || [],
     handleDeleteDeliveryNote,
     handleUpdateDeliveryNote,
@@ -2631,6 +2660,7 @@ function App() {
           <Route path="/rendelesek/termekek/adatlap/:productId" element={<RequireRole allowed={['admin']}><AdatlapPage /></RequireRole>} />
           <Route path="/keszlet" element={<KeszletPage />} />
           <Route path="/keszlet/anyaglista" element={<RequireRole allowed={['admin', 'operator']}><AnyaglistaPage /></RequireRole>} />
+          <Route path="/keszlet/eszkozlista" element={<RequireRole allowed={['admin', 'operator']}><EszkozlistaPage /></RequireRole>} />
           <Route path="/szallitas" element={<SzallitasPage />} />
           <Route path="/dokumentumok/szallitolevel" element={<RequireRole allowed={['admin']}><SzallitolevelPage /></RequireRole>} />
           <Route path="/dokumentumok/etikett" element={<RequireRole allowed={['admin', 'operator']}><EtikettPage /></RequireRole>} />

@@ -222,17 +222,21 @@ export function ProductionView({
 
     return (
       <Card key={order.id} className={cn("border-l-4 transition-shadow hover:shadow-md", URGENCY_BORDER[deadlineUrgency(order.requiredDate)])}>
-        <CardHeader className="pb-2">
+        {/* grid-cols-[minmax(0,1fr)]: a CardHeader `display:grid`, explicit oszlop
+            nélkül a sáv max-content — a nem tördelő, 46px-es terméknév teljes
+            szélességére nőtt, ezért lógott ki a jobb oldali státusz a keretből. */}
+        <CardHeader className="pb-2 grid-cols-[minmax(0,1fr)]">
           {/* A megnevezés a maradék helyre (a státusz-badge-ek mellé) van
-              középre igazítva — a státusz valódi helyet foglal, nem takarja. */}
-          <div className="flex items-start gap-2">
-            <div className="flex-1 min-w-0 text-center">
+              középre igazítva — a státusz valódi helyet foglal, nem takarja.
+              flex-wrap: szűk kártyán a státusz-blokk a második sorba csúszik. */}
+          <div className="flex flex-wrap items-start gap-2">
+            <div className="flex-1 min-w-[8rem] text-center">
               <CardTitle className="text-[46px] leading-tight font-bold truncate">
                 {order.productName}
               </CardTitle>
               <p className="text-sm text-muted-foreground truncate">{order.customer}</p>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex flex-wrap items-center justify-end gap-1 min-w-0 max-w-full">
               {missingCount > 0 && (
                 <Badge
                   variant="outline"
@@ -316,10 +320,10 @@ export function ProductionView({
                 shift: currentShiftNow(),
               })}
               title="Mai műszakadat gyors rögzítése"
-              className="flex-1 min-w-0 h-12 text-base font-semibold"
+              className="flex-1 min-w-0 h-12 text-sm font-semibold"
             >
-              <Plus className="w-5 h-5 mr-2" weight="bold" />
-              Munkafelvétel
+              <Plus className="w-4 h-4 mr-1.5 shrink-0" weight="bold" />
+              <span className="truncate">Munkafelvétel</span>
             </Button>
             <Button
               size="lg"

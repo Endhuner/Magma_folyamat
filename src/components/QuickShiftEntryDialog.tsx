@@ -72,6 +72,41 @@ export function QuickShiftEntryDialog({
   const [editingId, setEditingId] = useState<string | null>(null)
   const startShotsRef = useRef<HTMLInputElement>(null)
   const endShotsRef = useRef<HTMLInputElement>(null)
+  // Érintőképernyőn (tablet) saját numpad ugrik fel a mező mellé, a rendszer-
+  // billentyűzet helyett — így nem takarja el a Rögzítés gombot.
+  const isTouch = useMemo(
+    () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches,
+    [],
+  )
+  const [activeField, setActiveField] = useState<'start' | 'end' | null>(null)
+  // Első leütés a mező megnyitása után felülírja a régi értéket (kalkulátor-logika).
+  const [freshEntry, setFreshEntry] = useState(true)
+  const numpadRef = useRef<HTMLDivElement>(null)
+
+  const openField = (f: 'start' | 'end') => {
+    setActiveField(f)
+    setFreshEntry(true)
+  }
+
+  const pressNum = (k: string) => {
+    if (!activeField) return
+    const isEnd = activeField === 'end'
+    const cur = isEnd ? endShots : startShots
+    let next: string
+    if (k === 'C') next = ''
+    else if (k === '⌫') next = cur.slice(0, -1)
+    else {
+      const base = freshEntry || cur === '0' ? '' : cur
+      next = (base + k).replace(/^0+(?=\d)/, '')
+    }
+    setFreshEntry(false)
+    if (isEnd) {
+      setEndShots(next)
+      setEndEdited(true)
+    } else {
+      setStartShots(next)
+    }
+  }
 
   // Nyitáskor a dátumot a propból vesszük (mai nap); utána szabadon módosítható.
   useEffect(() => {
@@ -85,8 +120,9 @@ export function QuickShiftEntryDialog({
 
   // Nyitáskor / dátum-váltáskor:
   //  - ha a választott dátumra + műszakra MÁR van rögzítés → betöltjük (szerkesztés),
-  //  - különben a Kezdő lövésszámot az előző műszak vég-számlálójából töltjük ki
-  //    (mint a Gyártásban), a Vég üres marad (jön a javaslat).
+  //  - ha van korábbi műszak → a Kezdő lövésszám annak vég-számlálója (mint a Gyártásban),
+  //  - ha még nincs egy műszak sem (új, „felvéve" rendelés) → a Kezdő 0.
+  //    A Vég üres marad (jön a javaslat), a kurzor a Vég mezőbe kerül (lásd lentebb).
   useEffect(() => {
     if (!open) return
     const existing = orderShifts.find((s) => s.date === dateLocal && s.shift === shift)
@@ -106,7 +142,7 @@ export function QuickShiftEntryDialog({
     }
     setEditingId(null)
     const prevShift = previousShiftFor(orderShifts, dateLocal, shift)
-    setStartShots(prevShift?.endShotsAbsolute != null ? String(prevShift.endShotsAbsolute) : '')
+    setStartShots(prevShift?.endShotsAbsolute != null ? String(prevShift.endShotsAbsolute) : '0')
     setEndShots('')
     setEndEdited(false)
     setNotes('')
@@ -121,10 +157,21 @@ export function QuickShiftEntryDialog({
     setEndShots(startShots.trim() !== '' && Number.isFinite(n) ? String(n + SUGGESTED_SHIFT_SHOTS) : '')
   }, [open, startShots, endEdited])
 
-  // A kurzor a Vég lövésszám mezőbe (ott a következő beírandó szám); ha még
-  // nincs Kezdő, oda visszük — a tablet-billentyűzetet az autoFocus hozza fel.
+  // Nyitáskor:
+  //  - Érintőn (tablet): a Vég mezőre nyitjuk a saját numpadot — nincs rendszer-
+  //    billentyűzet, ezért semmi nem takarja el a Rögzítést.
+  //  - Egéren: a kurzort a Vég mezőbe visszük (ott a következő beírandó szám); ha
+  //    még nincs Kezdő, oda.
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      setActiveField(null)
+      return
+    }
+    if (isTouch) {
+      setActiveField('end')
+      setFreshEntry(true)
+      return
+    }
     const t = setTimeout(() => {
       const hasStart = (startShotsRef.current?.value ?? '').trim() !== ''
       if (hasStart) {
@@ -135,7 +182,14 @@ export function QuickShiftEntryDialog({
       }
     }, 60)
     return () => clearTimeout(t)
-  }, [open])
+  }, [open, isTouch])
+
+  // A megnyíló numpadot görgessük láthatóvá (érintőn).
+  useEffect(() => {
+    if (activeField && numpadRef.current) {
+      numpadRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+  }, [activeField])
 
   const startNum = parseFloatSafe(startShots, 0, { allowNegative: false })
   const endNum = parseFloatSafe(endShots, 0, { allowNegative: false })
@@ -188,15 +242,15 @@ export function QuickShiftEntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl flex flex-col max-h-[92vh] gap-0 p-0">
+        <DialogHeader className="p-6 pb-3 flex-none">
           <DialogTitle className="text-lg">Műszak gyártás</DialogTitle>
           <DialogDescription className="text-base">
             {order.productName} · {order.customer}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-2">
+        <div className="space-y-5 px-6 py-3 overflow-y-auto flex-1 min-h-0">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="grid gap-1">
               <Label htmlFor="qs-date" className="text-sm text-muted-foreground">Dátum</Label>
@@ -248,6 +302,8 @@ export function QuickShiftEntryDialog({
                 onChange={setStartShots}
                 placeholder="pl. 12 500"
                 onKeyDown={handleKeyDown}
+                inputMode={isTouch ? 'none' : 'numeric'}
+                onInputFocus={isTouch ? () => openField('start') : undefined}
                 inputClassName="font-mono font-bold h-20 text-[2.8rem] md:text-[2.8rem] coarse:text-[2.8rem]"
                 buttonClassName="h-20 px-4"
               />
@@ -266,12 +322,71 @@ export function QuickShiftEntryDialog({
                 onChange={(v) => { setEndShots(v); setEndEdited(true) }}
                 placeholder="Kezdő + 1440"
                 onKeyDown={handleKeyDown}
-                autoFocus
+                autoFocus={!isTouch}
+                inputMode={isTouch ? 'none' : 'numeric'}
+                onInputFocus={isTouch ? () => openField('end') : undefined}
                 inputClassName="font-mono font-bold h-20 text-[2.8rem] md:text-[2.8rem] coarse:text-[2.8rem]"
                 buttonClassName="h-20 px-4"
               />
             </div>
           </div>
+
+          {/* Érintő-numpad: a mezőre koppintva ez jön fel a rendszer-billentyűzet
+              helyett, így semmi nem takarja el a Rögzítést. */}
+          {isTouch && activeField && (
+            <div ref={numpadRef} className="rounded-xl border bg-card shadow-md p-3 space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-sm font-medium text-muted-foreground">
+                  {activeField === 'end' ? 'Vég lövésszám' : 'Kezdő lövésszám'}
+                </span>
+                <span className="font-mono font-bold text-xl">
+                  {(activeField === 'end' ? endShots : startShots) || '0'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((k) => (
+                  <Button
+                    key={k}
+                    type="button"
+                    variant="outline"
+                    className="h-16 text-3xl font-semibold"
+                    onClick={() => pressNum(k)}
+                  >
+                    {k}
+                  </Button>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-16 text-xl font-semibold text-orange-600"
+                  onClick={() => pressNum('C')}
+                >
+                  C
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-16 text-3xl font-semibold"
+                  onClick={() => pressNum('0')}
+                >
+                  0
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-16 text-2xl font-semibold text-orange-600"
+                  onClick={() => pressNum('⌫')}
+                  aria-label="Visszatörlés"
+                >
+                  ⌫
+                </Button>
+              </div>
+              <Button type="button" className="w-full h-12 text-base" onClick={() => setActiveField(null)}>
+                <CheckCircle className="w-5 h-5 mr-2" weight="fill" />
+                Kész
+              </Button>
+            </div>
+          )}
 
           <div className="grid gap-2">
             <Label htmlFor="qs-notes" className="text-base">Megjegyzés (opcionális)</Label>
@@ -311,7 +426,7 @@ export function QuickShiftEntryDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="p-6 pt-3 flex-none border-t">
           <Button variant="outline" size="lg" className="text-base" onClick={onClose}>
             Mégse
           </Button>

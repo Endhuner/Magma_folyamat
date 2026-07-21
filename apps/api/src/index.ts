@@ -26,6 +26,7 @@ import { priceListsRoutes } from './routes/priceLists.js'
 import { attendanceRoutes } from './routes/attendance.js'
 import { datasheetsRoutes } from './routes/datasheets.js'
 import { filledFormsRoutes } from './routes/filledForms.js'
+import { toolsRoutes } from './routes/tools.js'
 import { auditLogRoutes } from './routes/auditLog.js'
 import { eventsRoutes } from './routes/events.js'
 import { authRoutes } from './routes/auth.js'
@@ -147,6 +148,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     await api.register(attendanceRoutes)
     await api.register(datasheetsRoutes)
     await api.register(filledFormsRoutes)
+    await api.register(toolsRoutes)
     await api.register(auditLogRoutes)
     await api.register(eventsRoutes)
     await api.register(backupRoutes)
