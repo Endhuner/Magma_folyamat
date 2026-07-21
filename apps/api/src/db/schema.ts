@@ -41,6 +41,7 @@ const AUDIT_ENTITY_TYPES = [
   'defect',
   'inventory',
   'inventoryTransaction',
+  'tool',
 ] as const
 
 const AUDIT_ACTIONS = [
@@ -672,6 +673,27 @@ export const filledForms = sqliteTable('filled_forms', {
   title: text('title').notNull().default(''),
   /** JSON: az űrlap változó mezői. */
   data: text('data').notNull().default('{}'),
+  createdAt: text('created_at').notNull().default(nowDefault),
+  updatedAt: text('updated_at').notNull().default(nowDefault),
+})
+
+/** Eszközlista (Készlet → Eszközlista) — szerszámok, eszközök készlettel és beszerzési helyekkel. */
+export const tools = sqliteTable('tools', {
+  id: text('id').primaryKey(),
+  partNumber: text('part_number').notNull().default(''),
+  name: text('name').notNull().default(''),
+  manufacturer: text('manufacturer').notNull().default(''),
+  size: text('size').notNull().default(''),
+  location: text('location').notNull().default(''),
+  stock: real('stock').notNull().default(0),
+  /** Mértékegység: 'db' vagy 'kg'. */
+  unit: text('unit').notNull().default('db'),
+  price: real('price').notNull().default(0),
+  purchasePrice: real('purchase_price').notNull().default(0),
+  /** Beszerzés ideje — ISO dátum (YYYY-MM-DD), üres ha nincs megadva. */
+  purchasedAt: text('purchased_at').notNull().default(''),
+  /** JSON: [{name, website, email, contact}] — egy eszközhöz több beszerzési hely. */
+  suppliers: text('suppliers').notNull().default('[]'),
   createdAt: text('created_at').notNull().default(nowDefault),
   updatedAt: text('updated_at').notNull().default(nowDefault),
 })

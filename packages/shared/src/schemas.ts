@@ -28,6 +28,7 @@ export const orderStatusSchema = z.enum([
   'Folyamatban',
   'Előkészítve',
   'Javítás alatt',
+  'Elkészült',
 ]).catch('Felvéve')  // ismeretlen státuszt alapértelmezettre állítja visszautasítás helyett
 
 export const orderCreateSchema = z.object({
@@ -564,3 +565,34 @@ export const filledFormCreateSchema = z.object({
   data: z.any().optional(),
 })
 export const filledFormUpdateSchema = filledFormCreateSchema.partial()
+
+// ----------------------------------------------------------------------
+// Tool (Eszközlista)
+// ----------------------------------------------------------------------
+/** Egy beszerzési hely — eszközönként több is lehet. */
+export const toolSupplierSchema = z.object({
+  name: z.string().default(''),
+  website: z.string().default(''),
+  email: z.string().default(''),
+  contact: z.string().default(''),
+})
+
+export const toolUnitSchema = z.enum(['db', 'kg'])
+
+export const toolCreateSchema = z.object({
+  id: z.string().optional(),
+  partNumber: z.string().default(''),
+  // A megnevezés azonosít (audit-log, lomtár neve) — a materials/machines mintája szerint kötelező.
+  name: z.string().min(1),
+  manufacturer: z.string().default(''),
+  size: z.string().default(''),
+  location: z.string().default(''),
+  stock: z.number().default(0),
+  unit: toolUnitSchema.default('db'),
+  price: z.number().default(0),
+  purchasePrice: z.number().default(0),
+  /** ISO dátum (YYYY-MM-DD) vagy üres. */
+  purchasedAt: z.string().default(''),
+  suppliers: z.array(toolSupplierSchema).optional(),
+})
+export const toolUpdateSchema = toolCreateSchema.partial()

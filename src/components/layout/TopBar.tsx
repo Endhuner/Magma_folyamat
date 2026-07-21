@@ -10,6 +10,20 @@ import { titleForPath } from '@/lib/navigation'
 import type { Order } from '@/lib/types'
 import { APP_VERSION } from '@/version'
 
+/**
+ * A fejlécben MINDIG értelmes verziószám látszódjon.
+ *
+ * A build-időben injektált `VITE_APP_VERSION`-t csak akkor fogadjuk el, ha
+ * tényleg verziószámnak néz ki. Kézi `docker build`-nél ugyanis bármi
+ * bekerülhet build-argként (élesben pl. `manual-0025` volt látható, a
+ * Dockerfile alapértelmezése pedig `dev`) — ilyenkor a kódban tárolt
+ * `APP_VERSION` a helyes érték.
+ */
+function displayVersion(): string {
+  const injected = import.meta.env.VITE_APP_VERSION
+  return /^v?\d+\.\d+/.test(injected ?? '') ? injected : APP_VERSION
+}
+
 interface TopBarProps {
   auth: ReturnType<typeof useAuth>
   messagesApi: Parameters<typeof MessageCenter>[0]['messagesApi']
@@ -70,7 +84,7 @@ export function TopBar(props: TopBarProps) {
             </div>
           )}
           <span className="hidden lg:inline text-xs font-mono text-muted-foreground">
-            {import.meta.env.VITE_APP_VERSION || APP_VERSION}
+            {displayVersion()}
           </span>
         </div>
       </div>

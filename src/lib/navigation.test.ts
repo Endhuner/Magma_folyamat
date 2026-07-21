@@ -46,7 +46,7 @@ describe('navigation: jogosultság-mátrix (spec szerint)', () => {
   })
   it('operátor: engedélyezett oldalak', () => {
     for (const p of ['/gyartas', '/gyartas/tervezes', '/gyartas/elozmenyek', '/gyartas/gepek',
-      '/gyartas/karbantartas', '/keszlet', '/keszlet/anyaglista', '/szallitas',
+      '/gyartas/karbantartas', '/keszlet', '/keszlet/anyaglista', '/keszlet/eszkozlista', '/szallitas',
       '/dokumentumok/etikett']) {
       expect(canAccess('operator', p), p).toBe(true)
     }
@@ -56,7 +56,7 @@ describe('navigation: jogosultság-mátrix (spec szerint)', () => {
       expect(canAccess('viewer', p), p).toBe(true)
     }
     for (const p of ['/gyartas/elozmenyek', '/gyartas/gepek', '/gyartas/karbantartas',
-      '/keszlet/anyaglista', '/rendelesek/vevok', '/rendelesek/termekek',
+      '/keszlet/anyaglista', '/keszlet/eszkozlista', '/rendelesek/vevok', '/rendelesek/termekek',
       '/dokumentumok/szallitolevel', '/arajanlat', '/aktualis-arak',
       '/beallitasok/felhasznalok', '/beallitasok/sablonok', '/beallitasok/munkanaptar',
       '/beallitasok/riportok', '/beallitasok/lomtar']) {

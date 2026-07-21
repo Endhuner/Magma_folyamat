@@ -292,6 +292,7 @@ function AuditLogViewImpl({ entries }: AuditLogViewProps) {
     'shift',
     'defect',
     'inventory',
+    'tool',
   ]
   const actions: AuditAction[] = [
     'create',
