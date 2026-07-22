@@ -655,7 +655,6 @@ export interface Tool {
   stock: number
   unit: ToolUnit
   price: number
-  purchasePrice: number
   /** ISO dátum (YYYY-MM-DD) vagy üres. */
   purchasedAt: string
   suppliers: ToolSupplier[]

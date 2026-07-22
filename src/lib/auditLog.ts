@@ -136,7 +136,6 @@ const FIELD_LABELS: Record<string, Record<string, string>> = {
     stock: 'Készlet',
     unit: 'Egység',
     price: 'Ár',
-    purchasePrice: 'Beszerzési ár',
     purchasedAt: 'Beszerzés ideje',
     suppliers: 'Beszerzési helyek',
   },

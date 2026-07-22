@@ -26,7 +26,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Plus, PencilSimple, Trash, MagnifyingGlass, Wrench } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, MagnifyingGlass, Wrench, CopySimple } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { generateId } from '@/lib/generateId'
 import { stripDiacritics } from '@/lib/helpers'
@@ -62,14 +62,13 @@ interface Draft {
   stock: string
   unit: ToolUnit
   price: string
-  purchasePrice: string
   purchasedAt: string
   suppliers: ToolSupplier[]
 }
 
 const emptyDraft = (): Draft => ({
   partNumber: '', name: '', manufacturer: '', size: '', location: '',
-  stock: '', unit: 'db', price: '', purchasePrice: '', purchasedAt: '', suppliers: [],
+  stock: '', unit: 'db', price: '', purchasedAt: '', suppliers: [],
 })
 
 /** "12,5" és "12.5" is elfogadott; üres → 0. */
@@ -91,6 +90,8 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft>(emptyDraft)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  /** A sorra kattintva jelöl ki — az "Eszköz másolása" gomb ezt használja. */
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -112,22 +113,37 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
     setDialogOpen(true)
   }
 
+  /** Egy meglévő eszközből űrlap-adat. A beszerzési helyeket MÁSOLJUK, hogy a
+   *  dialógusbeli szerkesztés ne írja a listát mentés előtt. */
+  const draftFrom = (t: Tool): Draft => ({
+    partNumber: t.partNumber ?? '',
+    name: t.name ?? '',
+    manufacturer: t.manufacturer ?? '',
+    size: t.size ?? '',
+    location: t.location ?? '',
+    stock: t.stock != null ? String(t.stock) : '',
+    unit: UNITS.includes(t.unit) ? t.unit : 'db',
+    price: t.price != null ? String(t.price) : '',
+    purchasedAt: t.purchasedAt ?? '',
+    suppliers: supOf(t).map((s) => ({ ...s })),
+  })
+
   const openEdit = (t: Tool) => {
-    setDraft({
-      partNumber: t.partNumber ?? '',
-      name: t.name ?? '',
-      manufacturer: t.manufacturer ?? '',
-      size: t.size ?? '',
-      location: t.location ?? '',
-      stock: t.stock != null ? String(t.stock) : '',
-      unit: UNITS.includes(t.unit) ? t.unit : 'db',
-      price: t.price != null ? String(t.price) : '',
-      purchasePrice: t.purchasePrice != null ? String(t.purchasePrice) : '',
-      purchasedAt: t.purchasedAt ?? '',
-      // másolat, hogy a dialógusbeli szerkesztés ne írja a listát mentés előtt
-      suppliers: supOf(t).map((s) => ({ ...s })),
-    })
+    setDraft(draftFrom(t))
     setEditingId(t.id)
+    setDialogOpen(true)
+  }
+
+  /**
+   * Kijelölt eszköz másolása: ugyanaz az űrlap nyílik meg a másolt adatokkal,
+   * de ÚJ rekordként (editingId = null). Így mentés előtt még módosítható —
+   * a nevet eleve megjelöljük, hogy ne legyen két azonos nevű sor.
+   */
+  const openCopy = () => {
+    const src = tools.find((t) => t.id === selectedId)
+    if (!src) return
+    setDraft({ ...draftFrom(src), name: `${src.name} (másolat)` })
+    setEditingId(null)
     setDialogOpen(true)
   }
 
@@ -156,7 +172,6 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
       stock: parseNum(draft.stock),
       unit: draft.unit,
       price: parseNum(draft.price),
-      purchasePrice: parseNum(draft.purchasePrice),
       purchasedAt: draft.purchasedAt,
       // a teljesen üres sorokat nem mentjük
       suppliers: draft.suppliers
@@ -188,6 +203,8 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
     setDeleting(true)
     try {
       await Promise.resolve(onDelete(deleteId))
+      // a törölt sor ne maradjon "kijelölve" a másolás gombnak
+      if (selectedId === deleteId) setSelectedId(null)
       toast.success('Eszköz törölve')
     } catch {
       // hívó tósztol
@@ -226,6 +243,16 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
             <Plus className="w-4 h-4" weight="bold" />
             Új eszköz
           </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={openCopy}
+            disabled={!selectedId}
+            title={selectedId ? 'A kijelölt eszköz másolása' : 'Előbb jelöljön ki egy sort a listában'}
+          >
+            <CopySimple className="w-4 h-4" weight="bold" />
+            Eszköz másolása
+          </Button>
         </div>
       </div>
 
@@ -255,7 +282,6 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
                     <TableHead style={{ minWidth: 130 }}>Elhelyezés</TableHead>
                     <TableHead className="text-right" style={{ minWidth: 110 }}>Készlet</TableHead>
                     <TableHead className="text-right" style={{ minWidth: 100 }}>Ár</TableHead>
-                    <TableHead className="text-right" style={{ minWidth: 120 }}>Beszerzési ár</TableHead>
                     <TableHead style={{ minWidth: 130 }}>Beszerzés ideje</TableHead>
                     <TableHead style={{ minWidth: 280 }}>Beszerzési helyek</TableHead>
                     <TableHead className="text-right min-w-[120px] sticky right-0 bg-card">
@@ -272,7 +298,11 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
                     </TableRow>
                   ) : (
                     filtered.map((t) => (
-                      <TableRow key={t.id}>
+                      <TableRow
+                        key={t.id}
+                        onClick={() => setSelectedId(t.id)}
+                        className={`cursor-pointer ${t.id === selectedId ? 'bg-accent/15' : ''}`}
+                      >
                         <TableCell className="font-mono text-sm">
                           {t.partNumber || <span className="text-muted-foreground/60">—</span>}
                         </TableCell>
@@ -290,7 +320,6 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
                           {fmtNum(t.stock ?? 0)} <span className="text-muted-foreground">{t.unit || 'db'}</span>
                         </TableCell>
                         <TableCell className="text-right font-mono">{fmtNum(t.price ?? 0)}</TableCell>
-                        <TableCell className="text-right font-mono">{fmtNum(t.purchasePrice ?? 0)}</TableCell>
                         <TableCell className="whitespace-nowrap">
                           {t.purchasedAt || <span className="text-muted-foreground/60">—</span>}
                         </TableCell>
@@ -305,6 +334,8 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
                                     {s.name || <span className="text-muted-foreground/60">(névtelen)</span>}
                                   </span>
                                   <span className="text-muted-foreground">
+                                    {/* A teljes URL / e-mail cím helyett rövid, kék
+                                        kapaszkodó — a teljes érték a tooltipben. */}
                                     {s.website && (
                                       <>
                                         {' · '}
@@ -312,9 +343,10 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
                                           href={webHref(s.website)}
                                           target="_blank"
                                           rel="noreferrer"
-                                          className="underline hover:text-foreground"
+                                          title={s.website}
+                                          className="text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
                                         >
-                                          {s.website}
+                                          www
                                         </a>
                                       </>
                                     )}
@@ -323,9 +355,10 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
                                         {' · '}
                                         <a
                                           href={`mailto:${s.email}`}
-                                          className="underline hover:text-foreground"
+                                          title={s.email}
+                                          className="text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
                                         >
-                                          {s.email}
+                                          e-mail
                                         </a>
                                       </>
                                     )}
@@ -463,17 +496,6 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
               />
             </div>
             <div>
-              <Label htmlFor="tool-purchase-price" className="mb-1.5 block">Beszerzési ár</Label>
-              <Input
-                id="tool-purchase-price"
-                type="number"
-                min={0}
-                value={draft.purchasePrice}
-                onChange={(e) => setDraft((d) => ({ ...d, purchasePrice: e.target.value }))}
-                placeholder="0"
-              />
-            </div>
-            <div className="md:col-span-2">
               <Label htmlFor="tool-purchased-at" className="mb-1.5 block">Beszerzés ideje</Label>
               <Input
                 id="tool-purchased-at"
