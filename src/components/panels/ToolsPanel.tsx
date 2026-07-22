@@ -7,8 +7,12 @@
  * tud kezelni, és a ~10 másik oldal miatt nem akartuk átszabni. Ezért ez a
  * panel önálló, de vizuálisan pontosan követi a SimpleListView-t.
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -26,10 +30,13 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Plus, PencilSimple, Trash, MagnifyingGlass, Wrench, CopySimple } from '@phosphor-icons/react'
+import {
+  Plus, PencilSimple, Trash, MagnifyingGlass, Wrench, CopySimple, Columns, Check,
+} from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { generateId } from '@/lib/generateId'
 import { stripDiacritics } from '@/lib/helpers'
+import { useKV } from '@/hooks/useKV'
 import type { Tool, ToolSupplier, ToolUnit } from '@/lib/types'
 
 /** Választható mértékegységek. */
@@ -84,6 +91,71 @@ function webHref(url: string): string {
   return /^https?:\/\//i.test(url) ? url : `https://${url}`
 }
 
+/** Üres cella jelölése. */
+const dash = <span className="text-muted-foreground/60">—</span>
+
+/** A beszerzési helyek cellája — rövid, kék www / e-mail linkekkel. */
+function SuppliersCell({ tool }: { tool: Tool }) {
+  const list = supOf(tool)
+  if (list.length === 0) return dash
+  const link = 'text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300'
+  return (
+    <div className="space-y-1">
+      {list.map((s, i) => (
+        <div key={i} className="text-sm leading-tight">
+          <span className="font-medium">
+            {s.name || <span className="text-muted-foreground/60">(névtelen)</span>}
+          </span>
+          <span className="text-muted-foreground">
+            {/* A teljes URL / e-mail cím helyett rövid kapaszkodó; a teljes érték a tooltipben. */}
+            {s.website && (
+              <>{' · '}<a href={webHref(s.website)} target="_blank" rel="noreferrer" title={s.website} className={link}>www</a></>
+            )}
+            {s.email && (
+              <>{' · '}<a href={`mailto:${s.email}`} title={s.email} className={link}>e-mail</a></>
+            )}
+            {s.contact && <> {' · '}{s.contact}</>}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * A táblázat oszlopai — EGYETLEN forrás a fejléchez, a cellákhoz és az
+ * "Oszlopok" kapcsolóhoz. A Műveletek oszlop szándékosan nincs itt: az mindig
+ * látszik, különben nem lehetne szerkeszteni/törölni.
+ */
+interface ToolColumn {
+  key: string
+  label: string
+  minWidth: number
+  headClass?: string
+  cellClass?: string
+  render: (t: Tool) => ReactNode
+}
+
+const COLUMNS: ToolColumn[] = [
+  { key: 'partNumber', label: 'Cikkszám', minWidth: 120, cellClass: 'font-mono text-sm', render: (t) => t.partNumber || dash },
+  { key: 'name', label: 'Termék megnevezése', minWidth: 200, cellClass: 'font-medium', render: (t) => t.name },
+  { key: 'manufacturer', label: 'Gyártó', minWidth: 140, render: (t) => t.manufacturer || dash },
+  { key: 'size', label: 'Méret', minWidth: 110, render: (t) => t.size || dash },
+  { key: 'location', label: 'Elhelyezés', minWidth: 130, render: (t) => t.location || dash },
+  {
+    key: 'stock', label: 'Készlet', minWidth: 110,
+    headClass: 'text-right', cellClass: 'text-right font-mono whitespace-nowrap',
+    render: (t) => <>{fmtNum(t.stock ?? 0)} <span className="text-muted-foreground">{t.unit || 'db'}</span></>,
+  },
+  {
+    key: 'price', label: 'Ár', minWidth: 100,
+    headClass: 'text-right', cellClass: 'text-right font-mono',
+    render: (t) => fmtNum(t.price ?? 0),
+  },
+  { key: 'purchasedAt', label: 'Beszerzés ideje', minWidth: 130, cellClass: 'whitespace-nowrap', render: (t) => t.purchasedAt || dash },
+  { key: 'suppliers', label: 'Beszerzési helyek', minWidth: 280, render: (t) => <SuppliersCell tool={t} /> },
+]
+
 export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsPanelProps) {
   const [search, setSearch] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -92,6 +164,17 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
   const [deleteId, setDeleteId] = useState<string | null>(null)
   /** A sorra kattintva jelöl ki — az "Eszköz másolása" gomb ezt használja. */
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  /**
+   * Elrejtett oszlopok. Gépenként megjegyezve (nézet-beállítás, nem közös adat),
+   * ezért localStorage — mint a rendelés-tábla oszlop-rögzítésénél.
+   */
+  const [hiddenCols, setHiddenCols] = useKV<string[]>('tools-hidden-columns', [])
+  const visibleCols = useMemo(
+    () => COLUMNS.filter((c) => !hiddenCols.includes(c.key)),
+    [hiddenCols],
+  )
+  const toggleCol = (key: string) =>
+    setHiddenCols((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]))
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -253,6 +336,53 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
             <CopySimple className="w-4 h-4" weight="bold" />
             Eszköz másolása
           </Button>
+
+          {/* Oszlop-választó: a szám az AKTÍV / ÖSSZES oszlopot mutatja. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="gap-2"
+                title={`${visibleCols.length} oszlop látszik a ${COLUMNS.length}-ból`}
+              >
+                <Columns className="w-4 h-4" weight="bold" />
+                Oszlopok
+                <span className="ml-0.5 rounded bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold">
+                  {visibleCols.length}/{COLUMNS.length}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel className="flex items-center justify-between">
+                <span>Látható oszlopok</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {visibleCols.length}/{COLUMNS.length} aktív
+                </span>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {COLUMNS.map((c) => {
+                const on = !hiddenCols.includes(c.key)
+                return (
+                  <DropdownMenuItem
+                    key={c.key}
+                    // preventDefault: a menü maradjon nyitva, hogy több oszlop
+                    // egymás után kapcsolható legyen
+                    onSelect={(e) => { e.preventDefault(); toggleCol(c.key) }}
+                    className="flex items-center justify-between gap-3 cursor-pointer"
+                  >
+                    <span className={on ? '' : 'text-muted-foreground'}>{c.label}</span>
+                    {on && (
+                      <Check
+                        className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400"
+                        weight="bold"
+                        aria-label="bekapcsolva"
+                      />
+                    )}
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -275,15 +405,11 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead style={{ minWidth: 120 }}>Cikkszám</TableHead>
-                    <TableHead style={{ minWidth: 200 }}>Termék megnevezése</TableHead>
-                    <TableHead style={{ minWidth: 140 }}>Gyártó</TableHead>
-                    <TableHead style={{ minWidth: 110 }}>Méret</TableHead>
-                    <TableHead style={{ minWidth: 130 }}>Elhelyezés</TableHead>
-                    <TableHead className="text-right" style={{ minWidth: 110 }}>Készlet</TableHead>
-                    <TableHead className="text-right" style={{ minWidth: 100 }}>Ár</TableHead>
-                    <TableHead style={{ minWidth: 130 }}>Beszerzés ideje</TableHead>
-                    <TableHead style={{ minWidth: 280 }}>Beszerzési helyek</TableHead>
+                    {visibleCols.map((c) => (
+                      <TableHead key={c.key} className={c.headClass} style={{ minWidth: c.minWidth }}>
+                        {c.label}
+                      </TableHead>
+                    ))}
                     <TableHead className="text-right min-w-[120px] sticky right-0 bg-card">
                       Műveletek
                     </TableHead>
@@ -292,7 +418,7 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
                 <TableBody>
                   {noHits ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
+                      <TableCell colSpan={visibleCols.length + 1} className="text-center text-muted-foreground py-10">
                         Nincs találat a keresésre.
                       </TableCell>
                     </TableRow>
@@ -303,72 +429,11 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
                         onClick={() => setSelectedId(t.id)}
                         className={`cursor-pointer ${t.id === selectedId ? 'bg-accent/15' : ''}`}
                       >
-                        <TableCell className="font-mono text-sm">
-                          {t.partNumber || <span className="text-muted-foreground/60">—</span>}
-                        </TableCell>
-                        <TableCell className="font-medium">{t.name}</TableCell>
-                        <TableCell>
-                          {t.manufacturer || <span className="text-muted-foreground/60">—</span>}
-                        </TableCell>
-                        <TableCell>
-                          {t.size || <span className="text-muted-foreground/60">—</span>}
-                        </TableCell>
-                        <TableCell>
-                          {t.location || <span className="text-muted-foreground/60">—</span>}
-                        </TableCell>
-                        <TableCell className="text-right font-mono whitespace-nowrap">
-                          {fmtNum(t.stock ?? 0)} <span className="text-muted-foreground">{t.unit || 'db'}</span>
-                        </TableCell>
-                        <TableCell className="text-right font-mono">{fmtNum(t.price ?? 0)}</TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {t.purchasedAt || <span className="text-muted-foreground/60">—</span>}
-                        </TableCell>
-                        <TableCell>
-                          {supOf(t).length === 0 ? (
-                            <span className="text-muted-foreground/60">—</span>
-                          ) : (
-                            <div className="space-y-1">
-                              {supOf(t).map((s, i) => (
-                                <div key={i} className="text-sm leading-tight">
-                                  <span className="font-medium">
-                                    {s.name || <span className="text-muted-foreground/60">(névtelen)</span>}
-                                  </span>
-                                  <span className="text-muted-foreground">
-                                    {/* A teljes URL / e-mail cím helyett rövid, kék
-                                        kapaszkodó — a teljes érték a tooltipben. */}
-                                    {s.website && (
-                                      <>
-                                        {' · '}
-                                        <a
-                                          href={webHref(s.website)}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          title={s.website}
-                                          className="text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
-                                        >
-                                          www
-                                        </a>
-                                      </>
-                                    )}
-                                    {s.email && (
-                                      <>
-                                        {' · '}
-                                        <a
-                                          href={`mailto:${s.email}`}
-                                          title={s.email}
-                                          className="text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
-                                        >
-                                          e-mail
-                                        </a>
-                                      </>
-                                    )}
-                                    {s.contact && <> {' · '}{s.contact}</>}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </TableCell>
+                        {visibleCols.map((c) => (
+                          <TableCell key={c.key} className={c.cellClass}>
+                            {c.render(t)}
+                          </TableCell>
+                        ))}
                         <TableCell className="text-right sticky right-0 bg-card">
                           <div className="flex items-center justify-end gap-1">
                             <Button
