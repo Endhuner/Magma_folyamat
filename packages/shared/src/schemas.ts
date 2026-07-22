@@ -590,7 +590,6 @@ export const toolCreateSchema = z.object({
   stock: z.number().default(0),
   unit: toolUnitSchema.default('db'),
   price: z.number().default(0),
-  purchasePrice: z.number().default(0),
   /** ISO dátum (YYYY-MM-DD) vagy üres. */
   purchasedAt: z.string().default(''),
   suppliers: z.array(toolSupplierSchema).optional(),
