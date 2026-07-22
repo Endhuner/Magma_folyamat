@@ -37,10 +37,14 @@ import { toast } from 'sonner'
 import { generateId } from '@/lib/generateId'
 import { stripDiacritics } from '@/lib/helpers'
 import { useKV } from '@/hooks/useKV'
-import type { Tool, ToolSupplier, ToolUnit } from '@/lib/types'
+import type { Tool, ToolSupplier, ToolUnit, ToolCurrency } from '@/lib/types'
 
 /** Választható mértékegységek. */
 const UNITS: ToolUnit[] = ['db', 'kg']
+
+/** Választható pénznemek és a megjelenített utótagjuk. */
+const CURRENCIES: ToolCurrency[] = ['HUF', 'EUR']
+const CURRENCY_SUFFIX: Record<ToolCurrency, string> = { HUF: 'Ft', EUR: '€' }
 
 export interface ToolsPanelProps {
   tools: Tool[]
@@ -69,13 +73,14 @@ interface Draft {
   stock: string
   unit: ToolUnit
   price: string
+  currency: ToolCurrency
   purchasedAt: string
   suppliers: ToolSupplier[]
 }
 
 const emptyDraft = (): Draft => ({
   partNumber: '', name: '', manufacturer: '', size: '', location: '',
-  stock: '', unit: 'db', price: '', purchasedAt: '', suppliers: [],
+  stock: '', unit: 'db', price: '', currency: 'HUF', purchasedAt: '', suppliers: [],
 })
 
 /** "12,5" és "12.5" is elfogadott; üres → 0. */
@@ -86,6 +91,12 @@ function parseNum(raw: string): number {
 
 const fmtNum = (n: number) => n.toLocaleString('hu-HU', { maximumFractionDigits: 2 })
 
+/** Ár a pénznem utótagjával. Ha nincs összeg, semmit nem írunk ki. */
+function fmtPrice(t: Tool): string | null {
+  if (!t.price) return null
+  return `${fmtNum(t.price)} ${CURRENCY_SUFFIX[t.currency] ?? CURRENCY_SUFFIX.HUF}`
+}
+
 /** Csak akkor csinálunk linket, ha tényleg van mit megnyitni. */
 function webHref(url: string): string {
   return /^https?:\/\//i.test(url) ? url : `https://${url}`
@@ -94,30 +105,44 @@ function webHref(url: string): string {
 /** Üres cella jelölése. */
 const dash = <span className="text-muted-foreground/60">—</span>
 
-/** A beszerzési helyek cellája — rövid, kék www / e-mail linkekkel. */
+/**
+ * A beszerzési helyek cellája — rövid, kék www / e-mail linkekkel.
+ *
+ * CSAK a kitöltött részek jelennek meg: ami üresen maradt (cégnév, webcím,
+ * e-mail, telefon), arról semmi nem íródik ki — se helykitöltő szöveg, se
+ * lógó " · " elválasztó. Ezért a darabokat előbb összegyűjtjük, és csak a
+ * meglévőket fűzzük össze.
+ */
 function SuppliersCell({ tool }: { tool: Tool }) {
   const list = supOf(tool)
   if (list.length === 0) return dash
   const link = 'text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300'
   return (
     <div className="space-y-1">
-      {list.map((s, i) => (
-        <div key={i} className="text-sm leading-tight">
-          <span className="font-medium">
-            {s.name || <span className="text-muted-foreground/60">(névtelen)</span>}
-          </span>
-          <span className="text-muted-foreground">
-            {/* A teljes URL / e-mail cím helyett rövid kapaszkodó; a teljes érték a tooltipben. */}
-            {s.website && (
-              <>{' · '}<a href={webHref(s.website)} target="_blank" rel="noreferrer" title={s.website} className={link}>www</a></>
-            )}
-            {s.email && (
-              <>{' · '}<a href={`mailto:${s.email}`} title={s.email} className={link}>e-mail</a></>
-            )}
-            {s.contact && <> {' · '}{s.contact}</>}
-          </span>
-        </div>
-      ))}
+      {list.map((s, i) => {
+        const parts: ReactNode[] = []
+        if (s.name) parts.push(<span key="n" className="font-medium text-foreground">{s.name}</span>)
+        if (s.website) {
+          parts.push(
+            <a key="w" href={webHref(s.website)} target="_blank" rel="noreferrer" title={s.website} className={link}>www</a>
+          )
+        }
+        if (s.email) {
+          parts.push(<a key="e" href={`mailto:${s.email}`} title={s.email} className={link}>e-mail</a>)
+        }
+        if (s.contact) parts.push(<span key="c">{s.contact}</span>)
+        if (parts.length === 0) return null
+        return (
+          <div key={i} className="text-sm leading-tight text-muted-foreground">
+            {parts.map((p, j) => (
+              <span key={j}>
+                {j > 0 && ' · '}
+                {p}
+              </span>
+            ))}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -148,9 +173,9 @@ const COLUMNS: ToolColumn[] = [
     render: (t) => <>{fmtNum(t.stock ?? 0)} <span className="text-muted-foreground">{t.unit || 'db'}</span></>,
   },
   {
-    key: 'price', label: 'Ár', minWidth: 100,
-    headClass: 'text-right', cellClass: 'text-right font-mono',
-    render: (t) => fmtNum(t.price ?? 0),
+    key: 'price', label: 'Ár', minWidth: 110,
+    headClass: 'text-right', cellClass: 'text-right font-mono whitespace-nowrap',
+    render: (t) => fmtPrice(t) ?? dash,
   },
   { key: 'purchasedAt', label: 'Beszerzés ideje', minWidth: 130, cellClass: 'whitespace-nowrap', render: (t) => t.purchasedAt || dash },
   { key: 'suppliers', label: 'Beszerzési helyek', minWidth: 280, render: (t) => <SuppliersCell tool={t} /> },
@@ -207,6 +232,7 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
     stock: t.stock != null ? String(t.stock) : '',
     unit: UNITS.includes(t.unit) ? t.unit : 'db',
     price: t.price != null ? String(t.price) : '',
+    currency: CURRENCIES.includes(t.currency) ? t.currency : 'HUF',
     purchasedAt: t.purchasedAt ?? '',
     suppliers: supOf(t).map((s) => ({ ...s })),
   })
@@ -255,6 +281,7 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
       stock: parseNum(draft.stock),
       unit: draft.unit,
       price: parseNum(draft.price),
+      currency: draft.currency,
       purchasedAt: draft.purchasedAt,
       // a teljesen üres sorokat nem mentjük
       suppliers: draft.suppliers
@@ -559,6 +586,24 @@ export function ToolsPanel({ tools, onSave, onDelete, canDelete = true }: ToolsP
                 onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))}
                 placeholder="0"
               />
+            </div>
+            <div>
+              <Label htmlFor="tool-currency" className="mb-1.5 block">Pénznem</Label>
+              <Select
+                value={draft.currency}
+                onValueChange={(v) => setDraft((d) => ({ ...d, currency: v as ToolCurrency }))}
+              >
+                <SelectTrigger id="tool-currency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c} ({CURRENCY_SUFFIX[c]})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="tool-purchased-at" className="mb-1.5 block">Beszerzés ideje</Label>

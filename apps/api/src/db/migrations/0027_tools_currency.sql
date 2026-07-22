@@ -1,0 +1,1 @@
+ALTER TABLE `tools` ADD COLUMN `currency` text DEFAULT 'HUF' NOT NULL;

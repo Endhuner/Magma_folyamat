@@ -644,6 +644,9 @@ export interface ToolSupplier {
 /** Eszköz mértékegysége. */
 export type ToolUnit = 'db' | 'kg'
 
+/** Az ár pénzneme. */
+export type ToolCurrency = 'HUF' | 'EUR'
+
 /** Eszköz (Készlet → Eszközlista). */
 export interface Tool {
   id: string
@@ -655,6 +658,7 @@ export interface Tool {
   stock: number
   unit: ToolUnit
   price: number
+  currency: ToolCurrency
   /** ISO dátum (YYYY-MM-DD) vagy üres. */
   purchasedAt: string
   suppliers: ToolSupplier[]

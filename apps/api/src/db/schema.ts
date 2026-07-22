@@ -689,6 +689,8 @@ export const tools = sqliteTable('tools', {
   /** Mértékegység: 'db' vagy 'kg'. */
   unit: text('unit').notNull().default('db'),
   price: real('price').notNull().default(0),
+  /** Az ár pénzneme: 'HUF' vagy 'EUR'. */
+  currency: text('currency').notNull().default('HUF'),
   /** Beszerzés ideje — ISO dátum (YYYY-MM-DD), üres ha nincs megadva. */
   purchasedAt: text('purchased_at').notNull().default(''),
   /** JSON: [{name, website, email, contact}] — egy eszközhöz több beszerzési hely. */
