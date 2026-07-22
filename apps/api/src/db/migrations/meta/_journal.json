@@ -190,6 +190,13 @@
       "when": 1784060000000,
       "tag": "0026_tools",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1784070000000,
+      "tag": "0027_tools_currency",
+      "breakpoints": true
     }
   ]
 }

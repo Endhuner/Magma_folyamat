@@ -578,6 +578,7 @@ export const toolSupplierSchema = z.object({
 })
 
 export const toolUnitSchema = z.enum(['db', 'kg'])
+export const toolCurrencySchema = z.enum(['HUF', 'EUR'])
 
 export const toolCreateSchema = z.object({
   id: z.string().optional(),
@@ -590,6 +591,7 @@ export const toolCreateSchema = z.object({
   stock: z.number().default(0),
   unit: toolUnitSchema.default('db'),
   price: z.number().default(0),
+  currency: toolCurrencySchema.default('HUF'),
   /** ISO dátum (YYYY-MM-DD) vagy üres. */
   purchasedAt: z.string().default(''),
   suppliers: z.array(toolSupplierSchema).optional(),
